@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 
 from core.client import create_client
+from core.task_event import TaskEventEmitter
 from linear_updater import (
     LinearTaskState,
     is_linear_enabled,
@@ -536,6 +537,18 @@ async def run_autonomous_agent(
 
         # Handle session status
         if status == "complete":
+            # Emit ALL_SUBTASKS_DONE for XState machine transition
+            # This signals frontend that coding is done and QA should begin
+            task_emitter = TaskEventEmitter.from_spec_dir(spec_dir)
+            completed, total = count_subtasks(spec_dir)
+            task_emitter.emit(
+                "ALL_SUBTASKS_DONE",
+                {
+                    "completedSubtasks": completed,
+                    "totalSubtasks": total,
+                },
+            )
+
             # Don't emit COMPLETE here - subtasks are done but QA hasn't run yet
             # QA loop will emit COMPLETE after actual approval
             print_build_complete_banner(spec_dir)
