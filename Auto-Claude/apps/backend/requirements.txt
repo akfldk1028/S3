@@ -33,3 +33,6 @@ pydantic>=2.0.0
 
 # Error tracking (optional - requires SENTRY_DSN environment variable)
 sentry-sdk>=2.0.0
+
+# File system watching for Task Daemon (24/7 background service)
+watchdog>=4.0.0

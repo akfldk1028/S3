@@ -56,6 +56,30 @@ python run.py --spec 001
 | `--list-worktrees` | List all worktrees |
 | `--help` | Show all options |
 
+## 24/7 Task Daemon
+
+Run Auto-Claude without UI for headless, unattended operation:
+
+```bash
+# Basic daemon
+python runners/daemon_runner.py --project-dir "C:\path\to\project"
+
+# Parallel execution with worktree isolation
+python runners/daemon_runner.py --project-dir "..." \
+    --max-concurrent 4 \
+    --use-worktrees \
+    --status-file status.json
+```
+
+Features:
+- Watches `.auto-claude/specs/` for new tasks
+- Parallel task execution with priority queue
+- Git worktree isolation for concurrent tasks
+- Auto-recovery for stuck tasks
+- Claude CLI plan mode for design tasks
+
+See `services/README.md` for full documentation.
+
 ## Configuration
 
 Optional `.env` settings:
@@ -92,6 +116,8 @@ backend/
 ├── project/         # Project detection
 ├── prompts/         # Prompt templates
 ├── qa/              # QA validation
+├── runners/         # Standalone CLI runners
+├── services/        # 24/7 background services (Task Daemon)
 ├── spec/            # Spec management
 └── ui/              # Terminal UI
 ```
