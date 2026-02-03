@@ -3,8 +3,10 @@ Subtask Management Tools
 ========================
 
 Tools for managing subtask status in implementation_plan.json.
+Also includes tools for creating child specs (for large architecture projects).
 """
 
+import asyncio
 import json
 import logging
 from datetime import datetime, timezone
@@ -200,5 +202,210 @@ def create_subtask_tools(spec_dir: Path, project_dir: Path) -> list:
             }
 
     tools.append(update_subtask_status)
+
+    # -------------------------------------------------------------------------
+    # Tool: create_child_spec
+    # -------------------------------------------------------------------------
+    @tool(
+        "create_child_spec",
+        """Create a new implementation spec (child task) that will be executed by the daemon.
+
+Use this when you are a Design Agent breaking down a large project into parallel modules.
+Each child spec will be picked up by the Task Daemon and executed independently.
+
+Example:
+    create_child_spec({
+        "task_description": "Implement user authentication API",
+        "priority": 1,
+        "task_type": "impl",
+        "depends_on": ["002-database-schema"],
+        "files_to_modify": ["src/auth/api.py", "src/auth/models.py"]
+    })
+""",
+        {
+            "task_description": str,
+            "priority": int,
+            "task_type": str,
+            "depends_on": list,
+            "files_to_modify": list,
+            "acceptance_criteria": list,
+        },
+    )
+    async def create_child_spec(args: dict[str, Any]) -> dict[str, Any]:
+        """Create a new child spec for parallel execution."""
+        task_description = args.get("task_description")
+        if not task_description:
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Error: task_description is required",
+                    }
+                ]
+            }
+
+        priority = args.get("priority", 2)
+        task_type = args.get("task_type", "impl")
+        depends_on = args.get("depends_on") or []
+        files_to_modify = args.get("files_to_modify") or []
+        acceptance_criteria = args.get("acceptance_criteria") or []
+
+        # Get parent spec ID from current spec directory
+        parent_spec_id = spec_dir.name
+
+        try:
+            # Import SpecFactory
+            from services.spec_factory import SpecFactory
+
+            factory = SpecFactory(project_dir)
+
+            # Create the child spec
+            child_spec_dir = asyncio.get_event_loop().run_until_complete(
+                factory.create_child_spec(
+                    parent_spec_id=parent_spec_id,
+                    task_description=task_description,
+                    priority=priority,
+                    task_type=task_type,
+                    depends_on=depends_on,
+                    files_to_modify=files_to_modify,
+                    acceptance_criteria=acceptance_criteria,
+                )
+            )
+
+            child_spec_id = child_spec_dir.name
+
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Successfully created child spec '{child_spec_id}'.\n\n"
+                        f"- Task: {task_description}\n"
+                        f"- Priority: {priority}\n"
+                        f"- Type: {task_type}\n"
+                        f"- Depends on: {depends_on or 'None'}\n"
+                        f"- Parent: {parent_spec_id}\n\n"
+                        f"The spec will be picked up by the Task Daemon automatically.",
+                    }
+                ]
+            }
+
+        except Exception as e:
+            logging.error(f"Failed to create child spec: {e}")
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Error creating child spec: {e}",
+                    }
+                ]
+            }
+
+    tools.append(create_child_spec)
+
+    # -------------------------------------------------------------------------
+    # Tool: create_batch_child_specs
+    # -------------------------------------------------------------------------
+    @tool(
+        "create_batch_child_specs",
+        """Create multiple child specs at once for parallel execution.
+
+Use this when you have analyzed a large project and want to create multiple
+implementation tasks in one go.
+
+Example:
+    create_batch_child_specs({
+        "specs": [
+            {
+                "task": "Backend API module",
+                "priority": 1,
+                "task_type": "impl"
+            },
+            {
+                "task": "Database schema",
+                "priority": 1,
+                "task_type": "impl"
+            },
+            {
+                "task": "Frontend UI components",
+                "priority": 2,
+                "depends_on": ["002-backend-api"]
+            },
+            {
+                "task": "Integration tests",
+                "priority": 3,
+                "depends_on": ["002-backend-api", "004-frontend-ui"]
+            }
+        ]
+    })
+""",
+        {"specs": list},
+    )
+    async def create_batch_child_specs(args: dict[str, Any]) -> dict[str, Any]:
+        """Create multiple child specs for parallel execution."""
+        specs_list = args.get("specs") or []
+        if not specs_list:
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Error: specs list is required and cannot be empty",
+                    }
+                ]
+            }
+
+        parent_spec_id = spec_dir.name
+
+        try:
+            from services.spec_factory import SpecFactory
+
+            factory = SpecFactory(project_dir)
+
+            # Create all specs
+            created_specs = asyncio.get_event_loop().run_until_complete(
+                factory.create_batch_specs(
+                    parent_spec_id=parent_spec_id,
+                    specs=specs_list,
+                )
+            )
+
+            # Build result message
+            result_lines = [
+                f"Successfully created {len(created_specs)} child specs:",
+                "",
+            ]
+
+            for i, spec_dir_path in enumerate(created_specs):
+                spec_def = specs_list[i] if i < len(specs_list) else {}
+                task = spec_def.get("task") or spec_def.get("task_description", "Unknown")
+                result_lines.append(f"  {i+1}. {spec_dir_path.name}")
+                result_lines.append(f"     Task: {task}")
+
+            result_lines.extend([
+                "",
+                f"Parent spec: {parent_spec_id}",
+                "All specs will be picked up by the Task Daemon automatically.",
+            ])
+
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "\n".join(result_lines),
+                    }
+                ]
+            }
+
+        except Exception as e:
+            logging.error(f"Failed to create batch specs: {e}")
+            return {
+                "content": [
+                    {
+                        "type": "text",
+                        "text": f"Error creating batch specs: {e}",
+                    }
+                ]
+            }
+
+    tools.append(create_batch_child_specs)
 
     return tools

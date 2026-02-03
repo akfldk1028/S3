@@ -174,12 +174,74 @@ Status file contains:
 services/
 ├── __init__.py          # Module exports
 ├── task_daemon.py       # Core 24/7 daemon
+├── spec_factory.py      # Programmatic spec creation for design agents
 ├── orchestrator.py      # Service coordination
 ├── recovery.py          # Stuck task recovery
 └── context.py           # Service context
 
 runners/
 └── daemon_runner.py     # CLI entry point
+
+prompts/
+└── design_architect.md  # Design agent prompt for large projects
+```
+
+## Spec Factory (For Large Architecture Projects)
+
+The `SpecFactory` enables design agents to create multiple child specs programmatically:
+
+```python
+from services import SpecFactory
+
+factory = SpecFactory(project_dir)
+
+# Single child spec
+spec_dir = await factory.create_child_spec(
+    parent_spec_id="001-design",
+    task_description="Implement user auth module",
+    priority=1,
+    depends_on=["002-database"],
+)
+
+# Batch creation (recommended)
+specs = await factory.create_batch_specs(
+    parent_spec_id="001-design",
+    specs=[
+        {"task": "Database schema", "priority": 0},
+        {"task": "Backend API", "priority": 1, "depends_on": ["002-database"]},
+        {"task": "Frontend UI", "priority": 1, "depends_on": ["002-database"]},
+        {"task": "Integration tests", "priority": 2, "depends_on": ["003-backend", "004-frontend"]},
+    ]
+)
+```
+
+### Agent Tools
+
+Design agents have access to these tools via `subtask.py`:
+
+| Tool | Description |
+|------|-------------|
+| `create_child_spec` | Create single child spec |
+| `create_batch_child_specs` | Create multiple specs at once |
+| `update_subtask_status` | Update subtask status |
+
+### Large Project Workflow
+
+```
+1. User creates "design" task
+   └── taskType: "design", priority: 0
+
+2. Design Agent analyzes project
+   └── Uses plan mode (read-only exploration)
+
+3. Design Agent calls create_batch_child_specs
+   └── Creates N child specs with dependencies
+
+4. Task Daemon picks up child specs
+   └── Runs them in parallel (respecting dependencies)
+
+5. All child specs complete
+   └── Integration task runs (if configured)
 ```
 
 ## Claude CLI Integration
