@@ -185,19 +185,42 @@ Status file contains:
 
 ```
 services/
-├── __init__.py          # Module exports
-├── task_daemon.py       # Core 24/7 daemon
-├── spec_factory.py      # Programmatic spec creation for design agents
-├── orchestrator.py      # Service coordination
-├── recovery.py          # Stuck task recovery
-└── context.py           # Service context
+├── __init__.py              # Public API (re-exports all)
+├── task_daemon/             # Modular daemon package
+│   ├── __init__.py         # TaskDaemon class (slim orchestration)
+│   ├── types.py            # Enums, constants, data classes
+│   ├── watcher.py          # File system watching (SpecsWatcher)
+│   ├── executor.py         # Task execution (run.py, Claude CLI)
+│   └── state.py            # State persistence (StateManager)
+├── spec_factory.py          # Programmatic spec creation
+├── orchestrator.py          # Service coordination
+├── recovery.py              # Recovery utilities
+└── context.py               # Service context
 
 runners/
-└── daemon_runner.py     # CLI entry point
+└── daemon_runner.py         # CLI entry point
 
 prompts/
-└── design_architect.md  # Design agent prompt for large projects
+└── design_architect.md      # Design agent prompt
 ```
+
+### Module Responsibilities
+
+| Module | Responsibility | Lines |
+|--------|----------------|-------|
+| `types.py` | Enums, constants, data classes | ~200 |
+| `watcher.py` | File system watching, debouncing | ~100 |
+| `executor.py` | Command building, process spawning | ~200 |
+| `state.py` | State persistence, recovery counts | ~150 |
+| `__init__.py` | Orchestration, lifecycle | ~400 |
+
+### Benefits of Modular Structure
+
+1. **Single Responsibility**: Each module handles one concern
+2. **Easy Testing**: Test individual modules in isolation
+3. **Easy Extension**: Add new executors without touching other code
+4. **Maintainability**: Smaller files are easier to understand
+5. **Reusability**: StateManager can be used elsewhere
 
 ## Spec Factory (For Large Architecture Projects)
 
