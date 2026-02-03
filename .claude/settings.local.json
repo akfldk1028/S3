@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:storage.googleapis.com)",
+      "Bash(powershell -Command:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File \"C:\\\\DK\\\\download_flutter.ps1\")",
+      "Bash(curl:*)",
+      "Bash(powershell -ExecutionPolicy Bypass -File:*)",
+      "Bash(C:\\\\DK\\\\flutter\\\\bin\\\\flutter.bat doctor:*)",
+      "Bash(cmd /c \"C:\\\\DK\\\\flutter\\\\bin\\\\flutter.bat doctor -v\")",
+      "Bash(dir /b \"C:\\\\DK\\\\S3\\\\S3\")",
+      "WebFetch(domain:github.com)",
+      "Bash(where:*)",
+      "Bash(git clone:*)",
+      "Bash(node:*)",
+      "Bash(npm --version:*)",
+      "Bash(msiexec /i \"C:\\\\DK\\\\node-v24.13.0-x64.msi\" /qn /norestart)",
+      "Bash(ls \"C:\\\\DK\\\\S3\\\\S3\\\\Auto-Claude\\\\shared_docs\"\" 2>/dev/null || echo \"No shared_docs found \")",
+      "Bash(dir /s /b \"C:\\\\DK\\\\S3\\\\S3\\\\Auto-Claude\\\\apps\\\\backend\\\\prompts\")",
+      "Bash(dir /s /b \"C:\\\\DK\\\\S3\\\\S3\\\\Auto-Claude\\\\apps\\\\backend\")",
+      "Bash(findstr:*)",
+      "Bash(\".venv\\\\Scripts\\\\python.exe\":*)",
+      "Bash(\".venv\\\\Scripts\\\\python.exe\" -c \"\nfrom agents.tools_pkg.models import AGENT_CONFIGS, list_custom_agents\n\nprint\\(''Custom agents loaded:''\\)\nfor a in list_custom_agents\\(\\):\n    print\\(f''  - {a[\"\"agent_type\"\"]}''\\)\n\nprint\\(f''\\\\nTotal: {len\\(AGENT_CONFIGS\\)} agents''\\)\nprint\\(''Conflict test passed!''\\)\n\")",
+      "Bash(dir /s /b \"C:\\\\DK\\\\S3\\\\S3\\\\frontend\\\\lib\")",
+      "WebFetch(domain:codewithandrea.com)",
+      "Bash(for dir in common_widgets constants routing utils features/auth/pages/providers features/auth/pages/screens features/auth/pages/widgets features/auth/queries features/auth/mutations features/auth/models features/home/pages/providers features/home/pages/screens features/home/pages/widgets features/home/queries features/home/mutations features/home/models features/profile/pages/providers features/profile/pages/screens features/profile/pages/widgets features/profile/queries features/profile/mutations features/profile/models)",
+      "Bash(do touch \"$dir/.gitkeep\")",
+      "Bash(done)",
+      "WebFetch(domain:pub.dev)",
+      "WebFetch(domain:flutter-shadcn-ui.mariuti.com)",
+      "WebFetch(domain:mariuti.com)",
+      "Bash(C:DKflutterbinflutter.bat pub get)",
+      "Bash(/c/DK/flutter/bin/flutter pub:*)",
+      "Bash(/c/DK/flutter/bin/flutter devices:*)",
+      "WebFetch(domain:news.hada.io)"
+    ]
+  }
+}
