@@ -1119,14 +1119,14 @@ class TaskDaemon:
             str(run_script),
             "--spec", spec_id,
             "--project-dir", str(work_dir),
-            "--auto-continue",
+            "--auto-continue",  # Non-interactive mode for daemon
         ]
 
-        # Add execution mode flags (if supported by run.py)
-        if execution_mode == ExecutionMode.PLAN:
-            cmd.extend(["--plan-only"])  # Design phase: just create plan
-        elif execution_mode == ExecutionMode.HEADLESS:
-            cmd.extend(["--headless"])  # Skip interactive prompts
+        # Note: run.py currently only supports --auto-continue for non-interactive mode
+        # Future: Add --plan-only and --headless flags to run.py
+        #
+        # For now, execution_mode is used for logging/tracking only
+        # All modes use --auto-continue which skips prompts
 
         return cmd
 
