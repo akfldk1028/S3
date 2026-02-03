@@ -87,12 +87,25 @@ if TYPE_CHECKING:
 
 class TaskType(str, Enum):
     """Task types for large project orchestration."""
-    DESIGN = "design"           # 프로젝트/모듈 설계 → Plan 모드 사용
-    ARCHITECTURE = "architecture"  # 아키텍처 설계 → Plan 모드 사용
-    IMPLEMENTATION = "impl"     # 구현 → Headless 모드
-    TEST = "test"               # 테스트
-    INTEGRATION = "integration" # 통합
-    DEFAULT = "default"         # 기본
+    # Plan Mode Tasks (설계/분석 - read-only exploration)
+    DESIGN = "design"              # 프로젝트/모듈 설계
+    ARCHITECTURE = "architecture"  # 아키텍처 설계
+    PLANNING = "planning"          # 구현 계획 수립
+    RESEARCH = "research"          # 코드베이스 분석/조사
+    REVIEW = "review"              # 코드 리뷰
+
+    # Implementation Tasks (구현 - headless mode)
+    IMPLEMENTATION = "impl"        # 구현
+    FRONTEND = "frontend"          # 프론트엔드 구현
+    BACKEND = "backend"            # 백엔드 구현
+    DATABASE = "database"          # 데이터베이스 작업
+    API = "api"                    # API 개발
+
+    # Other Tasks
+    TEST = "test"                  # 테스트
+    INTEGRATION = "integration"    # 통합
+    DOCUMENTATION = "docs"         # 문서화
+    DEFAULT = "default"            # 기본
 
 
 class ExecutionMode(str, Enum):
@@ -100,6 +113,14 @@ class ExecutionMode(str, Enum):
     PLAN = "plan"               # Plan mode (read-only exploration)
     HEADLESS = "headless"       # Headless mode (skip permissions)
     STANDARD = "standard"       # Standard interactive mode
+
+
+# Task types that should use Plan mode (design/analysis)
+PLAN_MODE_TASK_TYPES = frozenset({
+    "design", "architecture", "planning", "research", "review",
+    TaskType.DESIGN, TaskType.ARCHITECTURE, TaskType.PLANNING,
+    TaskType.RESEARCH, TaskType.REVIEW,
+})
 
 
 class TaskPriority(int, Enum):
@@ -461,9 +482,16 @@ class TaskDaemon:
         return None
 
     def _get_execution_mode(self, task_type: str) -> str:
-        """Determine execution mode based on task type."""
-        # Design and architecture tasks use plan mode for exploration
-        if task_type in (TaskType.DESIGN, TaskType.ARCHITECTURE, "design", "architecture"):
+        """Determine execution mode based on task type.
+
+        Plan Mode Tasks (read-only exploration):
+        - design, architecture, planning, research, review
+
+        Headless Mode Tasks (implementation):
+        - impl, frontend, backend, database, api, test, integration, etc.
+        """
+        # Design/analysis tasks use plan mode for exploration
+        if task_type in PLAN_MODE_TASK_TYPES:
             return ExecutionMode.PLAN
 
         # All other tasks use headless mode if enabled
@@ -1025,10 +1053,16 @@ class TaskDaemon:
             self._log_error("Failed to build task command")
             return False
 
+        # Determine working directory
+        # - Claude CLI: Run in project directory
+        # - run.py: Run in auto_claude_dir (it handles project_dir via --project-dir)
+        is_claude_cli = cmd[0] == self.claude_cli_path if self.claude_cli_path else False
+        cwd = str(work_dir) if is_claude_cli else str(self.auto_claude_dir)
+
         try:
             process = subprocess.Popen(
                 cmd,
-                cwd=str(self.auto_claude_dir) if not self.use_claude_cli else str(work_dir),
+                cwd=cwd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
@@ -1095,12 +1129,21 @@ class TaskDaemon:
         - Standard run.py execution
         - Claude CLI with --permission-mode plan (for design tasks)
         - Claude CLI with --dangerously-skip-permissions (for headless)
+
+        Strategy:
+        - Plan mode (design/architecture): Use Claude CLI if available
+        - Implementation mode: Use run.py (better subtask management)
         """
-        # Option 1: Use Claude CLI directly
+        # For plan mode, prefer Claude CLI (has --permission-mode plan)
+        if execution_mode == ExecutionMode.PLAN and self.claude_cli_path:
+            self._log_debug(f"Using Claude CLI for plan mode: {spec_id}")
+            return self._build_claude_cli_command(spec_id, work_dir, execution_mode)
+
+        # For explicit Claude CLI mode
         if self.use_claude_cli and self.claude_cli_path:
             return self._build_claude_cli_command(spec_id, work_dir, execution_mode)
 
-        # Option 2: Use run.py (default)
+        # Default: Use run.py (better for implementation with subtasks)
         return self._build_run_py_command(spec_id, work_dir, execution_mode)
 
     def _build_run_py_command(
@@ -1139,8 +1182,14 @@ class TaskDaemon:
         """Build command using Claude CLI directly.
 
         This leverages Claude CLI's native features:
-        - --permission-mode plan: Read-only exploration
-        - --dangerously-skip-permissions: Unattended operation
+        - --permission-mode plan: Read-only exploration (for design tasks)
+        - --dangerously-skip-permissions: Unattended operation (for 24/7)
+
+        Claude CLI Flags:
+        - -p "prompt": Headless mode with prompt
+        - --permission-mode plan: Plan mode (read-only exploration)
+        - --dangerously-skip-permissions: Skip all permission prompts
+        - --output-format json: Structured JSON output
         """
         if not self.claude_cli_path:
             return None
@@ -1148,41 +1197,70 @@ class TaskDaemon:
         # Read the spec to get the task prompt
         spec_dir = self.specs_dir / spec_id
         spec_path = spec_dir / "spec.md"
+        requirements_path = spec_dir / "requirements.json"
         plan_path = spec_dir / "implementation_plan.json"
 
-        if not spec_path.exists():
-            self._log_warning(f"Spec file not found: {spec_path}")
-            return None
-
-        # Build base command
+        # Build base command - run in project directory
         cmd = [self.claude_cli_path]
 
-        # Add execution mode
+        # Add execution mode flags
         if execution_mode == ExecutionMode.PLAN:
+            # Plan mode: Read-only exploration for design/architecture
             cmd.extend(["--permission-mode", "plan"])
         elif execution_mode == ExecutionMode.HEADLESS:
+            # Headless mode: Skip all permission prompts for 24/7 operation
             cmd.append("--dangerously-skip-permissions")
 
-        # Add prompt from spec
-        try:
-            spec_content = spec_path.read_text(encoding="utf-8")
-            prompt = f"Implement the following specification:\n\n{spec_content}"
+        # Build prompt from available sources
+        prompt_parts = []
 
-            # If there's an implementation plan, include context
-            if plan_path.exists():
+        # Try spec.md first
+        if spec_path.exists():
+            try:
+                spec_content = spec_path.read_text(encoding="utf-8")
+                prompt_parts.append(spec_content)
+            except Exception:
+                pass
+
+        # Try requirements.json
+        if requirements_path.exists():
+            try:
+                requirements = json.loads(requirements_path.read_text(encoding="utf-8"))
+                task = requirements.get("task", "")
+                if task and task not in str(prompt_parts):
+                    prompt_parts.insert(0, f"Task: {task}\n")
+            except Exception:
+                pass
+
+        # If no spec content found, use a generic prompt
+        if not prompt_parts:
+            self._log_warning(f"No spec content found for: {spec_id}")
+            prompt_parts.append(f"Implement task: {spec_id}")
+
+        # Add context about subtasks if available
+        if plan_path.exists():
+            try:
                 plan = json.loads(plan_path.read_text(encoding="utf-8"))
-                if "subtasks" in plan:
-                    subtasks = plan.get("subtasks", [])
-                    prompt += f"\n\nSubtasks to complete: {len(subtasks)}"
+                subtasks = plan.get("subtasks", [])
+                if subtasks:
+                    prompt_parts.append(f"\n\nSubtasks to complete: {len(subtasks)}")
 
-            cmd.extend(["-p", prompt])
+                # For design tasks, add instruction to create child specs
+                task_type = plan.get("taskType", plan.get("task_type", ""))
+                if task_type in ("design", "architecture"):
+                    prompt_parts.append(
+                        "\n\nAs a Design Agent, analyze the project and use "
+                        "create_batch_child_specs tool to create implementation tasks."
+                    )
+            except Exception:
+                pass
 
-        except Exception as e:
-            self._log_error(f"Failed to read spec: {e}")
-            return None
+        # Combine prompt
+        prompt = "\n".join(prompt_parts)
+        cmd.extend(["-p", prompt])
 
-        # Add output format for structured results
-        cmd.extend(["--output-format", "json"])
+        # Add output format for structured results (helps with parsing)
+        cmd.extend(["--output-format", "stream-json"])
 
         return cmd
 

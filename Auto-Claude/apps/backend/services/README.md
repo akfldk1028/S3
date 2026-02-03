@@ -62,13 +62,26 @@ python runners/daemon_runner.py --project-dir "..." \
 
 ### Task Types and Execution Modes
 
-| Task Type | Execution Mode | Description |
-|-----------|---------------|-------------|
-| `design` | Plan Mode | Read-only exploration, creates child tasks |
-| `architecture` | Plan Mode | Architecture analysis |
-| `impl` | Headless | Standard implementation |
-| `test` | Headless | Test execution |
-| `integration` | Headless | Integration tasks |
+**Plan Mode Tasks** (Claude CLI `--permission-mode plan`):
+| Task Type | Description |
+|-----------|-------------|
+| `design` | Project/module design, creates child tasks |
+| `architecture` | Architecture analysis and design |
+| `planning` | Implementation planning |
+| `research` | Codebase analysis and investigation |
+| `review` | Code review |
+
+**Implementation Tasks** (Claude CLI `--dangerously-skip-permissions`):
+| Task Type | Description |
+|-----------|-------------|
+| `impl` | General implementation |
+| `frontend` | Frontend development |
+| `backend` | Backend development |
+| `database` | Database work |
+| `api` | API development |
+| `test` | Test execution |
+| `integration` | Integration tasks |
+| `docs` | Documentation |
 
 ### Task Priority Levels
 
