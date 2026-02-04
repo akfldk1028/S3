@@ -46,6 +46,10 @@ class TaskType(str, Enum):
     DATABASE = "database"          # 데이터베이스 작업
     API = "api"                    # API 개발
 
+    # Verification & Error-Check Tasks
+    VERIFY = "verify"              # 구현 검증 (테스트/빌드/런타임)
+    ERROR_CHECK = "error_check"    # 에러 수정
+
     # Other Tasks
     TEST = "test"                  # 테스트
     INTEGRATION = "integration"    # 통합
@@ -122,6 +126,9 @@ class TaskState:
     # Worktree and execution mode support
     worktree_path: Path | None = None
     execution_mode: str = "standard"
+
+    # Recovery coordination (prevents race between _read_output and _recover_task)
+    recovering: bool = False
 
     def is_running(self) -> bool:
         """Check if task process is still running."""

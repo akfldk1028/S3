@@ -289,10 +289,11 @@ def invoke_agent(agent_type: str, task: str):
 
 ## 5. 기존 Skills/Agents 목록
 
-### Claude Skills (4개)
+### Claude Skills (5개)
 
 | 이름 | 명령어 | 용도 |
 |------|--------|------|
+| s3-auto-task | `/s3-auto-task "설명"` | Auto-Claude task 생성/빌드 |
 | s3-build | `/s3-build [target]` | 빌드 자동화 |
 | s3-test | `/s3-test [scope]` | 테스트 실행 |
 | s3-feature | `/s3-feature "설명"` | 기능 개발 워크플로우 |

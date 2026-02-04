@@ -39,7 +39,6 @@ import os
 import subprocess
 import sys
 import threading
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
@@ -61,6 +60,12 @@ from .watcher import SpecsWatcher, check_watchdog_available
 from .executor import TaskExecutor, find_auto_claude_backend
 from .state import StateManager
 
+
+# Task types that trigger auto-verify after successful completion
+IMPL_TASK_TYPES = frozenset({"impl", "frontend", "backend", "database", "api"})
+
+# Maximum verify→error_check→verify cycles before giving up
+MAX_VERIFY_ATTEMPTS = 3
 
 __all__ = [
     # Main class
@@ -165,6 +170,7 @@ class TaskDaemon:
         self._stop_event = threading.Event()
         self._lock = threading.RLock()
         self._queue_condition = threading.Condition(self._lock)
+        self._all_complete_fired = False  # Guard against double-firing (BUG 5)
 
     def _setup_logging(self, log_file: Path | None) -> None:
         """Setup logging configuration."""
@@ -362,6 +368,7 @@ class TaskDaemon:
         with self._queue_condition:
             self.task_queue.append(queued_task)
             self.task_queue.sort()
+            self._all_complete_fired = False  # Reset so callback fires again
             self._queue_condition.notify()
 
         self._logger.info(f"Queued: {spec_id} (priority={priority}, type={task_type})")
@@ -372,9 +379,11 @@ class TaskDaemon:
         if not plan_path.exists():
             return None
         try:
-            with open(plan_path, encoding="utf-8") as f:
+            with open(plan_path, encoding="utf-8-sig") as f:
                 return json.load(f)
-        except (OSError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError) as e:
+            if self._logger:
+                self._logger.warning(f"Failed to load plan {plan_path}: {e}")
             return None
 
     def _update_plan_status(
@@ -450,7 +459,10 @@ class TaskDaemon:
                 return False
 
         execution_mode = self._executor.get_execution_mode(queued_task.task_type)
-        cmd, cwd = self._executor.build_command(spec_id, self.project_dir, execution_mode)
+        cmd, cwd = self._executor.build_command(
+            spec_id, self.project_dir, execution_mode,
+            task_type=queued_task.task_type,
+        )
 
         if cmd is None:
             self._logger.error(f"Failed to build command for: {spec_id}")
@@ -502,25 +514,60 @@ class TaskDaemon:
             return False
 
     def _read_output(self, spec_id: str, process: subprocess.Popen) -> None:
-        """Read process output."""
+        """Read process output line-by-line.
+
+        Uses readline() instead of iterator to avoid Python's read-ahead
+        buffer which blocks real-time output. This ensures last_update
+        stays current and prevents false stuck detection.
+
+        If the task is being recovered (_recover_task sets state.recovering),
+        this thread exits without cleanup since _recover_task handles it (BUG 2).
+        """
+        lines_read = 0
         try:
-            for line in process.stdout:
+            while True:
+                # Guard against closed pipe (BUG 10)
+                if process.stdout is None or process.stdout.closed:
+                    break
+
+                line = process.stdout.readline()
+                if not line:
+                    break  # EOF - process closed stdout
+                lines_read += 1
                 line = line.rstrip()
                 if line:
-                    with self._lock:
-                        if spec_id in self.running_tasks:
-                            self.running_tasks[spec_id].last_update = datetime.now(timezone.utc)
-        except Exception:
+                    self._logger.debug(f"[{spec_id}] {line[:200]}")
+                with self._lock:
+                    if spec_id in self.running_tasks:
+                        self.running_tasks[spec_id].last_update = datetime.now(timezone.utc)
+        except (ValueError, OSError):
+            # ValueError: I/O operation on closed file (stdout closed by _kill_task)
+            # OSError: other I/O errors on the pipe
             pass
+        except Exception as e:
+            self._logger.warning(f"[{spec_id}] Output reader error after {lines_read} lines: {e}")
+
+        self._logger.info(f"[{spec_id}] Output reader finished ({lines_read} lines read)")
+
+        # If task is being recovered, _recover_task handles cleanup (BUG 2)
+        with self._lock:
+            task = self.running_tasks.get(spec_id)
+            if task and task.recovering:
+                self._logger.debug(f"[{spec_id}] Recovery in progress, skipping cleanup")
+                return
 
         return_code = process.wait()
         success = return_code == 0
 
         self._logger.info(f"Completed: {spec_id} (success={success})")
 
+        task_type = None
+        spec_dir = None
         with self._lock:
             if spec_id in self.running_tasks:
                 state = self.running_tasks[spec_id]
+                task_type = state.task_type
+                spec_dir = state.spec_dir
 
                 if success:
                     self._state_manager.reset_recovery_count(spec_id)
@@ -531,6 +578,18 @@ class TaskDaemon:
                     self._update_plan_status(state.spec_dir, "error", "error")
 
                 del self.running_tasks[spec_id]
+
+        # Auto-queue verify for successful impl tasks
+        if success and task_type in IMPL_TASK_TYPES and spec_dir is not None:
+            self._auto_queue_verify(spec_id, spec_dir)
+
+        # After error_check succeeds, re-verify the parent impl task
+        if success and task_type == "error_check" and spec_dir is not None:
+            parent_spec_id = self._get_parent_spec_id(spec_id, spec_dir)
+            if parent_spec_id:
+                parent_spec_dir = self.specs_dir / parent_spec_id
+                if parent_spec_dir.exists():
+                    self._auto_queue_verify(parent_spec_id, parent_spec_dir)
 
         with self._queue_condition:
             self._queue_condition.notify()
@@ -544,14 +603,109 @@ class TaskDaemon:
         self._check_all_complete()
 
     def _check_all_complete(self) -> None:
-        """Check if all tasks complete."""
+        """Check if all tasks complete (fires callback at most once per cycle, BUG 5)."""
         with self._lock:
             if len(self.running_tasks) == 0 and len(self.task_queue) == 0:
+                if self._all_complete_fired:
+                    return  # Already fired, don't fire again
+                self._all_complete_fired = True
                 if self._on_all_tasks_complete:
                     try:
                         self._on_all_tasks_complete()
                     except Exception:
                         pass
+
+    # -------------------------------------------------------------------------
+    # Auto-Verify Pipeline
+    # -------------------------------------------------------------------------
+
+    def _get_parent_spec_id(self, spec_id: str, spec_dir: Path) -> str | None:
+        """Get the parent task ID from a child spec's implementation_plan.json."""
+        plan = self._load_plan(spec_dir)
+        if not plan:
+            return None
+        return plan.get("parentTask", plan.get("parent_task"))
+
+    def _auto_queue_verify(self, spec_id: str, spec_dir: Path) -> None:
+        """
+        Auto-queue a verify task after a successful impl task.
+
+        Creates a verify spec in the specs directory that depends on the
+        completed impl spec. The watcher will pick it up and the scheduler
+        will queue it once dependencies are met.
+
+        Prevents infinite loops by:
+        - Only triggering for IMPL_TASK_TYPES (verify/error_check excluded)
+        - Limiting verify attempts via MAX_VERIFY_ATTEMPTS
+        """
+        # Count existing verify specs for this parent to prevent infinite loops
+        verify_count = 0
+        for child_dir in self.specs_dir.iterdir():
+            if not child_dir.is_dir():
+                continue
+            child_plan_path = child_dir / "implementation_plan.json"
+            if child_plan_path.exists():
+                try:
+                    with open(child_plan_path, encoding="utf-8-sig") as f:
+                        child_plan = json.load(f)
+                    if (
+                        child_plan.get("taskType", child_plan.get("task_type")) == "verify"
+                        and spec_id in child_plan.get("dependsOn", child_plan.get("depends_on", []))
+                    ):
+                        verify_count += 1
+                except (OSError, json.JSONDecodeError):
+                    pass
+
+        if verify_count >= MAX_VERIFY_ATTEMPTS:
+            self._logger.warning(
+                f"Max verify attempts ({MAX_VERIFY_ATTEMPTS}) reached for {spec_id}, skipping"
+            )
+            return
+
+        # Generate verify spec ID with attempt number for re-verify support
+        attempt = verify_count + 1
+        verify_spec_id = f"verify-{spec_id}" if attempt == 1 else f"verify-{spec_id}-{attempt}"
+        verify_dir = self.specs_dir / verify_spec_id
+
+        if verify_dir.exists():
+            self._logger.debug(f"Verify spec already exists: {verify_spec_id}")
+            return
+
+        verify_dir.mkdir(parents=True, exist_ok=True)
+
+        # Read the original spec for context
+        original_spec_path = spec_dir / "spec.md"
+        original_spec = ""
+        if original_spec_path.exists():
+            try:
+                original_spec = original_spec_path.read_text(encoding="utf-8-sig")
+            except OSError:
+                pass
+
+        # Create verify spec.md
+        verify_spec_content = (
+            f"# Verify: {spec_id}\n\n"
+            f"Verify the implementation of `{spec_id}` by running tests, "
+            f"checking for build errors, and performing runtime validation.\n\n"
+            f"## Original Spec\n\n{original_spec}\n"
+        )
+        (verify_dir / "spec.md").write_text(verify_spec_content, encoding="utf-8")
+
+        # Create implementation_plan.json for the verify task
+        verify_plan = {
+            "status": "queue",
+            "taskType": "verify",
+            "priority": TaskPriority.HIGH,
+            "dependsOn": [spec_id],
+            "parentTask": spec_id,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "phases": [],
+        }
+        plan_path = verify_dir / "implementation_plan.json"
+        with open(plan_path, "w", encoding="utf-8") as f:
+            json.dump(verify_plan, f, indent=2)
+
+        self._logger.info(f"Auto-queued verify task: {verify_spec_id} (parent: {spec_id})")
 
     # -------------------------------------------------------------------------
     # Stuck Detection
@@ -583,7 +737,11 @@ class TaskDaemon:
             self._recover_task(spec_id, state)
 
     def _recover_task(self, spec_id: str, state: TaskState) -> None:
-        """Recover a stuck task."""
+        """Recover a stuck task.
+
+        Sets state.recovering to prevent _read_output from doing cleanup (BUG 2).
+        Uses _stop_event.wait() instead of time.sleep() for fast shutdown (BUG 1).
+        """
         recovery_count = self._state_manager.increment_recovery_count(spec_id)
 
         if recovery_count > self.max_recovery:
@@ -599,8 +757,18 @@ class TaskDaemon:
             return
 
         self._logger.info(f"Recovering: {spec_id} (attempt {recovery_count})")
+
+        # Signal _read_output to skip cleanup (BUG 2)
+        with self._lock:
+            state.recovering = True
+
         self._kill_task(state)
-        time.sleep(5)
+
+        # Wait for process cleanup; use _stop_event.wait so daemon can
+        # shut down without blocking on time.sleep() (BUG 1)
+        self._stop_event.wait(timeout=5)
+        if self._stop_event.is_set():
+            return  # Daemon is shutting down, abort recovery
 
         with self._lock:
             self.running_tasks.pop(spec_id, None)
@@ -617,18 +785,48 @@ class TaskDaemon:
                 pass
 
     def _kill_task(self, state: TaskState) -> None:
-        """Kill a task process."""
+        """Kill a task process and its entire process tree.
+
+        On Windows, terminate() only kills the direct child process.
+        Uses taskkill /F /T to kill the full tree (BUG 8).
+        Closes stdout pipe to unblock _read_output thread (BUG 10).
+        """
         if state.process is None:
             return
         try:
-            state.process.terminate()
-            try:
-                state.process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                state.process.kill()
-                state.process.wait(timeout=5)
+            pid = state.process.pid
+            if sys.platform == "win32":
+                # taskkill /F /T kills entire process tree on Windows
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True,
+                    timeout=15,
+                )
+            else:
+                # Unix: kill process group
+                try:
+                    pgid = os.getpgid(pid)
+                    os.killpg(pgid, 15)  # SIGTERM
+                except (ProcessLookupError, PermissionError):
+                    state.process.terminate()
+                try:
+                    state.process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    try:
+                        pgid = os.getpgid(pid)
+                        os.killpg(pgid, 9)  # SIGKILL
+                    except (ProcessLookupError, PermissionError):
+                        state.process.kill()
+                    state.process.wait(timeout=5)
         except Exception:
             pass
+        finally:
+            # Close stdout pipe to unblock _read_output readline() (BUG 10)
+            try:
+                if state.process and state.process.stdout:
+                    state.process.stdout.close()
+            except Exception:
+                pass
 
     # -------------------------------------------------------------------------
     # Status

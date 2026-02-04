@@ -83,6 +83,7 @@ SERVICE_ROOT_FILES = {
     "build.gradle",
     "Makefile",
     "Dockerfile",
+    "pubspec.yaml",  # Flutter/Dart
 }
 
 

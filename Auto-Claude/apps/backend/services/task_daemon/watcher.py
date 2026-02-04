@@ -68,6 +68,14 @@ class SpecsEventHandler(FileSystemEventHandler):
             if now - last_time < self.debounce_seconds:
                 return False
             self._last_events[spec_id] = now
+
+            # Prune stale entries to prevent memory leak (BUG 15)
+            if len(self._last_events) > 500:
+                cutoff = now - 60.0  # Remove entries older than 60s
+                self._last_events = {
+                    k: v for k, v in self._last_events.items() if v > cutoff
+                }
+
             return True
 
     def on_modified(self, event: FileSystemEvent) -> None:
@@ -147,14 +155,19 @@ class SpecsWatcher:
         self._observer.start()
 
     def stop(self, timeout: float = 5.0) -> None:
-        """Stop watching."""
-        if self._observer is None:
+        """Stop watching (safe to call multiple times, BUG 23)."""
+        observer = self._observer
+        if observer is None:
             return
 
-        self._observer.stop()
-        self._observer.join(timeout=timeout)
         self._observer = None
         self._handler = None
+
+        try:
+            observer.stop()
+            observer.join(timeout=timeout)
+        except Exception:
+            pass
 
     def is_running(self) -> bool:
         """Check if watcher is running."""

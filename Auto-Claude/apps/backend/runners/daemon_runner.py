@@ -276,20 +276,14 @@ Claude CLI Features:
         on_all_tasks_complete=lambda: log("event", "All tasks completed!"),
     )
 
-    # Setup signal handlers for graceful shutdown
+    # Setup signal handlers for graceful shutdown (BUG 26)
+    # Only set stop event; don't call daemon.stop() or sys.exit() here
+    # because joining threads from a signal handler can deadlock.
+    # The main loop detects _stop_event and calls stop() cleanly.
     def signal_handler(signum, frame):
         signal_name = signal.Signals(signum).name
         log("info", f"Received {signal_name}, shutting down...")
-        daemon.stop()
-
-        # Cleanup PID file
-        if args.pid_file and args.pid_file.exists():
-            try:
-                args.pid_file.unlink()
-            except Exception:
-                pass
-
-        sys.exit(0)
+        daemon._stop_event.set()
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -303,19 +297,28 @@ Claude CLI Features:
         import threading
 
         def write_status_periodically():
-            while not daemon._stop_event.is_set():
+            # Use public is_healthy() instead of private _stop_event (BUG 28)
+            while daemon.is_healthy() or not daemon._stop_event.is_set():
+                temp_path = args.status_file.with_suffix(".tmp")
                 try:
                     status = daemon.get_status()
                     status["timestamp"] = datetime.now().isoformat()
 
-                    temp_path = args.status_file.with_suffix(".tmp")
                     with open(temp_path, "w", encoding="utf-8") as f:
                         json.dump(status, f, indent=2)
                     temp_path.replace(args.status_file)
                 except Exception as e:
                     log("warning", f"Failed to write status file: {e}")
+                    # Clean up temp file on failure (BUG 29)
+                    try:
+                        if temp_path.exists():
+                            temp_path.unlink()
+                    except Exception:
+                        pass
 
                 daemon._stop_event.wait(timeout=10)
+                if daemon._stop_event.is_set():
+                    break
 
         status_thread = threading.Thread(
             target=write_status_periodically,
@@ -360,7 +363,7 @@ Claude CLI Features:
     print("Press Ctrl+C to stop")
     print()
 
-    # Start daemon (blocking)
+    # Start daemon (blocking - exits when _stop_event is set)
     try:
         daemon.start()
     except KeyboardInterrupt:
@@ -372,6 +375,9 @@ Claude CLI Features:
         traceback.print_exc()
         sys.exit(1)
     finally:
+        # Ensure clean shutdown (signal handler only sets _stop_event)
+        daemon.stop()
+
         # Cleanup PID file
         if args.pid_file and args.pid_file.exists():
             try:

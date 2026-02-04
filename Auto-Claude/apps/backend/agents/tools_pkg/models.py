@@ -247,6 +247,25 @@ AGENT_CONFIGS = {
         "thinking_default": "medium",
     },
     # ═══════════════════════════════════════════════════════════════════════
+    # VERIFICATION & ERROR-CHECK PHASES
+    # ═══════════════════════════════════════════════════════════════════════
+    "verify": {
+        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
+        "mcp_servers": ["context7", "auto-claude", "browser"],
+        "auto_claude_tools": [TOOL_GET_BUILD_PROGRESS, TOOL_GET_SESSION_CONTEXT],
+        "thinking_default": "high",
+    },
+    "error_check": {
+        "tools": BASE_READ_TOOLS + BASE_WRITE_TOOLS + WEB_TOOLS,
+        "mcp_servers": ["context7", "graphiti", "auto-claude"],
+        "auto_claude_tools": [
+            TOOL_UPDATE_SUBTASK_STATUS,
+            TOOL_GET_BUILD_PROGRESS,
+            TOOL_RECORD_GOTCHA,
+        ],
+        "thinking_default": "medium",
+    },
+    # ═══════════════════════════════════════════════════════════════════════
     # UTILITY PHASES (Minimal, no MCP)
     # ═══════════════════════════════════════════════════════════════════════
     "insights": {
@@ -529,6 +548,7 @@ def _map_mcp_server_name(
         "linear": "linear",
         "electron": "electron",
         "puppeteer": "puppeteer",
+        "playwright": "playwright",
         "auto-claude": "auto-claude",
     }
     # Check if it's a known mapping

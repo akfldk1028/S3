@@ -75,6 +75,13 @@ class FrameworkAnalyzer(BaseAnalyzer):
             content = self._read_file("Cargo.toml")
             self._detect_rust_framework(content)
 
+        # Dart/Flutter detection (check BEFORE Ruby - Flutter projects may have Gemfile for CI)
+        elif self._exists("pubspec.yaml"):
+            self.analysis["language"] = "Dart"
+            self.analysis["package_manager"] = "pub"
+            content = self._read_file("pubspec.yaml")
+            self._detect_dart_framework(content)
+
         # Swift/iOS detection (check BEFORE Ruby - iOS projects often have Gemfile for CocoaPods/Fastlane)
         elif self._exists("Package.swift") or any(self.path.glob("*.xcodeproj")):
             self.analysis["language"] = "Swift"
@@ -278,6 +285,61 @@ class FrameworkAnalyzer(BaseAnalyzer):
                 detected_port = port_detector.detect_port_from_sources(info["port"])
                 self.analysis["default_port"] = detected_port
                 break
+
+    def _detect_dart_framework(self, content: str) -> None:
+        """Detect Dart/Flutter framework from pubspec.yaml content."""
+        content_lower = content.lower()
+
+        # Flutter detection
+        if "flutter:" in content_lower and "sdk: flutter" in content_lower:
+            self.analysis["framework"] = "Flutter"
+            # Determine type based on platform targets
+            if self._exists("web") or self._exists("lib/web"):
+                self.analysis["type"] = "frontend"
+            elif self._exists("android") or self._exists("ios"):
+                self.analysis["type"] = "mobile"
+            else:
+                self.analysis["type"] = "mobile"  # Default for Flutter
+            self.analysis["dev_command"] = "flutter run"
+        else:
+            # Pure Dart (backend/CLI)
+            dart_backend_frameworks = {
+                "dart_frog": "Dart Frog",
+                "serverpod": "Serverpod",
+                "shelf": "Shelf",
+                "aqueduct": "Aqueduct",
+            }
+            for key, name in dart_backend_frameworks.items():
+                if key in content_lower:
+                    self.analysis["framework"] = name
+                    self.analysis["type"] = "backend"
+                    break
+
+            if not self.analysis.get("framework"):
+                self.analysis["framework"] = "Dart"
+                if not self.analysis.get("type"):
+                    self.analysis["type"] = "library"
+
+        # State management detection
+        state_mgmt = {
+            "flutter_riverpod": "Riverpod",
+            "riverpod": "Riverpod",
+            "flutter_bloc": "BLoC",
+            "bloc": "BLoC",
+            "provider": "Provider",
+            "get": "GetX",
+            "mobx": "MobX",
+        }
+        for key, name in state_mgmt.items():
+            if key in content_lower:
+                self.analysis["state_management"] = name
+                break
+
+        # Testing detection
+        if "flutter_test" in content_lower:
+            self.analysis["testing"] = "flutter_test"
+        elif "test:" in content_lower:
+            self.analysis["testing"] = "dart_test"
 
     def _detect_ruby_framework(self, content: str) -> None:
         """Detect Ruby framework."""

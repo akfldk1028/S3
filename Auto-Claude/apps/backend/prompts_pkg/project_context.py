@@ -67,6 +67,9 @@ def detect_project_capabilities(project_index: dict) -> dict:
         # Mobile frameworks
         "is_expo": False,
         "is_react_native": False,
+        "is_flutter": False,
+        # Game engines
+        "is_unity": False,
         # Web frontend frameworks
         "is_web_frontend": False,
         "is_nextjs": False,
@@ -113,6 +116,18 @@ def detect_project_capabilities(project_index: dict) -> dict:
             capabilities["is_expo"] = True
         if "react-native" in deps:
             capabilities["is_react_native"] = True
+
+        # Flutter detection (Dart/Flutter projects)
+        if framework in ("flutter", "dart"):
+            capabilities["is_flutter"] = True
+        # Also check for flutter-specific deps/markers
+        flutter_deps = {"flutter", "flutter_test", "flutter_lints", "cupertino_icons"}
+        if deps & flutter_deps:
+            capabilities["is_flutter"] = True
+
+        # Unity detection
+        if framework in ("unity", "unity3d"):
+            capabilities["is_unity"] = True
 
         # Web frontend detection
         web_frameworks = ("react", "vue", "svelte", "angular", "solid")

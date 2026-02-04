@@ -613,6 +613,126 @@ The project root is: `{project_dir}`
     return spec_context + raw_prompt
 
 
+def get_verify_prompt(spec_dir: Path, project_dir: Path) -> str:
+    """
+    Load the verify agent prompt with spec context and project capabilities injected.
+
+    The verify agent runs after an impl task completes to validate
+    the implementation via code review, build checks, tests, and
+    platform-specific runtime verification.
+
+    Dynamically detects the project type (Flutter, React, Unity, Python, etc.)
+    and injects relevant MCP tool documentation.
+
+    Args:
+        spec_dir: Directory containing the spec files
+        project_dir: Root directory of the project
+
+    Returns:
+        The verify agent prompt content with paths and capabilities injected
+    """
+    base_prompt = _load_prompt_file("verify_agent.md")
+
+    # Detect project capabilities
+    project_index = load_project_index(project_dir)
+    capabilities = detect_project_capabilities(project_index)
+
+    # Build capability summary
+    active_caps = [k for k, v in capabilities.items() if v]
+    cap_summary = ""
+    if active_caps:
+        cap_summary = "Based on project analysis, the following capabilities were detected:\n"
+        for cap in active_caps:
+            cap_name = cap.replace("is_", "").replace("has_", "").replace("_", " ").title()
+            cap_summary += f"- {cap_name}\n"
+    else:
+        cap_summary = "No special project capabilities detected. Detect from project files at runtime.\n"
+
+    # Inject relevant MCP tool docs
+    mcp_tool_files = get_mcp_tools_for_project(capabilities)
+    mcp_sections = []
+    for tool_file in mcp_tool_files:
+        try:
+            section = _load_prompt_file(tool_file)
+            mcp_sections.append(section)
+        except FileNotFoundError:
+            pass
+
+    mcp_content = ""
+    if mcp_sections:
+        mcp_content = "\n\n---\n\n## AVAILABLE VALIDATION TOOLS\n\n"
+        mcp_content += "\n\n---\n\n".join(mcp_sections)
+        mcp_content += "\n"
+
+    spec_context = f"""## SPEC LOCATION
+
+Your spec and progress files are located at:
+- Spec: `{spec_dir}/spec.md`
+- Implementation plan: `{spec_dir}/implementation_plan.json`
+- Progress notes: `{spec_dir}/build-progress.txt`
+- Verification report output: `{spec_dir}/verify_report.md`
+
+The project root is: `{project_dir}`
+
+## PROJECT CAPABILITIES DETECTED
+
+{cap_summary}
+---
+
+"""
+    return spec_context + base_prompt + mcp_content
+
+
+def get_error_check_prompt(spec_dir: Path, project_dir: Path) -> str:
+    """
+    Load the error-check agent prompt with spec context and project capabilities injected.
+
+    The error-check agent fixes errors found by the verify agent,
+    applying minimal targeted changes. Detects project type to use
+    the correct build/test commands.
+
+    Args:
+        spec_dir: Directory containing the spec files
+        project_dir: Root directory of the project
+
+    Returns:
+        The error-check agent prompt content with paths and capabilities injected
+    """
+    base_prompt = _load_prompt_file("error_check_agent.md")
+
+    # Detect project capabilities
+    project_index = load_project_index(project_dir)
+    capabilities = detect_project_capabilities(project_index)
+
+    active_caps = [k for k, v in capabilities.items() if v]
+    cap_summary = ""
+    if active_caps:
+        cap_summary = "Detected project capabilities:\n"
+        for cap in active_caps:
+            cap_name = cap.replace("is_", "").replace("has_", "").replace("_", " ").title()
+            cap_summary += f"- {cap_name}\n"
+    else:
+        cap_summary = "No special project capabilities detected. Detect from project files at runtime.\n"
+
+    spec_context = f"""## SPEC LOCATION
+
+Your spec and progress files are located at:
+- Spec: `{spec_dir}/spec.md`
+- Implementation plan: `{spec_dir}/implementation_plan.json`
+- Verification report: `{spec_dir}/verify_report.md`
+- Progress notes: `{spec_dir}/build-progress.txt`
+
+The project root is: `{project_dir}`
+
+## PROJECT CAPABILITIES DETECTED
+
+{cap_summary}
+---
+
+"""
+    return spec_context + base_prompt
+
+
 def is_custom_agent(agent_type: str) -> bool:
     """
     Check if an agent type is a custom agent.

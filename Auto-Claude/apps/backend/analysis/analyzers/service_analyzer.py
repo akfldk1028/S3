@@ -181,6 +181,8 @@ class ServiceAnalyzer(BaseAnalyzer):
             "cmd/main.go",
             "src/main.rs",
             "src/lib.rs",
+            "lib/main.dart",         # Flutter/Dart
+            "bin/main.dart",         # Dart CLI
         ]
 
         for pattern in entry_patterns:
@@ -198,6 +200,13 @@ class ServiceAnalyzer(BaseAnalyzer):
                 self.analysis["dependencies"] = list(deps.keys())[:20]  # Top 20
                 self.analysis["dev_dependencies"] = list(dev_deps.keys())[:10]
 
+        elif self._exists("pubspec.yaml"):
+            content = self._read_file("pubspec.yaml")
+            deps, dev_deps = self._parse_pubspec_deps(content)
+            self.analysis["dependencies"] = deps[:20]
+            if dev_deps:
+                self.analysis["dev_dependencies"] = dev_deps[:10]
+
         elif self._exists("requirements.txt"):
             content = self._read_file("requirements.txt")
             deps = []
@@ -208,6 +217,55 @@ class ServiceAnalyzer(BaseAnalyzer):
                     if match:
                         deps.append(match.group(1))
             self.analysis["dependencies"] = deps[:20]
+
+    @staticmethod
+    def _parse_pubspec_deps(content: str) -> tuple[list[str], list[str]]:
+        """Parse dependencies from pubspec.yaml without a YAML library.
+
+        Uses simple line-by-line parsing since pubspec.yaml has a predictable
+        structure: top-level `dependencies:` and `dev_dependencies:` keys
+        followed by indented package names.
+
+        Returns:
+            Tuple of (dependencies, dev_dependencies) as lists of package names.
+        """
+        deps: list[str] = []
+        dev_deps: list[str] = []
+        current_section: str | None = None
+
+        for line in content.split("\n"):
+            stripped = line.strip()
+            # Skip comments and empty lines
+            if not stripped or stripped.startswith("#"):
+                continue
+
+            # Detect top-level sections (no leading whitespace)
+            if not line[0:1].isspace() and stripped.endswith(":"):
+                section_name = stripped[:-1]
+                if section_name == "dependencies":
+                    current_section = "deps"
+                elif section_name == "dev_dependencies":
+                    current_section = "dev_deps"
+                else:
+                    current_section = None
+                continue
+
+            # Top-level key that's not a section we care about resets the section
+            if not line[0:1].isspace():
+                current_section = None
+                continue
+
+            # Inside a section: extract package name (first word before ":")
+            if current_section and ":" in stripped:
+                pkg_name = stripped.split(":")[0].strip()
+                # Skip SDK references and nested keys
+                if pkg_name and not pkg_name.startswith("sdk"):
+                    if current_section == "deps":
+                        deps.append(pkg_name)
+                    elif current_section == "dev_deps":
+                        dev_deps.append(pkg_name)
+
+        return deps, dev_deps
 
     def _detect_testing(self) -> None:
         """Detect testing framework and configuration."""
@@ -226,6 +284,16 @@ class ServiceAnalyzer(BaseAnalyzer):
 
         elif self._exists("pytest.ini") or self._exists("pyproject.toml"):
             self.analysis["testing"] = "pytest"
+
+        elif self._exists("pubspec.yaml") and not self.analysis.get("testing"):
+            # Flutter/Dart testing (may already be set by FrameworkAnalyzer)
+            content = self._read_file("pubspec.yaml")
+            if "flutter_test" in content:
+                self.analysis["testing"] = "flutter_test"
+                self.analysis["test_command"] = "flutter test"
+            elif "test:" in content:
+                self.analysis["testing"] = "dart_test"
+                self.analysis["test_command"] = "dart test"
 
         # Find test directory
         for test_dir in ["tests", "test", "__tests__", "spec"]:

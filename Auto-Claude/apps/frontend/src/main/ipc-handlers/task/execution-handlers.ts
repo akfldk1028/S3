@@ -19,6 +19,7 @@ import {
 import { findTaskWorktree } from '../../worktree-paths';
 import { projectStore } from '../../project-store';
 import { getIsolatedGitEnv, detectWorktreeBranch } from '../../utils/git-isolation';
+import { isDaemonManaged } from '../../daemon-status-watcher';
 
 /**
  * Atomic file write to prevent TOCTOU race conditions.
@@ -791,7 +792,7 @@ export function registerTaskExecutionHandlers(
   ipcMain.handle(
     IPC_CHANNELS.TASK_CHECK_RUNNING,
     async (_, taskId: string): Promise<IPCResult<boolean>> => {
-      const isRunning = agentManager.isRunning(taskId);
+      const isRunning = agentManager.isRunning(taskId) || isDaemonManaged(taskId);
       return { success: true, data: isRunning };
     }
   );

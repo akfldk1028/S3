@@ -19,6 +19,8 @@ import { findTaskAndProject } from "./task/shared";
 import { safeSendToRenderer } from "./utils";
 import { getClaudeProfileManager } from "../claude-profile-manager";
 import { taskStateManager } from "../task-state-manager";
+import { daemonStatusWatcher } from "../daemon-status-watcher";
+import { projectStore } from "../project-store";
 
 /**
  * Register all agent-events-related IPC handlers
@@ -284,4 +286,14 @@ export function registerAgenteventsHandlers(
     const { project } = findTaskAndProject(taskId);
     safeSendToRenderer(getMainWindow, IPC_CHANNELS.TASK_ERROR, taskId, error, project?.id);
   });
+
+  // Start daemon status watcher for projects with active daemons
+  const projects = projectStore.getProjects();
+  for (const p of projects) {
+    const statusPath = path.join(p.path, 'daemon_status.json');
+    if (existsSync(statusPath)) {
+      daemonStatusWatcher.start(statusPath, getMainWindow, p.id);
+      break; // One daemon at a time
+    }
+  }
 }

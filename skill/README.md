@@ -37,6 +37,17 @@ echo "# 에이전트 아이디어" > skill/ideas/new-agent-idea.md
 
 ---
 
+## 구현 완료된 Skills
+
+| 이름 | 명령어 | 설명 | 상태 |
+|------|--------|------|------|
+| s3-auto-task | `/s3-auto-task` | Auto-Claude task 생성 및 자동 빌드 | ✅ 완료 |
+| s3-build | `/s3-build` | Flutter/Python 빌드 | ✅ 완료 |
+| s3-test | `/s3-test` | 테스트 실행 | ✅ 완료 |
+| s3-deploy | `/s3-deploy` | 프로덕션 배포 | ✅ 완료 |
+
+---
+
 ## 추가 예정 Skills (아이디어)
 
 ### 개발 도구
