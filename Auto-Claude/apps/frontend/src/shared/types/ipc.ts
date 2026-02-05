@@ -883,6 +883,10 @@ export interface ElectronAPI {
 
   // Queue Routing API (rate limit recovery)
   queue: import('../../preload/api/queue-api').QueueAPI;
+
+  // Specs folder events (auto-refresh when new specs created by create_batch_child_specs)
+  onNewSpec: (callback: (data: { projectPath: string; specId: string; specDir: string }) => void) => () => void;
+  onNewSpecPlan: (callback: (data: { projectPath: string; specId: string; specDir: string }) => void) => () => void;
 }
 
 declare global {

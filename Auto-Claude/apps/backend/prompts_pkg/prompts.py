@@ -382,11 +382,14 @@ def is_first_run(spec_dir: Path) -> bool:
     The spec runner may create a skeleton implementation_plan.json with empty phases.
     This function checks for actual phases with subtasks, not just file existence.
 
+    For design/architecture tasks that create child specs instead of subtasks,
+    this function also checks if childSpecs exist or if the task is already complete.
+
     Args:
         spec_dir: Directory containing spec files
 
     Returns:
-        True if implementation_plan.json doesn't exist or has no subtasks
+        True if implementation_plan.json doesn't exist or has no subtasks/childSpecs
     """
     plan_file = spec_dir / "implementation_plan.json"
 
@@ -396,6 +399,19 @@ def is_first_run(spec_dir: Path) -> bool:
     try:
         with open(plan_file, encoding="utf-8") as f:
             plan = json.load(f)
+
+        # Check if design/architecture task has already completed (created child specs)
+        task_type = plan.get("taskType") or plan.get("task_type")
+        status = plan.get("status")
+
+        # If a design/architecture task is marked complete, it's done creating child specs
+        if task_type in ("design", "architecture") and status == "complete":
+            return False
+
+        # If childSpecs exist, the design agent already did its job
+        child_specs = plan.get("childSpecs", [])
+        if child_specs:
+            return False
 
         # Check if there are any phases with subtasks
         phases = plan.get("phases", [])

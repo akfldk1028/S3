@@ -288,12 +288,21 @@ export function registerAgenteventsHandlers(
   });
 
   // Start daemon status watcher for projects with active daemons
-  const projects = projectStore.getProjects();
-  for (const p of projects) {
-    const statusPath = path.join(p.path, 'daemon_status.json');
-    if (existsSync(statusPath)) {
-      daemonStatusWatcher.start(statusPath, getMainWindow, p.id);
-      break; // One daemon at a time
+  // Also poll periodically to detect daemon_status.json created after UI boot
+  // (e.g. when run.py is started from an external terminal)
+  const scanDaemonStatusFiles = () => {
+    const allProjects = projectStore.getProjects();
+    for (const p of allProjects) {
+      const statusPath = path.join(p.path, 'daemon_status.json');
+      if (existsSync(statusPath)) {
+        daemonStatusWatcher.start(statusPath, getMainWindow, p.id);
+      }
     }
-  }
+  };
+
+  // Initial scan
+  scanDaemonStatusFiles();
+
+  // Poll every 5s for newly created daemon_status.json files
+  setInterval(scanDaemonStatusFiles, 5000);
 }

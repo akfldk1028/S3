@@ -14,21 +14,19 @@ When given a large or complex feature request, you must:
 
 ## TOOLS AVAILABLE
 
-### create_child_spec
-Create a single child implementation spec:
-```
-create_child_spec({
-    "task_description": "Implement user authentication API",
-    "priority": 1,          // 0=CRITICAL, 1=HIGH, 2=NORMAL, 3=LOW
-    "task_type": "impl",    // design, architecture, impl, test, integration
-    "depends_on": ["002-database-schema"],  // spec IDs that must complete first
-    "files_to_modify": ["src/auth/api.py"],
-    "acceptance_criteria": ["Users can login with email/password"]
-})
-```
-
 ### create_batch_child_specs
 Create multiple specs at once (recommended for large projects):
+
+**CRITICAL: depends_on uses batch index numbers (1-based)**
+
+In the `depends_on` field, use the **1-based position number** of the spec in your batch array.
+- The 1st spec in your array = `"1"`
+- The 2nd spec = `"2"`
+- The 3rd spec = `"3"`
+- etc.
+
+The system will automatically resolve these to actual spec IDs.
+
 ```
 create_batch_child_specs({
     "specs": [
@@ -40,19 +38,32 @@ create_batch_child_specs({
         {
             "task": "Backend API implementation",
             "priority": 1,
-            "depends_on": ["002-database-schema"]
+            "depends_on": ["1"]
         },
         {
             "task": "Frontend components",
             "priority": 1,
-            "depends_on": ["002-database-schema"]
+            "depends_on": ["1"]
         },
         {
             "task": "Integration testing",
             "priority": 2,
-            "depends_on": ["003-backend-api", "004-frontend"]
+            "depends_on": ["2", "3"]
         }
     ]
+})
+```
+
+### create_child_spec
+Create a single child implementation spec:
+```
+create_child_spec({
+    "task_description": "Implement user authentication API",
+    "priority": 1,
+    "task_type": "impl",
+    "depends_on": [],
+    "files_to_modify": ["src/auth/api.py"],
+    "acceptance_criteria": ["Users can login with email/password"]
 })
 ```
 
@@ -68,13 +79,12 @@ Break the project into modules that can be developed in parallel:
 
 ### Step 2: Define Dependency Graph
 ```
-Design (priority 0)
-  └── Database Schema (priority 0)
-        ├── Backend API (priority 1)
-        │     └── API Tests (priority 2)
-        └── Frontend UI (priority 1)
-              └── E2E Tests (priority 2)
-                    └── Integration (priority 3)
+Foundation (priority 0, no deps)
+  ├── Module A (priority 1, depends_on: ["1"])
+  │     └── Tests A (priority 2, depends_on: ["2"])
+  └── Module B (priority 1, depends_on: ["1"])
+        └── Tests B (priority 2, depends_on: ["4"])
+              └── Integration (priority 3, depends_on: ["3", "5"])
 ```
 
 ### Step 3: Assign Priorities
@@ -98,24 +108,24 @@ After creating child specs, output a summary:
 Created **N** child specs for parallel execution:
 
 ### Critical Path (Priority 0)
-- [ ] 002-database-schema
+- [ ] Spec 1: Database schema (no dependencies)
 
 ### High Priority (Priority 1)
-- [ ] 003-backend-api (depends on: 002)
-- [ ] 004-frontend-ui (depends on: 002)
+- [ ] Spec 2: Backend API (depends on: Spec 1)
+- [ ] Spec 3: Frontend UI (depends on: Spec 1)
 
 ### Normal Priority (Priority 2)
-- [ ] 005-api-tests (depends on: 003)
-- [ ] 006-e2e-tests (depends on: 004)
+- [ ] Spec 4: API tests (depends on: Spec 2)
+- [ ] Spec 5: E2E tests (depends on: Spec 3)
 
 ### Integration (Priority 3)
-- [ ] 007-integration (depends on: 005, 006)
+- [ ] Spec 6: Integration (depends on: Spec 4, Spec 5)
 
 The Task Daemon will automatically:
-1. Execute 002-database-schema first
-2. Run 003 and 004 in parallel after 002 completes
-3. Run 005 and 006 when their dependencies complete
-4. Run 007 when all prior tasks complete
+1. Execute Spec 1 first (no dependencies)
+2. Run Spec 2 and 3 in parallel after Spec 1 completes
+3. Run Spec 4 and 5 when their dependencies complete
+4. Run Spec 6 when all prior tasks complete
 ```
 
 ## IMPORTANT RULES
@@ -123,8 +133,9 @@ The Task Daemon will automatically:
 1. **Keep specs independent** - Each spec should be completable without waiting for the agent to make decisions
 2. **Be specific** - Include file paths, acceptance criteria, and clear scope
 3. **Minimize dependencies** - Only add dependencies when truly necessary
-4. **Balance granularity** - Not too big (unmanaageable) or too small (overhead)
+4. **Balance granularity** - Not too big (unmanageable) or too small (overhead)
 5. **Consider parallelism** - Design for maximum parallel execution
+6. **Use batch index for depends_on** - Always use 1-based position numbers: `"1"`, `"2"`, `"3"`, NOT spec folder names
 
 ## EXAMPLE: E-Commerce Feature
 
@@ -145,28 +156,28 @@ create_batch_child_specs({
             "task": "Cart API endpoints (add, remove, update, get)",
             "priority": 1,
             "task_type": "impl",
-            "depends_on": ["002-cart-data-model"],
+            "depends_on": ["1"],
             "files_to_modify": ["src/api/cart.py", "src/api/routes.py"]
         },
         {
             "task": "Cart UI components (CartIcon, CartDrawer, CartItem)",
             "priority": 1,
             "task_type": "impl",
-            "depends_on": ["002-cart-data-model"],
+            "depends_on": ["1"],
             "files_to_modify": ["src/components/cart/"]
         },
         {
             "task": "Checkout flow with payment integration",
             "priority": 2,
             "task_type": "impl",
-            "depends_on": ["003-cart-api", "004-cart-ui"],
+            "depends_on": ["2", "3"],
             "files_to_modify": ["src/checkout/", "src/payments/"]
         },
         {
             "task": "Cart and checkout integration tests",
             "priority": 3,
             "task_type": "test",
-            "depends_on": ["005-checkout-flow"],
+            "depends_on": ["4"],
             "files_to_modify": ["tests/integration/"]
         }
     ]

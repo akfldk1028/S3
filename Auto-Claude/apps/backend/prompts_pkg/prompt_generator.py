@@ -354,6 +354,9 @@ def generate_planner_prompt(spec_dir: Path, project_dir: Path | None = None) -> 
     Generate the planner prompt (used only once at start).
     This is a simplified version that focuses on plan creation.
 
+    For taskType="design", uses design_architect.md which instructs the agent
+    to create child specs using create_batch_child_specs tool for parallel execution.
+
     Args:
         spec_dir: Directory containing spec.md
         project_dir: Working directory (for relative paths)
@@ -361,22 +364,56 @@ def generate_planner_prompt(spec_dir: Path, project_dir: Path | None = None) -> 
     Returns:
         Planner prompt string
     """
-    # Load the full planner prompt from file.
+    # Check taskType from implementation_plan.json to determine which prompt to use
+    task_type = None
+    plan_file = spec_dir / "implementation_plan.json"
+    if plan_file.exists():
+        try:
+            plan_data = json.loads(plan_file.read_text(encoding="utf-8"))
+            task_type = plan_data.get("taskType") or plan_data.get("task_type")
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Determine which prompt file to use based on taskType
     candidate_dirs = [
         Path(__file__).parent.parent / "prompts",  # current layout
         Path(__file__).parent / "prompts",  # legacy fallback (if any)
     ]
+
+    # For "design" or "architecture" taskType, use design_architect.md
+    # This prompt instructs the agent to use create_batch_child_specs tool
+    if task_type in ("design", "architecture"):
+        prompt_filename = "design_architect.md"
+    else:
+        prompt_filename = "planner.md"
+
     planner_file = next(
         (
-            (candidate_dir / "planner.md")
+            (candidate_dir / prompt_filename)
             for candidate_dir in candidate_dirs
-            if (candidate_dir / "planner.md").exists()
+            if (candidate_dir / prompt_filename).exists()
         ),
         None,
     )
 
     if planner_file:
         prompt = planner_file.read_text(encoding="utf-8")
+        # For design tasks, add explicit instruction to use create_batch_child_specs
+        if task_type in ("design", "architecture"):
+            prompt += """
+
+## CRITICAL REQUIREMENT
+
+You MUST call the `create_batch_child_specs` tool to create child implementation specs.
+Do NOT create subtasks inside implementation_plan.json - create separate specs instead.
+
+Each child spec will:
+1. Appear as a separate Kanban card in the UI
+2. Be executed by independent agents (parallel execution possible)
+3. Have its own implementation_plan.json and progress tracking
+
+After analyzing the project, call create_batch_child_specs with at least 3-5 child specs.
+"""
     else:
         prompt = (
             "Read spec.md and create implementation_plan.json with phases and subtasks."

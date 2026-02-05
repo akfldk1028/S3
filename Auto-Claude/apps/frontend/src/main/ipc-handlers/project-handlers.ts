@@ -28,6 +28,7 @@ import { insightsService } from '../insights-service';
 import { titleGenerator } from '../title-generator';
 import type { BrowserWindow } from 'electron';
 import { getEffectiveSourcePath } from '../updater/path-resolver';
+import { fileWatcher } from '../file-watcher';
 
 // ============================================
 // Git Helper Functions
@@ -241,6 +242,16 @@ export function registerProjectHandlers(
       }
 
       const projects = projectStore.getProjects();
+
+      // Start watching specs folders for each initialized project
+      for (const project of projects) {
+        if (project.autoBuildPath && isInitialized(project.path)) {
+          fileWatcher.watchSpecsFolder(project.path).catch((err) => {
+            console.error(`[IPC] Failed to watch specs folder for ${project.path}:`, err);
+          });
+        }
+      }
+
       console.warn('[IPC] PROJECT_LIST returning', projects.length, 'projects');
       return { success: true, data: projects };
     }
@@ -327,6 +338,23 @@ export function registerProjectHandlers(
   // ============================================
   // Project Initialization Operations
   // ============================================
+
+  // Set up file watcher events for new specs
+  fileWatcher.on('new-spec', (projectPath: string, specId: string, specDir: string) => {
+    const mainWindow = getMainWindow();
+    if (mainWindow) {
+      console.log(`[FileWatcher] Notifying renderer of new spec: ${specId}`);
+      mainWindow.webContents.send('specs:new-spec', { projectPath, specId, specDir });
+    }
+  });
+
+  fileWatcher.on('new-spec-plan', (projectPath: string, specId: string, specDir: string) => {
+    const mainWindow = getMainWindow();
+    if (mainWindow) {
+      console.log(`[FileWatcher] Notifying renderer of new spec plan: ${specId}`);
+      mainWindow.webContents.send('specs:new-spec-plan', { projectPath, specId, specDir });
+    }
+  });
 
   // Set up Python environment status events
   pythonEnvManager.on('status', (message: string) => {

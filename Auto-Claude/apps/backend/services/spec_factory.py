@@ -91,6 +91,39 @@ class SpecFactory:
 
         return f"{next_num:03d}-{slug}"
 
+    @staticmethod
+    def _normalize_list_field(value: Any) -> list[str]:
+        """
+        Normalize a field that should be a list but might be a JSON-encoded string.
+
+        MCP tools sometimes double-serialize lists, resulting in:
+            '["002-foo", "003-bar"]' instead of ["002-foo", "003-bar"]
+
+        Args:
+            value: The value to normalize (list, string, or None)
+
+        Returns:
+            A proper Python list of strings
+        """
+        if value is None:
+            return []
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str):
+            value = value.strip()
+            if value.startswith("["):
+                try:
+                    parsed = json.loads(value)
+                    if isinstance(parsed, list):
+                        return parsed
+                except json.JSONDecodeError:
+                    pass
+            # Single string value - treat as single-item list
+            if value:
+                return [value]
+            return []
+        return []
+
     async def create_child_spec(
         self,
         parent_spec_id: str,
@@ -121,6 +154,9 @@ class SpecFactory:
         Returns:
             Path to the created spec directory
         """
+        # Normalize depends_on in case it was double-serialized by MCP
+        depends_on = self._normalize_list_field(depends_on)
+
         spec_id = self._generate_spec_id(task_description)
         spec_dir = self.specs_dir / spec_id
         spec_dir.mkdir(parents=True, exist_ok=True)
@@ -193,13 +229,149 @@ class SpecFactory:
 
         return spec_dir
 
+    def _resolve_batch_dependencies(
+        self,
+        specs: list[dict[str, Any]],
+        created_specs: list[Path],
+    ) -> None:
+        """
+        Resolve internal dependency references to actual spec IDs.
+
+        Design agents use internal references like "002-database-schema" in depends_on,
+        but the actual spec IDs are "135-database-schema-...". This method builds a
+        mapping and updates all child spec implementation_plan.json files.
+
+        Mapping strategies (tried in order):
+        1. Batch index: agent uses NNN-slug where NNN maps to batch order
+           (e.g., "002" = 1st child if parent is "001", or 2nd in batch)
+        2. Slug matching: the slug portion matches the actual spec ID's slug
+        3. Pure number: just a number like "1", "2", "3" = batch index (1-based)
+        """
+        if not created_specs:
+            return
+
+        # Build mapping: internal ref patterns → actual spec ID
+        ref_to_actual: dict[str, str] = {}
+
+        for i, spec_dir in enumerate(created_specs):
+            actual_id = spec_dir.name  # e.g., "135-scientific-calculator-mode-implement..."
+            actual_slug = re.sub(r'^\d+-', '', actual_id)  # remove leading number
+
+            # Strategy: agent often numbers children starting from 002
+            # (assuming parent is 001). Map both 0-based and common patterns.
+            # Internal numbering: first child = 002, second = 003, etc.
+            internal_num = i + 2  # parent=001, children start at 002
+            batch_1based = i + 1  # 1-based batch index
+
+            # Register multiple possible reference patterns for this spec
+            # Pattern 1: "002-slug-name" (agent's internal numbering)
+            # Extract slug from original spec_def for matching
+            spec_def = specs[i] if i < len(specs) else {}
+            task = spec_def.get("task") or spec_def.get("task_description", "")
+            task_slug = re.sub(r'[^a-z0-9\s-]', '', task.lower())
+            task_slug = re.sub(r'[\s_]+', '-', task_slug)
+            task_slug = re.sub(r'-+', '-', task_slug).strip('-')
+
+            # Register all patterns that could refer to this spec
+            ref_to_actual[f"{internal_num:03d}"] = actual_id           # "002"
+            ref_to_actual[f"{batch_1based}"] = actual_id               # "1"
+            ref_to_actual[actual_id] = actual_id                       # exact match
+            if actual_slug:
+                ref_to_actual[actual_slug] = actual_id                 # "scientific-calculator-mode-implement..."
+
+        # Now resolve each spec's depends_on
+        for i, spec_dir in enumerate(created_specs):
+            spec_def = specs[i] if i < len(specs) else {}
+            original_deps = spec_def.get("depends_on") or []
+            if not original_deps:
+                continue
+
+            resolved_deps = []
+            for dep_ref in original_deps:
+                resolved = self._resolve_single_dep(dep_ref, ref_to_actual, created_specs)
+                resolved_deps.append(resolved)
+
+            # Update implementation_plan.json with resolved dependencies
+            plan_path = spec_dir / "implementation_plan.json"
+            if plan_path.exists():
+                try:
+                    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+                    plan["dependsOn"] = resolved_deps
+                    plan["updated_at"] = datetime.now(timezone.utc).isoformat()
+                    plan_path.write_text(json.dumps(plan, indent=2), encoding="utf-8")
+                except (json.JSONDecodeError, OSError):
+                    pass
+
+    def _resolve_single_dep(
+        self,
+        dep_ref: str,
+        ref_to_actual: dict[str, str],
+        created_specs: list[Path],
+    ) -> str:
+        """
+        Resolve a single dependency reference to an actual spec ID.
+
+        Args:
+            dep_ref: The internal reference (e.g., "002-database-schema")
+            ref_to_actual: Mapping of reference patterns to actual spec IDs
+            created_specs: List of created spec directories
+
+        Returns:
+            The resolved actual spec ID, or the original reference if unresolvable
+        """
+        # 1. Exact match
+        if dep_ref in ref_to_actual:
+            return ref_to_actual[dep_ref]
+
+        # 2. Extract number prefix and try matching
+        num_match = re.match(r'^(\d+)', dep_ref)
+        if num_match:
+            num_str = num_match.group(1)
+            # Try with leading zeros
+            padded = num_str.zfill(3)
+            if padded in ref_to_actual:
+                return ref_to_actual[padded]
+            # Try as-is
+            if num_str in ref_to_actual:
+                return ref_to_actual[num_str]
+
+        # 3. Slug-based fuzzy matching
+        dep_slug = re.sub(r'^\d+-', '', dep_ref).lower()  # remove leading number
+        if dep_slug:
+            best_match = None
+            best_score = 0
+            for spec_dir in created_specs:
+                actual_id = spec_dir.name
+                actual_slug = re.sub(r'^\d+-', '', actual_id).lower()
+
+                # Check if dep_slug is a prefix of or contained in actual_slug
+                if dep_slug in actual_slug or actual_slug.startswith(dep_slug):
+                    # Score by how much of the slug matches
+                    score = len(dep_slug) / max(len(actual_slug), 1)
+                    if score > best_score:
+                        best_score = score
+                        best_match = actual_id
+
+            if best_match and best_score > 0.3:
+                return best_match
+
+        # 4. No match found - return original (will be unresolvable but won't crash)
+        return dep_ref
+
     async def create_batch_specs(
         self,
         parent_spec_id: str,
         specs: list[dict[str, Any]],
     ) -> list[Path]:
         """
-        Create multiple child specs at once.
+        Create multiple child specs at once with dependency resolution.
+
+        Uses a 2-pass approach:
+        1. Pass 1: Create all specs (with empty depends_on)
+        2. Pass 2: Resolve internal dependency references to actual spec IDs
+
+        This ensures that agent's internal references like "002-database-schema"
+        are correctly mapped to actual spec IDs like "135-database-schema-...".
 
         Args:
             parent_spec_id: ID of the parent design spec
@@ -207,7 +379,7 @@ class SpecFactory:
                 - task: Task description (required)
                 - priority: Priority level (optional, default: NORMAL)
                 - task_type: Task type (optional, default: impl)
-                - depends_on: Dependencies (optional)
+                - depends_on: Dependencies (optional, will be resolved)
                 - complexity: Complexity (optional, default: standard)
                 - files: Files to modify (optional)
                 - criteria: Acceptance criteria (optional)
@@ -217,6 +389,7 @@ class SpecFactory:
         """
         created_specs = []
 
+        # Pass 1: Create all specs with empty depends_on
         for spec_def in specs:
             task = spec_def.get("task") or spec_def.get("task_description")
             if not task:
@@ -227,13 +400,16 @@ class SpecFactory:
                 task_description=task,
                 priority=spec_def.get("priority", TaskPriority.NORMAL),
                 task_type=spec_def.get("task_type", "impl"),
-                depends_on=spec_def.get("depends_on"),
+                depends_on=[],  # Empty initially - resolved in pass 2
                 complexity=spec_def.get("complexity", "standard"),
                 files_to_modify=spec_def.get("files") or spec_def.get("files_to_modify"),
                 acceptance_criteria=spec_def.get("criteria") or spec_def.get("acceptance_criteria"),
                 context=spec_def.get("context"),
             )
             created_specs.append(spec_dir)
+
+        # Pass 2: Resolve internal dependency references to actual spec IDs
+        self._resolve_batch_dependencies(specs, created_specs)
 
         return created_specs
 
@@ -304,6 +480,121 @@ class SpecFactory:
                 continue
 
         return children
+
+    def repair_all_dependencies(self) -> int:
+        """
+        Repair all broken dependency references across all specs.
+
+        This method:
+        1. Groups specs by parentTask
+        2. For each group, resolves internal refs to actual sibling spec IDs
+        3. Fixes string-encoded arrays (double-serialized JSON)
+        4. Updates implementation_plan.json files
+
+        Called by Task Daemon on startup to fix existing broken references.
+        Safe to call multiple times - already-correct refs are left unchanged.
+
+        Returns:
+            Number of specs that were repaired
+        """
+        if not self.specs_dir.exists():
+            return 0
+
+        # Step 1: Load all specs and group by parent
+        specs_by_parent: dict[str, list[Path]] = {}
+        all_spec_ids: set[str] = set()
+
+        for spec_dir in sorted(self.specs_dir.iterdir()):
+            if not spec_dir.is_dir() or spec_dir.name.startswith("."):
+                continue
+
+            plan_path = spec_dir / "implementation_plan.json"
+            if not plan_path.exists():
+                continue
+
+            all_spec_ids.add(spec_dir.name)
+
+            try:
+                plan = json.loads(plan_path.read_text(encoding="utf-8"))
+                parent = plan.get("parentTask") or plan.get("parent_task") or ""
+                if parent:
+                    specs_by_parent.setdefault(parent, []).append(spec_dir)
+            except (json.JSONDecodeError, OSError):
+                continue
+
+        # Step 2: For each parent group, resolve dependencies
+        repaired_count = 0
+
+        for parent_id, siblings in specs_by_parent.items():
+            # Build reference mapping for this group
+            ref_to_actual: dict[str, str] = {}
+
+            for i, spec_dir in enumerate(siblings):
+                actual_id = spec_dir.name
+                actual_slug = re.sub(r'^\d+-', '', actual_id).lower()
+
+                # Common internal numbering patterns
+                internal_num = i + 2  # parent=001, children start at 002
+                batch_1based = i + 1
+
+                ref_to_actual[f"{internal_num:03d}"] = actual_id
+                ref_to_actual[f"{batch_1based}"] = actual_id
+                ref_to_actual[str(internal_num)] = actual_id
+                ref_to_actual[actual_id] = actual_id
+                if actual_slug:
+                    ref_to_actual[actual_slug] = actual_id
+
+            # Now resolve each sibling's dependsOn
+            for spec_dir in siblings:
+                plan_path = spec_dir / "implementation_plan.json"
+                try:
+                    plan = json.loads(plan_path.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    continue
+
+                raw_deps = plan.get("dependsOn") or plan.get("depends_on") or []
+
+                # Fix string-encoded arrays
+                deps = self._normalize_list_field(raw_deps)
+
+                # Check if any dep needs resolution (not already a valid spec ID)
+                needs_repair = False
+                resolved_deps = []
+
+                for dep in deps:
+                    dep = dep.strip()
+                    if not dep:
+                        continue
+
+                    if dep in all_spec_ids:
+                        # Already a valid spec ID
+                        resolved_deps.append(dep)
+                    else:
+                        # Needs resolution
+                        resolved = self._resolve_single_dep(
+                            dep, ref_to_actual,
+                            [s for s in siblings],  # pass as list of Paths
+                        )
+                        resolved_deps.append(resolved)
+                        if resolved != dep:
+                            needs_repair = True
+
+                # Also check if format changed (string → array)
+                if isinstance(raw_deps, str) and raw_deps != "[]":
+                    needs_repair = True
+
+                if needs_repair or (deps != resolved_deps):
+                    plan["dependsOn"] = resolved_deps
+                    plan["updated_at"] = datetime.now(timezone.utc).isoformat()
+                    try:
+                        plan_path.write_text(
+                            json.dumps(plan, indent=2), encoding="utf-8"
+                        )
+                        repaired_count += 1
+                    except OSError:
+                        pass
+
+        return repaired_count
 
     def get_spec_manifest(self, parent_spec_id: str) -> dict[str, Any]:
         """Get manifest of all child specs for a parent."""

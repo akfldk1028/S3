@@ -10,11 +10,18 @@ interface WatcherInfo {
   planPath: string;
 }
 
+interface SpecsFolderWatcher {
+  projectPath: string;
+  watcher: FSWatcher;
+}
+
 /**
  * Watches implementation_plan.json files for real-time progress updates
+ * Also watches specs folders for new spec creation
  */
 export class FileWatcher extends EventEmitter {
   private watchers: Map<string, WatcherInfo> = new Map();
+  private specsFolderWatchers: Map<string, SpecsFolderWatcher> = new Map();
 
   /**
    * Start watching a task's implementation plan
@@ -88,16 +95,98 @@ export class FileWatcher extends EventEmitter {
   }
 
   /**
-   * Stop all watchers
+   * Watch a project's specs folder for new spec creation
+   * Emits 'new-spec' event when a new spec folder is created
+   */
+  async watchSpecsFolder(projectPath: string): Promise<void> {
+    // Stop any existing watcher for this project
+    await this.unwatchSpecsFolder(projectPath);
+
+    const specsPath = path.join(projectPath, '.auto-claude', 'specs');
+
+    // Check if specs folder exists
+    if (!existsSync(specsPath)) {
+      console.log(`[FileWatcher] Specs folder not found: ${specsPath}`);
+      return;
+    }
+
+    // Watch for new directories in specs folder
+    const watcher = chokidar.watch(specsPath, {
+      persistent: true,
+      ignoreInitial: true,
+      depth: 1, // Only watch immediate children
+      awaitWriteFinish: {
+        stabilityThreshold: 500,
+        pollInterval: 100
+      }
+    });
+
+    this.specsFolderWatchers.set(projectPath, {
+      projectPath,
+      watcher
+    });
+
+    // Handle new spec folder creation
+    watcher.on('addDir', (dirPath: string) => {
+      // Only emit for direct children of specs folder
+      const parentDir = path.dirname(dirPath);
+      if (path.normalize(parentDir) === path.normalize(specsPath)) {
+        const specId = path.basename(dirPath);
+        console.log(`[FileWatcher] New spec folder detected: ${specId}`);
+        this.emit('new-spec', projectPath, specId, dirPath);
+      }
+    });
+
+    // Also watch for implementation_plan.json creation in new specs
+    watcher.on('add', (filePath: string) => {
+      if (path.basename(filePath) === 'implementation_plan.json') {
+        const specDir = path.dirname(filePath);
+        const specId = path.basename(specDir);
+        console.log(`[FileWatcher] New spec plan detected: ${specId}`);
+        this.emit('new-spec-plan', projectPath, specId, specDir);
+      }
+    });
+
+    watcher.on('error', (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[FileWatcher] Specs folder watch error: ${message}`);
+    });
+
+    console.log(`[FileWatcher] Watching specs folder: ${specsPath}`);
+  }
+
+  /**
+   * Stop watching a project's specs folder
+   */
+  async unwatchSpecsFolder(projectPath: string): Promise<void> {
+    const watcherInfo = this.specsFolderWatchers.get(projectPath);
+    if (watcherInfo) {
+      await watcherInfo.watcher.close();
+      this.specsFolderWatchers.delete(projectPath);
+    }
+  }
+
+  /**
+   * Stop all watchers (both task watchers and specs folder watchers)
    */
   async unwatchAll(): Promise<void> {
-    const closePromises = Array.from(this.watchers.values()).map(
+    // Close task watchers
+    const taskClosePromises = Array.from(this.watchers.values()).map(
       async (info) => {
         await info.watcher.close();
       }
     );
-    await Promise.all(closePromises);
+
+    // Close specs folder watchers
+    const specsClosePromises = Array.from(this.specsFolderWatchers.values()).map(
+      async (info) => {
+        await info.watcher.close();
+      }
+    );
+
+    await Promise.all([...taskClosePromises, ...specsClosePromises]);
     this.watchers.clear();
+    this.specsFolderWatchers.clear();
   }
 
   /**

@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 
 from core.client import create_client
+from core.daemon_status_bridge import DaemonStatusBridge
 from core.task_event import TaskEventEmitter
 from linear_updater import (
     LinearTaskState,
@@ -84,6 +85,7 @@ async def run_autonomous_agent(
     max_iterations: int | None = None,
     verbose: bool = False,
     source_spec_dir: Path | None = None,
+    original_project_dir: Path | None = None,
 ) -> None:
     """
     Run the autonomous agent loop with automatic memory management.
@@ -110,6 +112,41 @@ async def run_autonomous_agent(
     status_manager = StatusManager(project_dir)
     status_manager.set_active(spec_dir.name, BuildState.BUILDING)
 
+    # Initialize daemon status bridge for UI real-time sync
+    bridge_project_dir = original_project_dir or project_dir
+    bridge = DaemonStatusBridge(bridge_project_dir, spec_dir.name, spec_dir)
+    bridge.start()
+
+    try:
+        await _run_autonomous_agent_inner(
+            project_dir=project_dir,
+            spec_dir=spec_dir,
+            model=model,
+            max_iterations=max_iterations,
+            verbose=verbose,
+            source_spec_dir=source_spec_dir,
+            status_manager=status_manager,
+            recovery_manager=recovery_manager,
+            bridge=bridge,
+        )
+    finally:
+        # Ensure daemon_status.json is cleaned up on any exit path
+        bridge.close()
+
+
+async def _run_autonomous_agent_inner(
+    *,
+    project_dir: Path,
+    spec_dir: Path,
+    model: str,
+    max_iterations: int | None,
+    verbose: bool,
+    source_spec_dir: Path | None,
+    status_manager: StatusManager,
+    recovery_manager: RecoveryManager,
+    bridge: DaemonStatusBridge,
+) -> None:
+    """Inner implementation of run_autonomous_agent, wrapped in try/finally for bridge cleanup."""
     # Initialize task logger for persistent logging
     task_logger = get_task_logger(spec_dir)
 
@@ -291,6 +328,13 @@ async def run_autonomous_agent(
             attempt=recovery_manager.get_attempt_count(subtask_id) + 1
             if subtask_id
             else 1,
+        )
+
+        # Update daemon status bridge for UI sync
+        bridge.update(
+            subtask_id=subtask_id,
+            phase="planning" if first_run else "coding",
+            session=iteration,
         )
 
         # Capture state before session for post-processing
@@ -553,6 +597,7 @@ async def run_autonomous_agent(
             # QA loop will emit COMPLETE after actual approval
             print_build_complete_banner(spec_dir)
             status_manager.update(state=BuildState.COMPLETE)
+            bridge.complete()
 
             # Reset error tracking on success
             _reset_concurrency_state()

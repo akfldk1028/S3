@@ -301,6 +301,10 @@ class TaskDaemon:
         if not self.specs_dir.exists():
             return
 
+        # Repair broken dependency references before scanning
+        # This fixes internal refs (e.g., "002-foo") → actual spec IDs (e.g., "135-foo-...")
+        self._repair_dependencies()
+
         self._logger.info("Scanning existing specs...")
         queued_count = 0
 
@@ -318,6 +322,17 @@ class TaskDaemon:
                         queued_count += 1
 
         self._logger.info(f"Scan complete: {queued_count} tasks queued")
+
+    def _repair_dependencies(self) -> None:
+        """Repair broken dependency references using SpecFactory."""
+        try:
+            from services.spec_factory import SpecFactory
+            factory = SpecFactory(self.project_dir)
+            repaired = factory.repair_all_dependencies()
+            if repaired > 0:
+                self._logger.info(f"Repaired dependency references in {repaired} specs")
+        except Exception as e:
+            self._logger.warning(f"Failed to repair dependencies: {e}")
 
     def _on_spec_change(self, spec_id: str, spec_dir: Path) -> None:
         """Handle spec change event."""
@@ -349,11 +364,33 @@ class TaskDaemon:
             return False
         return True
 
+    @staticmethod
+    def _normalize_depends_on(raw: Any) -> list[str]:
+        """Normalize dependsOn which may be a string-encoded JSON array."""
+        if isinstance(raw, list):
+            return raw
+        if isinstance(raw, str):
+            raw = raw.strip()
+            if raw.startswith("["):
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, list):
+                        return parsed
+                except json.JSONDecodeError:
+                    pass
+            # Comma-separated string
+            if "," in raw:
+                return [d.strip() for d in raw.split(",") if d.strip()]
+            if raw:
+                return [raw]
+        return []
+
     def _enqueue_task(self, spec_id: str, spec_dir: Path, plan: dict) -> None:
         """Add task to priority queue."""
         task_type = plan.get("taskType", plan.get("task_type", "default"))
         priority = plan.get("priority", TaskPriority.NORMAL)
-        depends_on = plan.get("dependsOn", plan.get("depends_on", []))
+        raw_deps = plan.get("dependsOn", plan.get("depends_on", []))
+        depends_on = self._normalize_depends_on(raw_deps)
         parent_task = plan.get("parentTask", plan.get("parent_task"))
 
         queued_task = QueuedTask(

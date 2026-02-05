@@ -240,6 +240,7 @@ def handle_build_command(
                 max_iterations=max_iterations,
                 verbose=verbose,
                 source_spec_dir=source_spec_dir,  # For syncing progress back to main project
+                original_project_dir=project_dir if working_dir != project_dir else None,
             )
         )
         debug_success("run.py", "Agent execution completed")
@@ -314,6 +315,7 @@ def handle_build_command(
             model=model,
             max_iterations=max_iterations,
             verbose=verbose,
+            source_spec_dir=source_spec_dir,
         )
     except Exception as e:
         print(f"\nFatal error: {e}")
@@ -332,6 +334,7 @@ def _handle_build_interrupt(
     model: str,
     max_iterations: int | None,
     verbose: bool,
+    source_spec_dir: Path | None = None,
 ) -> None:
     """
     Handle keyboard interrupt during build.
@@ -344,6 +347,7 @@ def _handle_build_interrupt(
         model: Model being used
         max_iterations: Maximum iterations
         verbose: Verbose mode flag
+        source_spec_dir: Original spec directory (for worktree sync)
     """
     from agent import run_autonomous_agent
 
@@ -450,6 +454,8 @@ def _handle_build_interrupt(
                     model=model,
                     max_iterations=max_iterations,
                     verbose=verbose,
+                    source_spec_dir=source_spec_dir,
+                    original_project_dir=project_dir if working_dir != project_dir else None,
                 )
             )
             # Build completed or was interrupted again - exit

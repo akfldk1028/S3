@@ -44,6 +44,9 @@ TOOL_RECORD_DISCOVERY = "mcp__auto-claude__record_discovery"
 TOOL_RECORD_GOTCHA = "mcp__auto-claude__record_gotcha"
 TOOL_GET_SESSION_CONTEXT = "mcp__auto-claude__get_session_context"
 TOOL_UPDATE_QA_STATUS = "mcp__auto-claude__update_qa_status"
+# Design agent tools for creating child specs (parallel task decomposition)
+TOOL_CREATE_CHILD_SPEC = "mcp__auto-claude__create_child_spec"
+TOOL_CREATE_BATCH_CHILD_SPECS = "mcp__auto-claude__create_batch_child_specs"
 
 # =============================================================================
 # External MCP Tools
@@ -202,6 +205,9 @@ AGENT_CONFIGS = {
             TOOL_GET_BUILD_PROGRESS,
             TOOL_GET_SESSION_CONTEXT,
             TOOL_RECORD_DISCOVERY,
+            # Design agent tools for parallel task decomposition
+            TOOL_CREATE_CHILD_SPEC,
+            TOOL_CREATE_BATCH_CHILD_SPECS,
         ],
         "thinking_default": "high",
     },

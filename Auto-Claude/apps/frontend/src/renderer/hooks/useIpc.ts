@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
-import { useTaskStore } from '../stores/task-store';
+import { useTaskStore, loadTasks } from '../stores/task-store';
 import { useRoadmapStore } from '../stores/roadmap-store';
 import { useRateLimitStore } from '../stores/rate-limit-store';
 import { useAuthFailureStore } from '../stores/auth-failure-store';
@@ -356,6 +356,34 @@ export function useIpcListeners(): void {
       }
     );
 
+    // New spec folder listener - auto-refresh task list when create_batch_child_specs creates new specs
+    const cleanupNewSpec = window.electronAPI.onNewSpec(
+      (data: { projectPath: string; specId: string; specDir: string }) => {
+        console.log('[useIpc] New spec detected:', data.specId);
+        // Find the project by path and refresh its tasks
+        const projects = useProjectStore.getState().projects;
+        const project = projects.find(p => p.path === data.projectPath);
+        if (project) {
+          console.log('[useIpc] Refreshing tasks for project:', project.id);
+          loadTasks(project.id, { forceRefresh: true });
+        }
+      }
+    );
+
+    // New spec plan listener - also triggers refresh when implementation_plan.json is created
+    const cleanupNewSpecPlan = window.electronAPI.onNewSpecPlan(
+      (data: { projectPath: string; specId: string; specDir: string }) => {
+        console.log('[useIpc] New spec plan detected:', data.specId);
+        // Find the project by path and refresh its tasks
+        const projects = useProjectStore.getState().projects;
+        const project = projects.find(p => p.path === data.projectPath);
+        if (project) {
+          console.log('[useIpc] Refreshing tasks for project:', project.id);
+          loadTasks(project.id, { forceRefresh: true });
+        }
+      }
+    );
+
     // Cleanup on unmount
     return () => {
       // Flush any pending batched updates before cleanup
@@ -376,6 +404,8 @@ export function useIpcListeners(): void {
       cleanupRateLimit();
       cleanupSDKRateLimit();
       cleanupAuthFailure();
+      cleanupNewSpec();
+      cleanupNewSpecPlan();
     };
   }, [updateTaskFromPlan, updateTaskStatus, updateExecutionProgress, appendLog, batchAppendLogs, setError]);
 }

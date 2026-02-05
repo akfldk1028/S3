@@ -16,6 +16,43 @@ from typing import Any
 from core.file_utils import write_json_atomic
 from spec.validate_pkg.auto_fix import auto_fix_plan
 
+
+def _get_original_project_dir(project_dir: Path) -> Path:
+    """
+    Get the original project directory from a worktree path.
+
+    Worktrees are located at:
+    - .auto-claude/worktrees/tasks/{spec-name}/
+    - .worktrees/{spec-name}/ (legacy)
+
+    This function extracts the original project path so child specs
+    are created in the main project, not inside the worktree.
+
+    Args:
+        project_dir: Current working directory (may be a worktree)
+
+    Returns:
+        Original project directory path
+    """
+    resolved = project_dir.resolve()
+    path_str = str(resolved).replace("\\", "/")
+
+    # Check for worktree markers
+    worktree_markers = [
+        "/.auto-claude/worktrees/tasks/",
+        "/.auto-claude/github/pr/worktrees/",
+        "/.worktrees/",
+    ]
+
+    for marker in worktree_markers:
+        if marker in path_str:
+            # Extract the original project path (everything before the marker)
+            original_path = path_str.split(marker)[0]
+            return Path(original_path)
+
+    # Not a worktree, return as-is
+    return project_dir
+
 try:
     from claude_agent_sdk import tool
 
@@ -257,19 +294,19 @@ Example:
             # Import SpecFactory
             from services.spec_factory import SpecFactory
 
-            factory = SpecFactory(project_dir)
+            # Use original project dir (not worktree) so specs are created in main project
+            original_project_dir = _get_original_project_dir(project_dir)
+            factory = SpecFactory(original_project_dir)
 
-            # Create the child spec
-            child_spec_dir = asyncio.get_event_loop().run_until_complete(
-                factory.create_child_spec(
-                    parent_spec_id=parent_spec_id,
-                    task_description=task_description,
-                    priority=priority,
-                    task_type=task_type,
-                    depends_on=depends_on,
-                    files_to_modify=files_to_modify,
-                    acceptance_criteria=acceptance_criteria,
-                )
+            # Create the child spec (await since we're in async function)
+            child_spec_dir = await factory.create_child_spec(
+                parent_spec_id=parent_spec_id,
+                task_description=task_description,
+                priority=priority,
+                task_type=task_type,
+                depends_on=depends_on,
+                files_to_modify=files_to_modify,
+                acceptance_criteria=acceptance_criteria,
             )
 
             child_spec_id = child_spec_dir.name
@@ -358,14 +395,14 @@ Example:
         try:
             from services.spec_factory import SpecFactory
 
-            factory = SpecFactory(project_dir)
+            # Use original project dir (not worktree) so specs are created in main project
+            original_project_dir = _get_original_project_dir(project_dir)
+            factory = SpecFactory(original_project_dir)
 
-            # Create all specs
-            created_specs = asyncio.get_event_loop().run_until_complete(
-                factory.create_batch_specs(
-                    parent_spec_id=parent_spec_id,
-                    specs=specs_list,
-                )
+            # Create all specs (await since we're in async function)
+            created_specs = await factory.create_batch_specs(
+                parent_spec_id=parent_spec_id,
+                specs=specs_list,
             )
 
             # Build result message
@@ -374,17 +411,41 @@ Example:
                 "",
             ]
 
+            child_spec_names = []
             for i, spec_dir_path in enumerate(created_specs):
                 spec_def = specs_list[i] if i < len(specs_list) else {}
                 task = spec_def.get("task") or spec_def.get("task_description", "Unknown")
                 result_lines.append(f"  {i+1}. {spec_dir_path.name}")
                 result_lines.append(f"     Task: {task}")
+                child_spec_names.append(spec_dir_path.name)
 
             result_lines.extend([
                 "",
                 f"Parent spec: {parent_spec_id}",
                 "All specs will be picked up by the Task Daemon automatically.",
             ])
+
+            # Update parent spec status to "complete" so it doesn't run again
+            # This prevents the infinite loop where is_first_run() keeps returning True
+            parent_plan_file = spec_dir / "implementation_plan.json"
+            if parent_plan_file.exists():
+                try:
+                    with open(parent_plan_file, encoding="utf-8") as f:
+                        parent_plan = json.load(f)
+
+                    parent_plan["status"] = "complete"
+                    parent_plan["planStatus"] = "complete"
+                    parent_plan["executionPhase"] = "complete"
+                    parent_plan["childSpecs"] = child_spec_names
+                    parent_plan["completedAt"] = datetime.now(timezone.utc).isoformat()
+
+                    write_json_atomic(parent_plan_file, parent_plan, indent=2)
+                    result_lines.append("")
+                    result_lines.append("Parent spec status updated to 'complete'.")
+                except Exception as plan_err:
+                    logging.warning(f"Failed to update parent spec status: {plan_err}")
+                    result_lines.append("")
+                    result_lines.append(f"Warning: Could not update parent status: {plan_err}")
 
             return {
                 "content": [

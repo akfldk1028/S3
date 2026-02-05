@@ -2,6 +2,8 @@
 
 Background services for autonomous task orchestration. Run Auto-Claude without UI for 24/7 headless operation.
 
+> **Quick Start**: [DESIGN_TASK_TEMPLATE.md](DESIGN_TASK_TEMPLATE.md) - Design task로 대형 프로젝트 분해하기
+
 ## Overview
 
 The services module provides:
@@ -12,6 +14,10 @@ The services module provides:
 ## Task Daemon
 
 The `TaskDaemon` class watches the `.auto-claude/specs/` folder and automatically executes tasks.
+
+> **CRITICAL: 프로젝트당 Daemon은 반드시 1개만 실행하세요.**
+> 동일 프로젝트에 Daemon 2개 이상 실행하면 task 충돌, 파일 잠금(Permission denied), worktree 경합 등 예측 불가능한 문제가 발생합니다.
+> Daemon을 재시작하려면 기존 프로세스를 반드시 먼저 종료해야 합니다.
 
 ### Features
 
@@ -30,17 +36,23 @@ The `TaskDaemon` class watches the `.auto-claude/specs/` folder and automaticall
 ```bash
 cd Auto-Claude/apps/backend
 
+# ⚠️ 실행 전: 기존 daemon이 돌고 있는지 반드시 확인
+# Windows:
+tasklist | findstr python
+# Linux/Mac:
+ps aux | grep daemon_runner
+
 # Basic: Sequential execution
 python runners/daemon_runner.py --project-dir "C:\path\to\project"
 
-# Parallel: 4 concurrent tasks with worktree isolation
+# Parallel: 3 concurrent tasks with worktree isolation (권장)
 python runners/daemon_runner.py --project-dir "..." \
-    --max-concurrent 4 \
+    --max-concurrent 3 \
     --use-worktrees
 
 # Full 24/7 Setup
 python runners/daemon_runner.py --project-dir "..." \
-    --max-concurrent 4 \
+    --max-concurrent 3 \
     --use-worktrees \
     --status-file daemon_status.json \
     --log-file daemon.log
@@ -87,6 +99,12 @@ python runners/daemon_runner.py --project-dir "..." \
 | `integration` | Integration tasks | default |
 | `docs` | Documentation | default |
 
+**Verification & Error-Check Tasks** (run.py, auto-queued after impl):
+| Task Type | Description | MCP Servers |
+|-----------|-------------|-------------|
+| `verify` | 구현 검증 (코드 리뷰 + 빌드 + 테스트 + 런타임) | context7, auto-claude, browser (동적) |
+| `error_check` | verify가 발견한 에러를 최소 변경으로 수정 | context7, graphiti, auto-claude |
+
 ### Task Priority Levels
 
 | Priority | Value | Use Case |
@@ -126,6 +144,59 @@ Tasks are configured via `implementation_plan.json`:
    └── Waits for all module tasks
    └── Merges and validates
 ```
+
+### Auto-Verify Pipeline (impl 완료 후 자동 검증)
+
+impl 계열 task가 성공적으로 완료되면 daemon이 자동으로 verify task를 생성합니다.
+
+```
+impl task 완료 (성공)
+  │
+  ▼
+daemon._auto_queue_verify()
+  → verify spec 생성 (verify-{spec_id}, priority: HIGH, dependsOn: [spec_id])
+  │
+  ▼
+verify agent 실행
+  → Phase 1: 코드 리뷰 (로직 에러, 보안, edge case)
+  → Phase 2: 빌드/정적 분석 (프로젝트 타입 자동 감지)
+  → Phase 3: 테스트 실행
+  → Phase 4: 런타임 검증 (웹: 브라우저, Flutter: flutter build, Unity: N/A)
+  │
+  ├── 에러 없음 → PASS → verify_report.md 작성 → 완료
+  │
+  └── 에러 발견 → FAIL
+        → create_batch_child_specs(type="error_check", priority=HIGH)
+        → verify_report.md에 에러 상세 기록
+        │
+        ▼
+      error_check agent 실행
+        → verify_report.md 읽고 에러 파악
+        → 최소한의 코드 변경으로 수정
+        → 수정 후 빌드/테스트 재실행
+        │
+        ▼
+      error_check 성공 완료
+        → daemon이 부모 impl의 re-verify 자동 큐잉
+        → verify-{spec_id}-2 생성 (최대 MAX_VERIFY_ATTEMPTS=3회)
+```
+
+**무한 루프 방지:**
+- `IMPL_TASK_TYPES = {"impl", "frontend", "backend", "database", "api"}` — verify/error_check 제외
+- verify spec ID에 attempt 번호 부여: `verify-{id}`, `verify-{id}-2`, `verify-{id}-3`
+- `MAX_VERIFY_ATTEMPTS = 3` 초과 시 중단
+
+**프로젝트 타입별 검증 방식:**
+
+| 프로젝트 | 빌드 검증 | 테스트 | 런타임 검증 |
+|----------|----------|--------|------------|
+| Flutter | `flutter analyze` | `flutter test` | `flutter build apk --debug` |
+| React/Vue | `npm run typecheck` + `npm run build` | `npm test` | 브라우저 MCP (Puppeteer/Playwright) |
+| Python | `ruff check` + `mypy` | `pytest` | 서버 시작 + API 체크 |
+| Unity | `dotnet build` | Unity Editor CLI | N/A (headless 불가) |
+| Go | `go build` + `go vet` | `go test` | 바이너리 실행 |
+
+verify agent는 `project_index.json`의 capabilities를 통해 프로젝트 타입을 자동 감지합니다.
 
 ### Programmatic Usage
 
@@ -561,8 +632,122 @@ Scheduler 실행:
     T3:  005 완료 → ALL COMPLETE
 ```
 
+## CLI → UI 실시간 연동 (DaemonStatusBridge)
+
+외부 터미널에서 `run.py`를 직접 실행할 때도 Electron UI에 실시간으로 진행 상황을 표시합니다.
+
+### 문제
+
+- `run.py`를 외부에서 실행하면 `daemon_status.json`을 안 씀
+- UI의 `DaemonStatusWatcher`가 이 파일을 감시해서 IPC 전송하는 구조
+- 파일이 없으면 UI에 아무것도 안 보임
+
+### 해결 구조
+
+```
+run.py (외부 터미널)
+  │
+  └── DaemonStatusBridge (core/daemon_status_bridge.py)
+        │
+        ├── start()  → daemon_status.json 생성 (빌드 시작)
+        ├── update() → running_tasks 업데이트 (subtask 진행)
+        ├── complete() → stats.completed +1 (빌드 성공)
+        └── close()  → 정리 (finally 블록에서 호출)
+        │
+        ▼
+  daemon_status.json (프로젝트 루트)
+        │
+        ▼
+  Electron Main Process
+        │
+        └── DaemonStatusWatcher (daemon-status-watcher.ts)
+              │
+              ├── chokidar: 파일 변경 감지 → processFile()
+              ├── setInterval 5s: 주기적 재전송 (forceRefresh 복구용)
+              └── processFile() → TASK_STATUS_CHANGE IPC 전송
+              │
+              ▼
+        Renderer (Zustand task store)
+              │
+              └── Kanban 카드 In Progress로 이동
+```
+
+### daemon_status.json 포맷
+
+TaskDaemon.get_status()와 동일한 포맷:
+
+```json
+{
+  "project_dir": "C:\\path\\to\\project",
+  "running": true,
+  "started_at": "2026-02-04T15:16:25+00:00",
+  "config": { "max_concurrent_tasks": 1, "headless_mode": true },
+  "running_tasks": {
+    "001-spec-id": {
+      "spec_id": "001-spec-id",
+      "spec_dir": "C:\\...\\specs\\001-spec-id",
+      "status": "in_progress",
+      "is_running": true,
+      "started_at": "...",
+      "last_update": "...",
+      "task_type": "impl",
+      "current_subtask": "subtask-1-1",
+      "phase": "coding",
+      "session": 1
+    }
+  },
+  "stats": { "running": 1, "queued": 0, "completed": 0 }
+}
+```
+
+### 수정된 파일
+
+| 파일 | 역할 |
+|------|------|
+| `core/daemon_status_bridge.py` | **신규** - daemon_status.json 작성 브릿지 |
+| `agents/coder.py` | bridge 연동 (start/update/complete/close) |
+| `cli/build_commands.py` | original_project_dir 전달 (worktree 모드 지원) |
+| `frontend/.../daemon-status-watcher.ts` | 다중 프로젝트 + 주기적 재전송 |
+| `frontend/.../agent-events-handlers.ts` | 5초 폴링으로 daemon_status.json 감지 |
+
+### 핵심 설계 결정
+
+1. **이중 쓰기 방지**: bridge.start() 시 기존 daemon_status.json의 PID 체크. 살아있는 daemon이 있으면 merge (덮어쓰지 않음)
+2. **Windows 호환**: `os.kill(pid, 0)` 대신 `ctypes.windll.kernel32.OpenProcess` 사용 (Windows에서 os.kill은 프로세스를 종료시킴)
+3. **Atomic write**: `.tmp` → `os.replace()` 패턴으로 partial read 방지
+4. **try/finally 보장**: coder.py에서 bridge.close()는 항상 실행 (예외/인터럽트 무관)
+5. **주기적 재전송**: DaemonStatusWatcher가 5초마다 processFile() 호출 → UI forceRefresh로 스토어가 클리어되어도 자동 복구
+6. **다중 프로젝트**: ProjectWatcher Map으로 여러 프로젝트 동시 감시
+
+### coder.py 연동 지점
+
+| 시점 | 메서드 | 설명 |
+|------|--------|------|
+| 빌드 시작 | `bridge.start()` | daemon_status.json 생성 |
+| subtask 진행 | `bridge.update(subtask_id, phase, session)` | running_tasks 업데이트 |
+| 빌드 성공 | `bridge.complete()` | stats.completed +1, running_tasks에서 제거 |
+| 항상 (finally) | `bridge.close()` | running: false로 정리 |
+
+### 테스트 방법
+
+```bash
+# Terminal 1: UI 실행
+cd Auto-Claude/apps/frontend && npm run dev
+
+# Terminal 2: CLI 빌드 (UI가 부팅된 후)
+cd Auto-Claude/apps/backend
+.venv\Scripts\python.exe run.py --project-dir "C:\path\to\project" --spec 001 --force --auto-continue --max-iterations 3
+
+# 기대 결과:
+# 1. daemon_status.json 자동 생성
+# 2. UI Kanban에서 카드가 In Progress로 이동 (5초 이내)
+# 3. subtask 진행 시 daemon_status.json 업데이트
+# 4. 빌드 완료 시 카드가 Human Review로 이동
+```
+
 ## Related Files
 
 - `runners/daemon_runner.py` - CLI entry point
 - `core/task_event.py` - Task event emission
+- `core/daemon_status_bridge.py` - CLI → UI 실시간 연동 브릿지
 - `requirements.txt` - `watchdog>=4.0.0` dependency
