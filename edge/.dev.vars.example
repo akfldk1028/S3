@@ -1,0 +1,9 @@
+# Vast.ai Backend GPU Server
+VASTAI_BACKEND_URL=http://localhost:8000
+
+# Edge ↔ Backend Authentication
+API_SECRET_KEY=
+
+# Supabase
+SUPABASE_URL=
+SUPABASE_ANON_KEY=

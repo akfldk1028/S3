@@ -1,0 +1,50 @@
+{
+  "categories": {
+    "objects": {
+      "description": "일반 객체 감지",
+      "prompts": [
+        "person",
+        "car",
+        "dog",
+        "cat",
+        "bicycle",
+        "chair",
+        "table",
+        "phone",
+        "laptop",
+        "bottle"
+      ]
+    },
+    "complex": {
+      "description": "복합 프롬프트 (속성 포함)",
+      "prompts": [
+        "person wearing a red shirt",
+        "white car on the road",
+        "dog sitting on grass",
+        "wooden chair near window",
+        "open laptop on desk"
+      ]
+    },
+    "background": {
+      "description": "배경/전경 분리",
+      "prompts": [
+        "background",
+        "foreground",
+        "sky",
+        "ground",
+        "wall",
+        "floor"
+      ]
+    },
+    "body_parts": {
+      "description": "인체 부위",
+      "prompts": [
+        "face",
+        "hand",
+        "hair",
+        "arm",
+        "leg"
+      ]
+    }
+  }
+}
