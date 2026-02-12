@@ -26,6 +26,6 @@
 | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | 초기 아키텍처 설계 |
 | [`../frontend/README.md`](../frontend/README.md) | Frontend 가이드 |
 | [`../edge/README.md`](../edge/README.md) | Edge API 가이드 |
-| [`../backend/README.md`](../backend/README.md) | Backend 추론 가이드 |
+| [`../backend/README.md`](../cf-backend/README.md) | Backend 추론 가이드 |
 | [`../supabase/README.md`](../supabase/README.md) | Supabase 가이드 |
-| [`../ai/README.md`](../ai/README.md) | AI 스크립트 가이드 |
+| [`../ai/README.md`](../ai-backend/README.md) | AI 스크립트 가이드 |

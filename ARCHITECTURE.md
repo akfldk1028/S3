@@ -1,396 +1,602 @@
-# S3 - SAM3 Segmentation App Architecture
+# S3 Architecture — 도메인 팔레트 엔진 기반 세트 생산 앱
 
-## Overview
+> v3.0 (2026-02-11) — `workflow.md`가 SSoT. 이 문서는 아키텍처 심화 참조.
 
-SAM3(Segment Anything Model 3, Meta 2025.11)를 활용한 이미지/비디오 세그멘테이션 앱.
-텍스트 프롬프트로 객체를 감지하고 세그멘테이션하는 서비스를 제공한다.
+---
 
-## System Architecture
+## 설계 원칙: n8n 모듈 패턴
 
-```
-┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│   Flutter    │────▶│  Cloudflare      │────▶│  Vast.ai GPU    │
-│   App        │◀────│  Workers + R2    │◀────│  (FastAPI)      │
-│  (Frontend)  │     │  (Edge Layer)    │     │  SAM3 Inference │
-└──────┬───────┘     └──────────────────┘     └─────────────────┘
-       │                                              │
-       │              ┌──────────────────┐            │
-       └─────────────▶│    Supabase      │◀───────────┘
-                      │  Auth / DB / RT  │
-                      └──────────────────┘
-```
-
-### Data Flow
+모든 계층과 에이전트는 **n8n 노드** 패턴을 따른다:
 
 ```
-1. User → Flutter App → 이미지 업로드 + 텍스트 프롬프트
-2. Flutter → Cloudflare R2 → 이미지 저장 (edge storage)
-3. Flutter → Cloudflare Workers → Vast.ai FastAPI → SAM3 추론
-4. SAM3 결과(마스크) → Cloudflare R2 저장 → Flutter 표시
-5. 메타데이터 → Supabase DB 저장
+┌─────────────────────────────────────┐
+│  Module (= n8n Node)                │
+│                                     │
+│  Input  → [ 자체 로직 ] → Output    │
+│                                     │
+│  ■ 경계 명확 (다른 모듈 직접 import 금지) │
+│  ■ 통신은 HTTP / Queue / Callback   │
+│  ■ 독립 배포 + 독립 테스트 가능       │
+│  ■ 실패해도 다른 모듈에 전파 안 됨     │
+└─────────────────────────────────────┘
+```
+
+| 원칙 | 설명 |
+|------|------|
+| **단일 책임** | 각 모듈은 하나의 역할만. Workers=입구, DO=상태, GPU=추론 |
+| **명확한 I/O** | JSON schema로 정의된 입출력. 암묵적 의존 금지 |
+| **독립 배포** | Workers/GPU Worker 각각 독립적으로 배포 가능 |
+| **실패 격리** | GPU Worker 다운 → Workers는 Queue에 남아있는 메시지로 재시도. 전체 시스템 안 죽음 |
+| **교체 가능** | adapter 패턴으로 GPU 플랫폼 교체 (Runpod ↔ Vast ↔ 자체서버) |
+
+---
+
+## 시스템 아키텍처: 입구 — 뇌 — 근육
+
+```
+┌──────────────┐      ┌─────────────────────────────────┐      ┌──────────────────┐
+│   Flutter    │─────▶│  Cloudflare                     │─────▶│  Runpod GPU      │
+│   App        │◀─────│  Workers (입구) + DO (뇌)       │◀─────│  Docker Worker   │
+│              │      │  + Queues + R2 + D1             │      │  (근육)          │
+└──────────────┘      └─────────────────────────────────┘      └──────────────────┘
+```
+
+### 모듈 분해 (n8n Node View)
+
+```
+┌─────────┐    HTTP     ┌──────────┐   DO call   ┌──────────────┐
+│ Flutter │───────────▶│ Workers  │───────────▶│ UserLimiter  │
+│  (UI)   │◀───────────│ (입구)   │◀───────────│  DO (뇌)     │
+└─────────┘   JSON      │          │             └──────────────┘
+                        │          │   DO call   ┌──────────────┐
+                        │          │───────────▶│ JobCoordinator│
+                        │          │◀───────────│  DO (뇌)     │
+                        └────┬─────┘             └──────┬───────┘
+                             │                          │
+                     R2 presigned              Queue push│
+                             │                          │
+                        ┌────▼─────┐             ┌──────▼───────┐
+                        │   R2     │◀────────────│ GPU Worker   │
+                        │ (저장소) │  S3 API     │  (근육)      │
+                        └──────────┘             └──────┬───────┘
+                                                        │
+                        ┌──────────┐             HTTP callback
+                        │   D1     │◀──── flush ────────┘
+                        │ (영속DB) │
+                        └──────────┘
 ```
 
 ---
 
-## Tech Stack
+## 계층별 모듈 상세
 
-| Layer | Technology | Purpose |
-|-------|-----------|---------|
-| **Frontend** | Flutter 3.38.9 | 크로스 플랫폼 앱 (iOS/Android/Web) |
-| **Edge** | Cloudflare Workers | API 게이트웨이, 캐싱, 라우팅 |
-| **Edge Storage** | Cloudflare R2 | 이미지/마스크 저장 (S3 호환) |
-| **GPU Backend** | FastAPI + Uvicorn | SAM3 추론 API 서버 |
-| **GPU Infra** | Vast.ai | GPU 임대 (A100/H100) |
-| **AI Model** | SAM3 (848M params) | 세그멘테이션 모델 |
-| **Database** | Supabase (PostgreSQL) | 유저, 프로젝트, 결과 메타데이터 |
-| **Auth** | Supabase Auth | 인증/인가 |
-| **Realtime** | Supabase Realtime | 추론 상태 실시간 알림 |
+### Module 1: Workers (입구)
+
+| 속성 | 값 |
+|------|---|
+| **역할** | HTTP API 서버 — 인증, 요청 검증, CRUD, presigned URL, DO 호출, Queue push |
+| **기술** | Hono + Cloudflare Workers (TypeScript) |
+| **Input** | Flutter HTTP 요청 (Authorization: Bearer JWT) |
+| **Output** | JSON Response Envelope `{ success, data, error, meta }` |
+| **바인딩** | D1 (DB), R2 (스토리지), DO (UserLimiter, JobCoordinator), Queue (gpu-jobs) |
+| **배포** | `npx wrangler deploy` |
+
+**내부 구조 (n8n sub-node):**
+
+```
+workers/src/
+├── index.ts              # Hono app entry → route mount
+├── routes/               # 각 route = 독립 Hono instance
+│   ├── auth.ts           # POST /auth/anon
+│   ├── presets.ts        # GET /presets, GET /presets/{id}
+│   ├── rules.ts          # CRUD /rules
+│   └── jobs.ts           # POST /jobs, execute, confirm, callback, cancel
+├── do/                   # Durable Objects
+│   ├── UserLimiterDO.ts  # 크레딧, 동시성, 룰 슬롯
+│   └── JobCoordinatorDO.ts # Job 상태머신, 멱등성
+├── middleware/            # auth JWT, error handler
+├── services/             # D1 queries, R2 presigned
+└── utils/                # response envelope
+```
+
+**14 API 엔드포인트:**
+
+| # | Method | Path | 처리 주체 |
+|---|--------|------|----------|
+| 1 | POST | `/auth/anon` | Workers → D1 |
+| 2 | GET | `/me` | UserLimiterDO |
+| 3-4 | GET | `/presets`, `/presets/{id}` | Workers (하드코딩) |
+| 5-8 | CRUD | `/rules` | D1 + UserLimiterDO |
+| 9-14 | POST/GET | `/jobs/*` | JobCoordinatorDO → Queue → R2 |
+
+### Module 2: Durable Objects (뇌)
+
+| 속성 | 값 |
+|------|---|
+| **역할** | 실시간 상태 관리 + 동시성 제어 + 멱등성 |
+| **기술** | Cloudflare Durable Objects |
+| **Input** | Workers 내부 DO 호출 (RPC) |
+| **Output** | 상태 변경 + Workers 응답 |
+
+**UserLimiterDO (유저당 1개):**
+
+```
+┌──────────────────────────────┐
+│ Input:  checkCredits(cost)   │
+│         reserve(job_id)      │
+│         release(job_id)      │
+│                              │
+│ State:  credits, active_jobs,│
+│         rule_slots_used      │
+│                              │
+│ Output: { allowed, reason }  │
+│         { credits_remaining }│
+└──────────────────────────────┘
+```
+
+**JobCoordinatorDO (job당 1개):**
+
+```
+┌──────────────────────────────────┐
+│ Input:  create(preset, items)    │
+│         confirmUpload()          │
+│         execute(concepts, protect)│
+│         callback(idx, status)    │
+│         cancel()                 │
+│                                  │
+│ State:  status (상태머신),        │
+│         items Map, done/failed,  │
+│         seen_idempotency_keys    │
+│                                  │
+│ Output: { status, progress }     │
+│         Queue message (execute)  │
+│         D1 flush (완료 시)        │
+└──────────────────────────────────┘
+
+상태머신:
+created → uploaded → queued → running → done
+                                    ↘ failed
+         (any) → canceled
+```
+
+### Module 3: GPU Worker (근육)
+
+| 속성 | 값 |
+|------|---|
+| **역할** | SAM3 세그멘테이션 + 룰 적용 (추론 전용) |
+| **기술** | Python 3.12 + PyTorch 2.7+ + SAM3 + Docker |
+| **Input** | Queue 메시지 (JSON) or Runpod event |
+| **Output** | R2 업로드 (결과) + Workers callback (HTTP) |
+| **배포** | Docker image → Runpod Serverless |
+
+**내부 구조 (n8n sub-node):**
+
+```
+gpu-worker/
+├── engine/               # 플랫폼 독립 코어 (n8n pure logic)
+│   ├── pipeline.py       # 전체 파이프라인 오케스트레이션
+│   ├── segmenter.py      # SAM3 wrapper: concept → masks
+│   ├── applier.py        # Rule apply: masks + params → result
+│   ├── r2_io.py          # R2 업/다운로드 (boto3, S3 호환)
+│   ├── callback.py       # Workers callback 보고
+│   └── idempotency.py    # 중복 처리 방지
+├── adapters/             # 플랫폼별 어댑터 (교체 지점)
+│   ├── runpod_serverless.py  # Runpod handler (MVP)
+│   ├── queue_pull.py         # Vast/Pod용 polling
+│   └── http_trigger.py       # HTTP trigger (옵션)
+├── presets/              # 도메인별 concept 매핑
+│   ├── interior.py
+│   └── seller.py
+├── Dockerfile            # 2단 빌드 (base CUDA + app)
+└── main.py               # 진입점
+```
+
+**2단계 추론 파이프라인:**
+
+```
+Input Image
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│  Phase A: SAM3 Segment (GPU 필수)       │
+│  concept text → SAM3 → N개 인스턴스 마스크 │
+│  protect concepts → protect 마스크들      │
+└─────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│  Phase B: Rule Apply (CPU/GPU)          │
+│  원본 + 마스크 + protect + rule params   │
+│  → 영역별 변환 → 결과 이미지              │
+└─────────────────────────────────────────┘
+    │
+    ▼
+R2 Upload → Callback → Workers
+```
+
+**GPU 플랫폼 교체 (adapter 패턴):**
+
+```
+engine/ (동일) + adapters/runpod.py   → Runpod Serverless
+engine/ (동일) + adapters/vast.py     → Vast.ai Pod
+engine/ (동일) + adapters/local.py    → 자체 GPU 서버
+```
+
+### Module 4: Flutter App (UI)
+
+| 속성 | 값 |
+|------|---|
+| **역할** | 사용자 인터페이스 — 팔레트 선택, 이미지 업로드, 결과 표시 |
+| **기술** | Flutter 3.38.9 + Riverpod 3 + ShadcnUI + Freezed 3 + GoRouter |
+| **Input** | 사용자 터치/입력 |
+| **Output** | Workers API HTTP 요청 |
+
+**내부 구조 (Feature-First):**
+
+```
+frontend/lib/
+├── core/                   # 공통 인프라
+│   ├── api/api_client.dart # Dio + JWT interceptor
+│   ├── auth/               # Auth provider + service
+│   ├── router/             # GoRouter + auth guard
+│   └── storage/            # flutter_secure_storage
+├── features/               # n8n 노드 = feature 모듈
+│   ├── auth/               # 인증 (anon JWT)
+│   ├── domain_select/      # 도메인 선택 (건축/셀러)
+│   ├── palette/            # 팔레트 + 보호 토글
+│   ├── upload/             # 이미지 업로드 (presigned URL → R2)
+│   ├── rules/              # 룰 CRUD
+│   ├── jobs/               # Job 실행 + polling 진행률
+│   ├── results/            # 결과 표시 + Before/After
+│   ├── compare/            # 시안 비교 (다른 룰 적용)
+│   └── export/             # 세트 내보내기 (템플릿)
+└── shared/                 # 공통 위젯, 유틸
+```
+
+### Module 5: 스토리지 (D1 + R2)
+
+**D1 (영속 기록 — 5개 테이블):**
+
+| 테이블 | 용도 |
+|--------|------|
+| `users` | 유저 프로필 + 플랜 + 크레딧 |
+| `rules` | 룰 저장 (user_id, preset_id, concepts_json, protect_json) |
+| `jobs_log` | Job 히스토리 |
+| `job_items_log` | Item 히스토리 |
+| `billing_events` | 정산 이벤트 |
+
+**R2 (이미지 저장 — S3 호환):**
+
+```
+inputs/{userId}/{jobId}/{idx}.jpg           # 원본
+outputs/{userId}/{jobId}/{idx}_result.png    # 결과
+masks/{userId}/{jobId}/{idx}_{concept}.png   # 마스크
+previews/{userId}/{jobId}/{idx}_thumb.jpg    # 미리보기
+```
 
 ---
 
-## Folder Structure
+## 모듈 간 통신 맵
 
 ```
-C:\DK\S3\
+Flutter ──HTTP──▶ Workers ──DO RPC──▶ UserLimiterDO
+                                   ──▶ JobCoordinatorDO
+                 Workers ──presigned──▶ R2 (Flutter가 직접 PUT)
+          JobCoordinatorDO ──Queue──▶ GPU Worker
+          GPU Worker ──S3 API──▶ R2
+          GPU Worker ──HTTP callback──▶ Workers → JobCoordinatorDO
+          JobCoordinatorDO ──flush──▶ D1
+```
+
+| 통신 | 프로토콜 | 인증 |
+|------|----------|------|
+| Flutter → Workers | HTTPS REST | JWT (HS256) |
+| Workers → DO | Internal RPC | N/A (같은 Worker) |
+| Workers → D1 | Binding | N/A (같은 Worker) |
+| Workers → R2 | Binding | N/A (같은 Worker) |
+| Workers → Queue | Binding | N/A (같은 Worker) |
+| Flutter → R2 | HTTPS PUT | presigned URL (시간 제한) |
+| Queue → GPU Worker | Queue consume / Runpod event | N/A (플랫폼 내부) |
+| GPU Worker → R2 | S3 API (boto3) | Access Key |
+| GPU Worker → Workers | HTTPS POST callback | `GPU_CALLBACK_SECRET` |
+
+---
+
+## 데이터 흐름 (전체)
+
+```
+ 1. Flutter → POST /auth/anon → JWT 획득
+ 2. Flutter → GET /presets/interior → concepts/protect 로드
+ 3. Flutter → POST /jobs { preset, item_count }
+    Workers → UserLimiterDO.checkCredits() → JobCoordinatorDO.create()
+    → presigned URLs + job_id 반환
+ 4. Flutter → R2 직접 업로드 (N장, presigned PUT)
+ 5. Flutter → POST /jobs/{id}/confirm-upload
+    → JobCoordinatorDO.markUploaded()
+ 6. [Flutter 로컬: concept 선택, protect 설정, 룰 구성]
+ 7. Flutter → POST /jobs/{id}/execute { concepts, protect, rule_id? }
+    → JobCoordinatorDO.markQueued() → Queue push
+ 8. GPU Worker: R2 다운로드 → SAM3 segment → rule apply → R2 업로드
+ 9. GPU Worker → POST /jobs/{id}/callback (item별)
+    → JobCoordinatorDO.onCallback()
+10. 전체 완료 → UserLimiterDO.release() + D1 flush
+11. Flutter → GET /jobs/{id} (polling 3초) → 결과 표시
+```
+
+---
+
+## 인증 (MVP: anon JWT)
+
+```
+┌──────────┐         ┌──────────┐         ┌──────┐
+│ Flutter  │─ POST ─▶│ Workers  │─ INSERT ▶│  D1  │
+│          │  /auth/ │          │         │      │
+│          │  anon   │ HS256    │         │ users│
+│          │◀─ JWT ──│ sign()   │         │      │
+└──────────┘         └──────────┘         └──────┘
+
+이후 모든 요청:
+Authorization: Bearer <JWT>
+Workers middleware → JWT 검증 → sub=user_id 추출
+```
+
+---
+
+## GPU 이동성 (adapter 패턴)
+
+```
+                    ┌─────────────────┐
+                    │   engine/       │  ← 플랫폼 독립 (불변)
+                    │   pipeline.py   │
+                    │   segmenter.py  │
+                    │   applier.py    │
+                    │   r2_io.py      │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┼──────────────┐
+              ▼              ▼              ▼
+     ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+     │  Runpod     │ │  Vast.ai    │ │  자체서버    │
+     │  adapter    │ │  adapter    │ │  adapter    │
+     │  (MVP)      │ │  (옵션)     │ │  (옵션)     │
+     └─────────────┘ └─────────────┘ └─────────────┘
+
+교체 시 변경: adapters/ 파일 1개만
+engine/ 코드: 변경 없음
+```
+
+---
+
+## MCP 도구 (모든 에이전트 필수)
+
+> 코드 작성 전 문서 조회, 배포 후 로그 확인 필수.
+
+### 필수 MCP (모든 에이전트)
+
+| MCP 서버 | 도구 | 용도 |
+|----------|------|------|
+| **cloudflare-observability** | `query_worker_observability`, `search_cloudflare_documentation`, `workers_list`, `workers_get_worker_code` | Workers 로그, D1/R2/DO 디버깅, CF 공식 문서 |
+| **context7** | `resolve-library-id` → `query-docs` | Hono, CF Workers, Flutter, Riverpod 등 최신 문서 |
+
+### 필수 MCP (GPU 에이전트)
+
+| MCP 서버 | 도구 | 용도 |
+|----------|------|------|
+| **runpod** | `create-pod`, `list-endpoints`, `create-endpoint`, `list-templates` 등 26개 | GPU Pod/Endpoint/Template 관리, Serverless 배포 |
+
+### 필수 MCP (Frontend 에이전트)
+
+| MCP 서버 | 도구 | 용도 |
+|----------|------|------|
+| **dart** | 코드 분석, 테스트, pub.dev 검색, API 문서 | 공식 Dart MCP (Dart SDK 3.9+ 내장) |
+| **flutter-docs** | `flutter_search`, `flutter_docs` | Flutter/Dart 문서 + pub.dev 50,000+ 패키지 |
+
+### 선택 MCP
+
+| MCP 서버 | 용도 |
+|----------|------|
+| **marionette** | Flutter 앱 실시간 제어 (위젯 탭, 스크린샷, hot reload) |
+| **playwright** | 브라우저 UI 테스트 |
+| **e2b** | Python 코드 실행 샌드박스 |
+| **brave-search** | 웹 검색 |
+| **github** | 이슈/PR 관리 |
+
+### 에이전트별 MCP 매핑
+
+| 에이전트 | 필수 MCP | 추가 MCP |
+|----------|----------|----------|
+| `s3_edge_api` | CF, context7 | playwright, brave-search |
+| `s3_backend_inference` | CF, context7, **runpod** | e2b, brave-search |
+| `s3_supabase` | CF, context7 | — |
+| `s3_frontend_auth` | CF, context7, **dart**, **flutter-docs** | playwright, marionette |
+| `s3_frontend_segmentation` | CF, context7, **dart**, **flutter-docs** | playwright, marionette |
+| `s3_frontend_gallery` | CF, context7, **dart**, **flutter-docs** | playwright, marionette |
+
+---
+
+## Auto-Claude 자동화 (n8n 워크플로우)
+
+### 에이전트 = n8n 노드
+
+각 커스텀 에이전트는 독립 n8n 노드:
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│ s3_edge_api │     │s3_backend_  │     │s3_frontend_ │
+│             │     │ inference   │     │ auth        │
+│ Input:      │     │ Input:      │     │ Input:      │
+│  spec.md    │     │  spec.md    │     │  spec.md    │
+│ Output:     │     │ Output:     │     │ Output:     │
+│  workers/   │     │  gpu-worker/│     │  frontend/  │
+│  src/*.ts   │     │  engine/*.py│     │  lib/core/  │
+│ Tools:      │     │ Tools:      │     │ Tools:      │
+│  CF MCP     │     │  CF+Runpod  │     │  CF MCP     │
+│  context7   │     │  MCP        │     │  context7   │
+└─────────────┘     └─────────────┘     └─────────────┘
+```
+
+### Daemon 실행
+
+```powershell
+set PYTHONUTF8=1
+python runners/daemon_runner.py --project-dir "C:\DK\S3" ^
+  --status-file "C:\DK\S3\.auto-claude\daemon_status.json"
+```
+
+### Task 생성
+
+```powershell
+python runners/spec_runner.py --task "작업 설명" --project-dir "C:\DK\S3" --no-build
+```
+
+### 파이프라인
+
+```
+spec_runner (--no-build) → spec 생성 (status: "queue")
+→ daemon 감지 → executor 실행 → planner → coder → QA → merge
+→ daemon_status.json 갱신 → UI Kanban 카드 이동
+```
+
+---
+
+## 디렉토리 구조
+
+### 현재 (전환 전)
+
+```
+S3/
+├── CLAUDE.md               ← Agent 마스터 가이드
+├── ARCHITECTURE.md         ← 지금 이 파일
+├── workflow.md             ← SSoT (아키텍처, API, 데이터 모델)
+├── frontend/               ← Flutter App (~30%)
+├── edge/                   ← Hono Workers (전환 대상 → workers/)
+├── cf-backend/             ← FastAPI scaffolding (전환 대상 → gpu-worker/)
+├── supabase/               ← Supabase 마이그레이션 (삭제 대상)
+├── ai-backend/             ← 모델 스크립트 (통합 대상 → gpu-worker/engine/)
+├── clone/Auto-Claude/      ← 자동 빌드 시스템
+└── .auto-claude/           ← specs, daemon_status.json
+```
+
+### 전환 후 목표
+
+```
+S3/
+├── CLAUDE.md
 ├── ARCHITECTURE.md
-├── .gitignore
-│
-├── frontend/                        # Flutter App
-│   ├── lib/
-│   │   ├── main.dart
-│   │   ├── app.dart
-│   │   ├── common_widgets/
-│   │   ├── constants/
-│   │   │   ├── app_colors.dart
-│   │   │   ├── app_theme.dart
-│   │   │   └── api_endpoints.dart
-│   │   ├── routing/
-│   │   │   └── app_router.dart
-│   │   ├── utils/
-│   │   └── features/
-│   │       ├── auth/
-│   │       │   ├── models/
-│   │       │   ├── mutations/
-│   │       │   ├── queries/
-│   │       │   └── pages/
-│   │       │       ├── providers/
-│   │       │       ├── screens/
-│   │       │       └── widgets/
-│   │       ├── home/
-│   │       │   └── pages/screens/
-│   │       ├── segmentation/       # ★ 핵심 기능
-│   │       │   ├── models/
-│   │       │   │   ├── segmentation_result_model.dart
-│   │       │   │   └── segmentation_request_model.dart
-│   │       │   ├── mutations/
-│   │       │   │   └── run_segmentation_mutation.dart
-│   │       │   ├── queries/
-│   │       │   │   ├── get_results_query.dart
-│   │       │   │   └── get_result_detail_query.dart
-│   │       │   └── pages/
-│   │       │       ├── providers/
-│   │       │       │   └── segmentation_provider.dart
-│   │       │       ├── screens/
-│   │       │       │   ├── segmentation_screen.dart
-│   │       │       │   └── result_detail_screen.dart
-│   │       │       └── widgets/
-│   │       │           ├── image_picker_widget.dart
-│   │       │           ├── prompt_input_widget.dart
-│   │       │           ├── mask_overlay_widget.dart
-│   │       │           └── result_card_widget.dart
-│   │       ├── gallery/             # 결과 갤러리
-│   │       │   ├── models/
-│   │       │   ├── queries/
-│   │       │   └── pages/
-│   │       │       ├── screens/
-│   │       │       └── widgets/
-│   │       └── profile/
-│   │           └── pages/screens/
-│   ├── pubspec.yaml
-│   └── test/
-│
-├── backend/                         # FastAPI + SAM3 (Vast.ai GPU)
-│   ├── app/
-│   │   ├── main.py                  # FastAPI 진입점
-│   │   ├── config.py                # 환경설정 (BaseSettings)
-│   │   │
-│   │   ├── api/
-│   │   │   └── v1/
-│   │   │       ├── router.py        # v1 라우터 통합
-│   │   │       └── endpoints/
-│   │   │           ├── health.py    # 헬스체크
-│   │   │           ├── segmentation.py  # ★ 세그멘테이션 API
-│   │   │           └── tasks.py     # 작업 상태 조회
-│   │   │
-│   │   ├── core/
-│   │   │   ├── security.py          # API Key / JWT 검증
-│   │   │   ├── middleware.py        # CORS, 로깅, 에러 핸들링
-│   │   │   └── dependencies.py      # FastAPI DI
-│   │   │
-│   │   ├── models/
-│   │   │   ├── sam3/                # ★ SAM3 모델 래퍼
-│   │   │   │   ├── predictor.py     # SAM3 predictor 초기화/추론
-│   │   │   │   ├── postprocess.py   # 마스크 후처리
-│   │   │   │   └── config.py        # 모델 설정 (weights path, device)
-│   │   │   └── __init__.py
-│   │   │
-│   │   ├── schemas/
-│   │   │   ├── segmentation.py      # Request/Response Pydantic 모델
-│   │   │   └── task.py              # 작업 상태 스키마
-│   │   │
-│   │   ├── services/
-│   │   │   ├── segmentation_service.py  # 비즈니스 로직
-│   │   │   ├── storage_service.py   # R2 업로드/다운로드
-│   │   │   └── task_service.py      # 비동기 작업 관리
-│   │   │
-│   │   └── utils/
-│   │       ├── image.py             # 이미지 전처리
-│   │       └── mask.py              # 마스크 인코딩/디코딩
-│   │
-│   ├── weights/                     # SAM3 모델 가중치 (gitignore)
-│   │   └── .gitkeep
-│   ├── tests/
-│   │   ├── test_segmentation.py
-│   │   └── conftest.py
-│   ├── Dockerfile                   # Vast.ai 배포용
-│   ├── docker-compose.yml
-│   ├── pyproject.toml
-│   ├── requirements.txt
-│   └── .env.example
-│
-├── edge/                            # Cloudflare Workers + R2
-│   ├── wrangler.toml                # Cloudflare 설정
+├── workflow.md
+├── workers/                ← Hono + CF Workers + D1 + DO + Queues + R2
 │   ├── src/
-│   │   ├── index.ts                 # Worker 진입점
-│   │   ├── router.ts                # 라우팅
-│   │   ├── handlers/
-│   │   │   ├── upload.ts            # 이미지 업로드 → R2
-│   │   │   ├── segmentation.ts      # Vast.ai 프록시
-│   │   │   └── result.ts            # 결과 조회
+│   │   ├── index.ts
+│   │   ├── routes/         # auth, presets, rules, jobs
+│   │   ├── do/             # UserLimiterDO, JobCoordinatorDO
 │   │   ├── middleware/
-│   │   │   ├── auth.ts              # Supabase JWT 검증
-│   │   │   ├── cors.ts              # CORS
-│   │   │   └── ratelimit.ts         # Rate limiting
 │   │   ├── services/
-│   │   │   ├── r2.ts                # R2 Storage 헬퍼
-│   │   │   └── vastai.ts            # Vast.ai backend 프록시
-│   │   └── types/
-│   │       └── index.ts             # TypeScript 타입 정의
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── .dev.vars                    # 로컬 환경변수 (gitignore)
-│
-├── supabase/                        # Supabase (DB + Auth)
-│   ├── config.toml                  # Supabase 프로젝트 설정
-│   ├── migrations/
-│   │   ├── 00001_create_users_profile.sql
-│   │   ├── 00002_create_projects.sql
-│   │   ├── 00003_create_segmentation_results.sql
-│   │   └── 00004_create_usage_logs.sql
-│   ├── functions/                   # Supabase Edge Functions
-│   │   └── process-webhook/
-│   │       └── index.ts
-│   └── seed.sql                     # 초기 데이터
-│
-├── ai/                              # AI 모델 관련 스크립트/노트북
-│   ├── notebooks/
-│   │   ├── sam3_test.ipynb          # SAM3 테스트
-│   │   └── benchmark.ipynb          # 성능 벤치마크
-│   ├── scripts/
-│   │   ├── download_weights.py      # 모델 가중치 다운로드
-│   │   └── convert_model.py         # 모델 변환 (optional)
-│   └── prompts/
-│       └── default_prompts.json     # 기본 텍스트 프롬프트 예시
-│
-├── docs/                            # 문서
-│   └── api.md                       # API 문서
-│
-├── scripts/                         # 프로젝트 스크립트
-│   ├── setup.sh                     # 전체 환경 셋업
-│   └── deploy.sh                    # 배포 스크립트
-│
-└── clone/                           # AC247 레퍼런스 (참고용)
-    └── Auto-Claude/
+│   │   └── utils/
+│   └── wrangler.toml
+├── gpu-worker/             ← Docker + SAM3 + Runpod
+│   ├── engine/             # 플랫폼 독립 코어
+│   ├── adapters/           # Runpod/Vast/자체서버
+│   ├── presets/            # 도메인 concept 매핑
+│   └── Dockerfile
+├── frontend/               ← Flutter 3.38.9 + Riverpod 3 + ShadcnUI
+│   └── lib/
+│       ├── core/           # api client, auth, router
+│       ├── features/       # feature-first 모듈들
+│       └── shared/         # 공통 위젯
+└── clone/Auto-Claude/      ← 자동 빌드 + 커스텀 에이전트 6개
 ```
 
 ---
 
-## Database Schema (Supabase)
+## 환경변수
 
-```sql
--- 유저 프로필 (Supabase Auth 연동)
-users_profile
-├── id              UUID PK (= auth.users.id)
-├── display_name    TEXT
-├── avatar_url      TEXT
-├── tier            TEXT DEFAULT 'free'   -- free / pro / enterprise
-├── credits         INTEGER DEFAULT 100
-├── created_at      TIMESTAMPTZ
-└── updated_at      TIMESTAMPTZ
-
--- 프로젝트
-projects
-├── id              UUID PK
-├── user_id         UUID FK → users_profile
-├── name            TEXT
-├── description     TEXT
-├── created_at      TIMESTAMPTZ
-└── updated_at      TIMESTAMPTZ
-
--- 세그멘테이션 결과
-segmentation_results
-├── id              UUID PK
-├── project_id      UUID FK → projects
-├── user_id         UUID FK → users_profile
-├── source_image_url    TEXT            -- R2 원본 이미지 URL
-├── mask_image_url      TEXT            -- R2 마스크 이미지 URL
-├── text_prompt         TEXT            -- 텍스트 프롬프트
-├── labels              JSONB           -- 감지된 라벨 목록
-├── metadata            JSONB           -- 추론 시간, 신뢰도 등
-├── status              TEXT            -- pending / processing / done / error
-├── created_at          TIMESTAMPTZ
-└── updated_at          TIMESTAMPTZ
-
--- 사용량 로그
-usage_logs
-├── id              UUID PK
-├── user_id         UUID FK → users_profile
-├── action          TEXT                -- segmentation / upload
-├── credits_used    INTEGER
-├── metadata        JSONB
-└── created_at      TIMESTAMPTZ
-```
-
----
-
-## API Endpoints
-
-### Edge (Cloudflare Workers) - Public API
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/v1/upload` | 이미지 업로드 → R2 저장 |
-| `POST` | `/api/v1/segment` | 세그멘테이션 요청 |
-| `GET` | `/api/v1/tasks/:id` | 작업 상태 조회 |
-| `GET` | `/api/v1/results` | 결과 목록 조회 |
-| `GET` | `/api/v1/results/:id` | 결과 상세 조회 |
-
-### Backend (FastAPI on Vast.ai) - Internal API
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | GPU 서버 헬스체크 |
-| `POST` | `/api/v1/predict` | SAM3 추론 실행 |
-| `POST` | `/api/v1/predict/batch` | 배치 추론 |
-| `GET` | `/api/v1/model/info` | 모델 정보 조회 |
-
----
-
-## Request Flow Detail
+### Workers (`workers/.dev.vars`)
 
 ```
-[Flutter App]
-    │
-    ├─ 1. POST /api/v1/upload (이미지)
-    │     → Cloudflare Worker → R2에 저장 → image_url 반환
-    │
-    ├─ 2. POST /api/v1/segment { image_url, text_prompt }
-    │     → Cloudflare Worker
-    │       ├─ JWT 검증 (Supabase Auth)
-    │       ├─ 크레딧 확인
-    │       ├─ Supabase DB에 task 생성 (status: pending)
-    │       ├─ Vast.ai FastAPI POST /api/v1/predict 호출
-    │       │   ├─ SAM3 추론 실행 (GPU)
-    │       │   ├─ 마스크 결과 → R2 업로드
-    │       │   └─ 결과 반환
-    │       ├─ Supabase DB 업데이트 (status: done, mask_url, labels)
-    │       └─ 크레딧 차감
-    │
-    └─ 3. GET /api/v1/results/:id
-          → Cloudflare Worker → Supabase 조회 → 결과 + R2 URL 반환
+JWT_SECRET=                  # HS256 서명키
+GPU_CALLBACK_SECRET=         # GPU Worker 콜백 인증
 ```
 
----
+> D1, R2, DO, Queue 바인딩 → `wrangler.toml`
 
-## Key Design Decisions
+### GPU Worker (`gpu-worker/.env`)
 
-### 1. Edge Layer (Cloudflare Workers)를 두는 이유
-- Vast.ai GPU 서버를 직접 노출하지 않음 (보안)
-- 이미지 캐싱, Rate Limiting, Auth 처리
-- Vast.ai 인스턴스 교체 시 엔드포인트 변경 불필요
-- R2 Storage로 이미지/마스크를 글로벌 엣지에서 서빙
-
-### 2. 비동기 처리 전략
-- SAM3 추론은 ~30ms (H200 기준)이지만 이미지 업로드/다운로드 포함 시 더 걸림
-- 간단한 요청: 동기 처리 (Worker가 대기)
-- 대용량/배치: task_id 반환 후 폴링 또는 Supabase Realtime으로 상태 알림
-
-### 3. Vast.ai 인스턴스 관리
-- Docker 이미지로 패키징 (SAM3 + FastAPI + 가중치)
-- 인스턴스 교체 시 edge/src/services/vastai.ts에서 URL만 변경
-- 오토스케일링 필요 시 여러 인스턴스 + Workers에서 로드밸런싱
-
----
-
-## Environment Variables
-
-### Backend (.env)
 ```
-SAM3_WEIGHTS_PATH=/app/weights/sam3.pt
-SAM3_DEVICE=cuda
-HF_TOKEN=hf_xxxxx
-R2_ENDPOINT=https://xxx.r2.cloudflarestorage.com
-R2_ACCESS_KEY_ID=xxx
-R2_SECRET_ACCESS_KEY=xxx
-R2_BUCKET=s3-images
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_SERVICE_KEY=xxx
-API_SECRET_KEY=xxx
+STORAGE_S3_ENDPOINT=         # R2 endpoint
+STORAGE_ACCESS_KEY=
+STORAGE_SECRET_KEY=
+STORAGE_BUCKET=s3-images
+BATCH_CONCURRENCY=4
+MODEL_CACHE_DIR=/models
+CALLBACK_TIMEOUT_SEC=10
+RUNPOD_API_KEY=              # Runpod Serverless 관리
 ```
 
-### Edge (.dev.vars)
-```
-VASTAI_BACKEND_URL=http://xxx.xxx.xxx.xxx:8000
-API_SECRET_KEY=xxx
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_ANON_KEY=xxx
-R2_BUCKET=s3-images
-```
+### Frontend (`frontend/lib/core/constants.dart`)
 
-### Frontend (constants/api_endpoints.dart)
 ```dart
-static const baseUrl = 'https://s3-api.your-domain.workers.dev';
-static const supabaseUrl = 'https://xxx.supabase.co';
-static const supabaseAnonKey = 'xxx';
+const baseUrl = 'https://s3-api.your-domain.workers.dev';
 ```
 
 ---
 
-## Commands
+## GPU 요구사항
 
-| Command | Location | Description |
-|---------|----------|-------------|
-| `flutter run` | `frontend/` | Flutter 앱 실행 |
-| `dart run build_runner build` | `frontend/` | Freezed/Riverpod 코드 생성 |
-| `uvicorn app.main:app --reload` | `backend/` | FastAPI 로컬 실행 |
-| `docker build -t s3-backend .` | `backend/` | Docker 이미지 빌드 |
-| `npx wrangler dev` | `edge/` | Workers 로컬 실행 |
-| `npx wrangler deploy` | `edge/` | Workers 배포 |
-| `supabase db push` | `supabase/` | DB 마이그레이션 |
-| `supabase start` | `supabase/` | 로컬 Supabase 실행 |
+| 항목 | 최소 | 권장 |
+|------|------|------|
+| GPU VRAM | 16 GB (RTX 4090) | 24+ GB (A100/H100) |
+| CUDA | 12.1+ | 12.6+ |
+| Python | 3.12+ | 3.12+ |
+| PyTorch | 2.7+ | 2.7+ |
+
+SAM3: 848M params, 가중치 3.4GB, 추론 ~30ms/image (H200)
 
 ---
 
-## GPU Requirements (Vast.ai)
+## 핵심 설계 결정
 
-| Spec | Minimum | Recommended |
-|------|---------|-------------|
-| **GPU VRAM** | 16 GB | 24+ GB |
-| **GPU Model** | RTX 4090 | A100 / H100 |
-| **RAM** | 16 GB | 32 GB |
-| **Disk** | 20 GB | 50 GB |
-| **CUDA** | 12.1+ | 12.6+ |
-| **Python** | 3.12+ | 3.12+ |
-| **PyTorch** | 2.7+ | 2.7+ |
+### 1. Supabase 제거 → D1 + DO
 
-SAM3 모델: **848M params**, 가중치 **3.4 GB**, 추론 **~30ms/image** (H200)
+| 이전 | 이후 | 이유 |
+|------|------|------|
+| Supabase Auth | Workers JWT (HS256) | 외부 의존 제거, 콜드스타트 없음 |
+| Supabase DB | D1 (SQLite) | Workers 바인딩으로 직접 쿼리, 0ms latency |
+| Supabase Realtime | DO 상태 + polling (MVP) | DO가 이미 상태 관리, 별도 Realtime 불필요 |
+
+### 2. Queue 기반 비동기 처리
+
+```
+Workers → Queue push (즉시 응답) → GPU Worker (비동기 소비)
+→ callback (item별 완료 보고) → DO 상태 갱신
+```
+
+- GPU Worker 다운 → Queue에 메시지 남아있음 → 재시작 시 자동 재처리
+- 여러 GPU Worker → Queue가 자동 분산
+
+### 3. DO = Source of Truth (실시간), D1 = 영속 기록
+
+| | DO | D1 |
+|--|----|----|
+| **목적** | 실시간 상태/동시성 | 히스토리/분석 |
+| **쓰기 빈도** | 매 요청 | Job 완료 시 flush |
+| **읽기 빈도** | 매 요청 | 대시보드/분석 |
+| **TTL** | 세션 기반 (10분 idle) | 영구 |
+
+### 4. Presigned URL 직접 업로드
+
+```
+Flutter → Workers (presigned URL 요청)
+Workers → R2 presigned URL 생성 → Flutter에 반환
+Flutter → R2 직접 PUT (Workers 우회) → 대용량 이미지 효율적 전송
+```
+
+---
+
+## 문서 인덱스
+
+| 문서 | 역할 |
+|------|------|
+| `workflow.md` | **SSoT** — 제품 비전, 아키텍처, API, 데이터 모델, 로드맵 |
+| `CLAUDE.md` | Agent 마스터 가이드 — 명령어, 규칙, MCP 도구, Auto-Claude |
+| `ARCHITECTURE.md` | 아키텍처 심화 — 모듈 설계, 통신 맵, 설계 결정 (이 파일) |
+| `docs/contracts/api-contracts.md` | API 요약 (SSoT는 workflow.md) |

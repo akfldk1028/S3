@@ -382,7 +382,7 @@ app.post('/', async (c) => {
   });
   if (!created) return c.json(error('INTERNAL_ERROR', 'Failed to create task'), 500);
 
-  // 4. Async backend call (don't wait for response)
+  // 4. Async cf-backend call (don't wait for response)
   c.executionCtx.waitUntil(
     proxyToBackend(c.env, '/api/v1/predict', {
       image_url: body.image_url,

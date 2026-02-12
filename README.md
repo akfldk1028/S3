@@ -33,9 +33,9 @@
 |-------|-----------|------|------|--------|
 | **Frontend** | [`frontend/`](frontend/README.md) | Flutter 3.38.9 + Riverpod 3 + ShadcnUI | 크로스 플랫폼 앱 | ~30% |
 | **Edge** | [`edge/`](edge/README.md) | Hono + CF Workers + R2 | Full API | 부분 구현 |
-| **Backend** | [`backend/`](backend/README.md) | FastAPI + SAM3 | GPU 추론 전용 | 스캐폴딩 |
+| **Backend** | [`backend/`](cf-backend/README.md) | FastAPI + SAM3 | GPU 추론 전용 | 스캐폴딩 |
 | **Supabase** | [`supabase/`](supabase/README.md) | PostgreSQL + Auth + Realtime | DB + Auth | 스키마 완료 |
-| **AI** | [`ai/`](ai/README.md) | SAM3 스크립트/노트북 | 모델 관리 | 스캐폴딩 |
+| **AI** | [`ai/`](ai-backend/README.md) | SAM3 스크립트/노트북 | 모델 관리 | 스캐폴딩 |
 | **Docs** | [`docs/`](docs/README.md) | API 계약서, 아키텍처 문서 | 문서화 | 완료 |
 
 ---
@@ -53,9 +53,9 @@
 | [`docs/contracts/api-contracts.md`](docs/contracts/api-contracts.md) | **API 계약서 (SSoT)** — 모든 엔드포인트 스펙 |
 | [`frontend/README.md`](frontend/README.md) | Flutter 앱 — 구조, 패턴, TODO, 커맨드 |
 | [`edge/README.md`](edge/README.md) | Edge Full API — Hono, 라우트, 서비스, Agent 가이드 |
-| [`backend/README.md`](backend/README.md) | Backend 추론 서버 — FastAPI, SAM3, Agent 가이드 |
+| [`backend/README.md`](cf-backend/README.md) | Backend 추론 서버 — FastAPI, SAM3, Agent 가이드 |
 | [`supabase/README.md`](supabase/README.md) | Supabase — 스키마, RLS, 마이그레이션, Agent 가이드 |
-| [`ai/README.md`](ai/README.md) | AI 스크립트 — 가중치 다운로드, 모델 변환, 벤치마크 |
+| [`ai/README.md`](ai-backend/README.md) | AI 스크립트 — 가중치 다운로드, 모델 변환, 벤치마크 |
 
 ---
 
@@ -89,7 +89,7 @@
 cd edge && npm install && cp .dev.vars.example .dev.vars && npx wrangler dev
 
 # Backend (SAM3 추론)
-cd backend && python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt && uvicorn src.main:app --reload
+cd cf-backend && python -m venv .venv && .venv\Scripts\activate && pip install -r requirements.txt && uvicorn src.main:app --reload
 
 # Frontend (Flutter)
 cd frontend && flutter pub get && dart run build_runner build && flutter run

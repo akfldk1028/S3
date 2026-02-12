@@ -1,0 +1,5 @@
+# Workers 환경변수 (.dev.vars)
+# wrangler dev 시 사용. 실제 시크릿은 wrangler secret put으로 설정.
+
+JWT_SECRET=your-jwt-secret-here
+GPU_CALLBACK_SECRET=your-callback-secret-here

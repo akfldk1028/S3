@@ -269,8 +269,8 @@ import subprocess
 
 def invoke_agent(agent_type: str, task: str):
     cmd = [
-        "C:/DK/S3/clone/Auto-Claude/apps/backend/.venv/Scripts/python.exe",
-        "C:/DK/S3/clone/Auto-Claude/apps/backend/run.py",
+        "C:/DK/S3/clone/Auto-Claude/apps/cf-backend/.venv/Scripts/python.exe",
+        "C:/DK/S3/clone/Auto-Claude/apps/cf-backend/run.py",
         "--agent", agent_type,
         "--task", task,
     ]

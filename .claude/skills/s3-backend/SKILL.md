@@ -1,5 +1,5 @@
 ---
-name: s3-backend
+name: s3-cf-backend
 description: |
   Backend SAM3 추론 서버 개발 (FastAPI + PyTorch). 추론 파이프라인, R2 스토리지, Supabase 결과 업데이트.
   사용 시점: (1) SAM3 추론 구현/수정 시, (2) 스토리지 서비스 구현 시, (3) 새 추론 엔드포인트 추가 시
