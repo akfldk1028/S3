@@ -3,6 +3,11 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Required secrets (set via: wrangler secret put <SECRET_NAME>)
+# - JWT_SECRET: Secret key for JWT token signing/verification
+# - GPU_CALLBACK_SECRET: Secret for validating GPU worker callbacks
+# For local development, copy .dev.vars.example to .dev.vars and set values
+
 [durable_objects]
 bindings = [
   { name = "USER_LIMITER", class_name = "UserLimiterDO" },
