@@ -5,6 +5,8 @@ TODO: Auto-Claude 구현
 """
 
 SELLER_CONCEPTS = {
+    "Product": {"prompt": "main product item", "multi_instance": False},
+    "Background": {"prompt": "background surface or backdrop", "multi_instance": False},
     "Body": {"prompt": "product body", "multi_instance": False},
     "Label_Text": {"prompt": "product label text", "multi_instance": False},
     "Logo": {"prompt": "brand logo", "multi_instance": True},

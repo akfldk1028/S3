@@ -1,17 +1,17 @@
 {
   "active": false,
-  "spec": "003-workers-advanced-userlimiterdo-jobcoordinatordo",
+  "spec": "006-gpu-worker-sam3-segmenter",
   "state": "completed",
   "subtasks": {
-    "completed": 23,
-    "total": 23,
+    "completed": 21,
+    "total": 21,
     "in_progress": 0,
     "failed": 0
   },
   "phase": {
-    "current": "Integration and Route Mounting",
+    "current": "Docker & Deployment",
     "id": null,
-    "total": 2
+    "total": 3
   },
   "workers": {
     "active": 0,
@@ -19,7 +19,7 @@
   },
   "session": {
     "number": 23,
-    "started_at": "2026-02-14T15:15:29.018985"
+    "started_at": "2026-02-14T19:58:30.965824"
   },
-  "last_update": "2026-02-14T16:02:49.764612"
+  "last_update": "2026-02-15T00:00:00.000000"
 }
