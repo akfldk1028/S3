@@ -1,21 +1,31 @@
 /**
- * JWT HS256 sign/verify — Web Crypto API 사용
+ * JWT HS256 sign/verify — hono/jwt 사용
  *
- * TODO: Auto-Claude 구현
  * - signJwt(payload, secret) → token string
  * - verifyJwt(token, secret) → JwtPayload
- * - Web Crypto: crypto.subtle.importKey + crypto.subtle.sign/verify (HMAC SHA-256)
- * - Base64url encoding/decoding
+ * - HS256 algorithm (default for hono/jwt)
+ * - NO plan field in JWT payload (UserLimiterDO is source of truth)
  */
 
+import { sign, verify } from 'hono/jwt';
 import type { JwtPayload } from './types';
 
 export async function signJwt(payload: JwtPayload, secret: string): Promise<string> {
-  // TODO: implement with Web Crypto API
-  throw new Error('Not implemented');
+  return await sign(
+    {
+      sub: payload.sub,
+      iat: payload.iat,
+      exp: payload.exp,
+    },
+    secret
+  );
 }
 
 export async function verifyJwt(token: string, secret: string): Promise<JwtPayload> {
-  // TODO: implement with Web Crypto API
-  throw new Error('Not implemented');
+  const decoded = await verify(token, secret, 'HS256');
+  return {
+    sub: decoded.sub as string,
+    iat: decoded.iat as number,
+    exp: decoded.exp as number,
+  };
 }
