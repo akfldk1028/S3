@@ -1,9 +1,18 @@
 {
   "recovery_counts": {},
-  "error_counts": {},
-  "last_errors": {},
-  "completed_tasks": [],
+  "error_counts": {
+    "006-gpu-worker-sam3-segmenter": 1,
+    "007-frontend-flutter-freezed-models": 1
+  },
+  "last_errors": {
+    "006-gpu-worker-sam3-segmenter": "Exit code 1",
+    "007-frontend-flutter-freezed-models": "Exit code 1"
+  },
+  "completed_tasks": [
+    "002-workers-foundation-schema-auth",
+    "003-workers-advanced-userlimiterdo-jobcoordinatordo"
+  ],
   "task_hierarchy": {},
-  "started_at": "2026-02-11T11:29:57.358673+00:00",
-  "last_updated": "2026-02-11T11:29:57.358673+00:00"
+  "started_at": "2026-02-14T08:34:13.999040+00:00",
+  "last_updated": "2026-02-14T08:35:07.268561+00:00"
 }

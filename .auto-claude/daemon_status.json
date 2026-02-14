@@ -1,19 +1,21 @@
 {
   "project_dir": "C:\\DK\\S3",
   "running": true,
-  "started_at": null,
+  "started_at": "2026-02-14T08:34:13.999040+00:00",
   "config": {
     "max_concurrent_tasks": 3,
     "stuck_timeout": 600,
-    "headless_mode": true
+    "headless_mode": true,
+    "use_worktrees": true,
+    "skip_qa": false
   },
   "running_tasks": {},
   "queued_tasks": [],
   "stats": {
     "running": 0,
     "queued": 0,
-    "completed": 0
+    "completed": 2
   },
-  "timestamp": "2026-02-11T20:29:57.357672",
-  "ws_port": 18801
+  "timestamp": "2026-02-14T17:42:37.428948",
+  "ws_port": 18800
 }
