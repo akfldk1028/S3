@@ -21,6 +21,21 @@ export const CreateRuleSchema = z.object({
   protect: z.array(z.string()),
 });
 
-export const UpdateRuleSchema = z.object({
-  // TODO: define schema
-});
+export const UpdateRuleSchema = z
+  .object({
+    name: z.string().min(1).max(100).optional(),
+    preset_id: z.string().min(1).optional(),
+    concepts: z
+      .record(
+        z.string(),
+        z.object({
+          action: z.string(),
+          value: z.string(),
+        })
+      )
+      .optional(),
+    protect: z.array(z.string()).optional(),
+  })
+  .refine((data) => data.name || data.preset_id || data.concepts || data.protect, {
+    message: 'At least one field must be provided for update',
+  });
