@@ -10,7 +10,8 @@
 import { Hono } from 'hono';
 import type { Env, AuthUser } from '../_shared/types';
 import { PRESETS } from './presets.data';
-import { ok } from '../_shared/response';
+import { ok, error } from '../_shared/response';
+import { ERR } from '../_shared/errors';
 
 const app = new Hono<{ Bindings: Env; Variables: { user: AuthUser } }>();
 
@@ -25,6 +26,16 @@ app.get('/', (c) => {
   return c.json(ok(presetList));
 });
 
-// GET /presets/:id
+// GET /presets/:id — 프리셋 상세 정보 반환
+app.get('/:id', (c) => {
+  const id = c.req.param('id');
+  const preset = PRESETS[id];
+
+  if (!preset) {
+    return c.json(error(ERR.INVALID_PRESET, `Preset '${id}' not found`), 404);
+  }
+
+  return c.json(ok(preset));
+});
 
 export default app;
