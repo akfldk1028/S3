@@ -14,6 +14,26 @@ export const authMiddleware = createMiddleware<{
   Bindings: Env;
   Variables: { user: AuthUser };
 }>(async (c, next) => {
-  // TODO: implement JWT verification
+  // Skip auth for health check and callback endpoints
+  const path = new URL(c.req.url).pathname;
+  if (path === '/health' || path.includes('/callback')) {
+    await next();
+    return;
+  }
+
+  // TEMPORARY: Mock user for testing (replace with real JWT verification)
+  // Extract user ID from Authorization header or use default test user
+  const authHeader = c.req.header('Authorization');
+  let userId = 'test-user-id';
+
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    // For testing: use token value as userId if provided
+    if (token && token !== 'test-token') {
+      userId = token;
+    }
+  }
+
+  c.set('user', { userId });
   await next();
 });
