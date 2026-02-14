@@ -14,6 +14,10 @@ export type Env = {
   GPU_QUEUE: Queue<GpuQueueMessage>;
   JWT_SECRET: string;
   GPU_CALLBACK_SECRET: string;
+  R2_ACCOUNT_ID: string;
+  R2_ACCESS_KEY_ID: string;
+  R2_SECRET_ACCESS_KEY: string;
+  R2_BUCKET_NAME: string;
 };
 
 // ─── Auth ────────────────────────────────────────────────
