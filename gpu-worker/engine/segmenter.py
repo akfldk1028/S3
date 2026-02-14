@@ -66,7 +66,47 @@ class SAM3Segmenter:
                 f"Error: {str(e)}"
             )
 
-    def segment(self, image, concepts: list[str], protect: list[str]) -> dict:
-        """Return concept masks and protect masks."""
-        # TODO: implement
-        raise NotImplementedError
+    def segment(self, image, concept_text: str):
+        """
+        Segment image by concept text, return instance masks + metadata.
+
+        Args:
+            image: PIL Image to segment
+            concept_text: Text description of concept to segment (e.g., "wall", "door")
+
+        Returns:
+            tuple[list[np.ndarray], dict]:
+                - List of instance masks (each mask is H x W array)
+                - Metadata dict with concept, instance_count, and scores
+
+        Example:
+            >>> segmenter = SAM3Segmenter()
+            >>> masks, metadata = segmenter.segment(image, "window")
+            >>> print(metadata)
+            {'concept': 'window', 'instance_count': 3, 'scores': [0.95, 0.89, 0.87]}
+        """
+        import numpy as np
+
+        # Prepare inputs using SAM3 processor
+        inputs = self.processor(
+            images=image,
+            text=concept_text,
+            return_tensors="pt",
+        ).to(self.device)
+
+        # Run inference (no gradient computation needed)
+        with torch.no_grad():
+            outputs = self.model(**inputs)
+
+        # Extract instance masks (SAM3 returns per-instance segmentation)
+        # Shape: [num_instances, H, W]
+        masks = outputs.pred_masks.cpu().numpy()
+
+        # Build metadata dict
+        metadata = {
+            "concept": concept_text,
+            "instance_count": len(masks),
+            "scores": outputs.iou_scores.cpu().numpy().tolist(),
+        }
+
+        return masks, metadata
