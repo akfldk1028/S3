@@ -130,6 +130,48 @@ app.get('/', async (c) => {
   }
 });
 
+// GET /rules/:id
+app.get('/:id', async (c) => {
+  try {
+    const user = c.get('user');
+    if (!user || !user.userId) {
+      return c.json(error(ERR.AUTH_REQUIRED, 'Authentication required'), 401);
+    }
+
+    const ruleId = c.req.param('id');
+
+    // Query the specific rule
+    const rule = await c.env.DB
+      .prepare('SELECT id, user_id, name, preset_id, concepts_json, protect_json, created_at, updated_at FROM rules WHERE id = ?')
+      .bind(ruleId)
+      .first<{
+        id: string;
+        user_id: string;
+        name: string;
+        preset_id: string;
+        concepts_json: string;
+        protect_json: string | null;
+        created_at: string;
+        updated_at: string | null;
+      }>();
+
+    // Check if rule exists
+    if (!rule) {
+      return c.json(error(ERR.RULE_NOT_FOUND, 'Rule not found'), 404);
+    }
+
+    // Check if rule belongs to the user
+    if (rule.user_id !== user.userId) {
+      return c.json(error(ERR.RULE_FORBIDDEN, 'Access denied to this rule'), 403);
+    }
+
+    return c.json(ok(rule));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return c.json(error(ERR.INTERNAL_ERROR, message), 500);
+  }
+});
+
 // PUT /rules/:id
 // DELETE /rules/:id
 
