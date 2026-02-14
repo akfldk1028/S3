@@ -15,7 +15,7 @@ part of 'auth_provider.dart';
 /// - login(): calls POST /auth/anon, saves JWT, updates state
 /// - logout(): deletes JWT from secure storage, updates state to null
 ///
-/// State: AsyncValue<String?> where String is the JWT token.
+/// State: `AsyncValue<String?>` where String is the JWT token.
 ///
 /// Usage:
 /// ```dart
@@ -39,7 +39,7 @@ final authProvider = AuthProvider._();
 /// - login(): calls POST /auth/anon, saves JWT, updates state
 /// - logout(): deletes JWT from secure storage, updates state to null
 ///
-/// State: AsyncValue<String?> where String is the JWT token.
+/// State: `AsyncValue<String?>` where String is the JWT token.
 ///
 /// Usage:
 /// ```dart
@@ -60,7 +60,7 @@ final class AuthProvider extends $AsyncNotifierProvider<Auth, String?> {
   /// - login(): calls POST /auth/anon, saves JWT, updates state
   /// - logout(): deletes JWT from secure storage, updates state to null
   ///
-  /// State: AsyncValue<String?> where String is the JWT token.
+  /// State: `AsyncValue<String?>` where String is the JWT token.
   ///
   /// Usage:
   /// ```dart
@@ -101,7 +101,7 @@ String _$authHash() => r'ebd9ee6f74c959790379e5c1cd7a73f8c96d3250';
 /// - login(): calls POST /auth/anon, saves JWT, updates state
 /// - logout(): deletes JWT from secure storage, updates state to null
 ///
-/// State: AsyncValue<String?> where String is the JWT token.
+/// State: `AsyncValue<String?>` where String is the JWT token.
 ///
 /// Usage:
 /// ```dart

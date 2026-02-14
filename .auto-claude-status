@@ -3,23 +3,23 @@
   "spec": "007-frontend-flutter-freezed-models",
   "state": "building",
   "subtasks": {
-    "completed": 14,
+    "completed": 16,
     "total": 30,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "GoRouter Configuration",
+    "current": "ShadcnUI Theme",
     "id": null,
-    "total": 2
+    "total": 1
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 8,
+    "number": 10,
     "started_at": "2026-02-14T20:12:26.254025"
   },
-  "last_update": "2026-02-14T20:39:30.773271"
+  "last_update": "2026-02-14T20:56:57.603894"
 }
