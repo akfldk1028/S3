@@ -1,0 +1,39 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\007-frontend-flutter-freezed-models/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\007-frontend-flutter-freezed-models/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\007-frontend-flutter-freezed-models/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\007-frontend-flutter-freezed-models/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\007-frontend-flutter-freezed-models/**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\007-frontend-flutter-freezed-models\\.auto-claude\\specs\\007-frontend-flutter-freezed-models/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\007-frontend-flutter-freezed-models\\.auto-claude\\specs\\007-frontend-flutter-freezed-models/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\007-frontend-flutter-freezed-models\\.auto-claude\\specs\\007-frontend-flutter-freezed-models/**)",
+      "Read(C:\\DK\\S3\\.auto-claude/**)",
+      "Write(C:\\DK\\S3\\.auto-claude/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)",
+      "mcp__graphiti-memory__search_nodes(*)",
+      "mcp__graphiti-memory__search_facts(*)",
+      "mcp__graphiti-memory__add_episode(*)",
+      "mcp__graphiti-memory__get_episodes(*)",
+      "mcp__graphiti-memory__get_entity_edge(*)"
+    ]
+  }
+}
