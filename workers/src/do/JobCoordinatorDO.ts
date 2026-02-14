@@ -60,7 +60,9 @@ export class JobCoordinatorDO extends DurableObject<Env> {
           rule_id TEXT,
           total_items INTEGER NOT NULL DEFAULT 0,
           done_items INTEGER NOT NULL DEFAULT 0,
-          failed_items INTEGER NOT NULL DEFAULT 0
+          failed_items INTEGER NOT NULL DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          finished_at INTEGER
         );
       `);
 
@@ -120,11 +122,27 @@ export class JobCoordinatorDO extends DurableObject<Env> {
       );
     }
 
+    // Check if transitioning to terminal state
+    const isTerminalState = newStatus === 'done' || newStatus === 'failed' || newStatus === 'canceled';
+
     // Execute validated transition
-    await this.ctx.storage.sql.exec(
-      'UPDATE job_state SET status = ?1',
-      newStatus
-    );
+    if (isTerminalState) {
+      // Set finished_at timestamp when transitioning to terminal state
+      const now = Date.now();
+      await this.ctx.storage.sql.exec(
+        'UPDATE job_state SET status = ?1, finished_at = ?2',
+        newStatus,
+        now
+      );
+
+      // Schedule alarm to flush to D1 and release credits (1 second delay)
+      await this.ctx.storage.setAlarm(Date.now() + 1000);
+    } else {
+      await this.ctx.storage.sql.exec(
+        'UPDATE job_state SET status = ?1',
+        newStatus
+      );
+    }
 
     return true;
   }
@@ -247,5 +265,121 @@ export class JobCoordinatorDO extends DurableObject<Env> {
     return true;
   }
 
-  // TODO: implement remaining FSM methods (create, markQueued, getStatus, cancel) + alarm
+  /**
+   * Alarm handler - flush to D1 and release credits on job completion
+   *
+   * Triggered when job reaches terminal state (done/failed/canceled)
+   *
+   * Steps:
+   * 1. Read all job state from DO SQLite
+   * 2. Read all job items from DO SQLite
+   * 3. Batch INSERT to D1 (jobs_log + job_items_log)
+   * 4. Call UserLimiterDO.release() to refund unprocessed items
+   */
+  async alarm(): Promise<void> {
+    // Read job state
+    const stateCursor = await this.ctx.storage.sql.exec(
+      `SELECT job_id, user_id, status, preset, concepts_json, protect_json, rule_id,
+              total_items, done_items, failed_items, created_at, finished_at
+       FROM job_state LIMIT 1`
+    );
+
+    const stateRow = stateCursor.toArray()[0];
+    if (!stateRow) {
+      throw new Error('Job state not found during alarm flush');
+    }
+
+    const jobState = {
+      jobId: stateRow[0] as string,
+      userId: stateRow[1] as string,
+      status: stateRow[2] as JobStatus,
+      preset: stateRow[3] as string,
+      conceptsJson: stateRow[4] as string,
+      protectJson: stateRow[5] as string,
+      ruleId: stateRow[6] as string | null,
+      totalItems: stateRow[7] as number,
+      doneItems: stateRow[8] as number,
+      failedItems: stateRow[9] as number,
+      createdAt: stateRow[10] as number,
+      finishedAt: stateRow[11] as number | null,
+    };
+
+    // Read all job items
+    const itemsCursor = await this.ctx.storage.sql.exec(
+      `SELECT idx, status, input_key, output_key, preview_key, error
+       FROM job_items
+       ORDER BY idx`
+    );
+
+    const items = itemsCursor.toArray().map((row) => ({
+      idx: row[0] as number,
+      status: row[1] as string,
+      inputKey: row[2] as string,
+      outputKey: row[3] as string,
+      previewKey: row[4] as string,
+      error: row[5] as string | null,
+    }));
+
+    // Prepare D1 batch statements
+    const batchStatements: D1PreparedStatement[] = [];
+
+    // 1. INSERT into jobs_log
+    batchStatements.push(
+      this.env.DB.prepare(
+        `INSERT OR REPLACE INTO jobs_log
+         (job_id, user_id, created_at, finished_at, status, preset, rule_id,
+          concepts_json, protect_json, params_json, cost_estimate, error)
+         VALUES (?, ?, datetime(?, 'unixepoch', 'subsec'), datetime(?, 'unixepoch', 'subsec'),
+                 ?, ?, ?, ?, ?, NULL, ?, NULL)`
+      ).bind(
+        jobState.jobId,
+        jobState.userId,
+        jobState.createdAt / 1000, // Convert ms to seconds for SQLite datetime
+        jobState.finishedAt ? jobState.finishedAt / 1000 : null,
+        jobState.status,
+        jobState.preset,
+        jobState.ruleId,
+        jobState.conceptsJson,
+        jobState.protectJson,
+        jobState.totalItems // cost_estimate = total_items
+      )
+    );
+
+    // 2. INSERT into job_items_log for each item
+    for (const item of items) {
+      batchStatements.push(
+        this.env.DB.prepare(
+          `INSERT OR REPLACE INTO job_items_log
+           (job_id, idx, status, input_key, output_key, error)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        ).bind(
+          jobState.jobId,
+          item.idx,
+          item.status,
+          item.inputKey,
+          item.outputKey,
+          item.error
+        )
+      );
+    }
+
+    // Execute D1 batch
+    await this.env.DB.batch(batchStatements);
+
+    // 3. Call UserLimiterDO.release() to refund unprocessed items
+    const userLimiterId = this.env.USER_LIMITER.idFromName(jobState.userId);
+    const userLimiterStub = this.env.USER_LIMITER.get(userLimiterId);
+
+    await userLimiterStub.fetch('http://internal/release', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jobId: jobState.jobId,
+        doneItems: jobState.doneItems,
+        totalItems: jobState.totalItems,
+      }),
+    });
+  }
+
+  // TODO: implement remaining FSM methods (create, markQueued, getStatus, cancel)
 }
