@@ -30,6 +30,9 @@ dependencies:
   # Secure Storage
   flutter_secure_storage: ^10.0.0
 
+  # Image Picker
+  image_picker: ^1.1.2
+
   # Model
   freezed_annotation: ^3.1.0
   json_annotation: ^4.9.0
@@ -40,9 +43,9 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
   # Code Generation
-  build_runner:
+  build_runner: ^2.4.13
   freezed: ^3.2.3
-  json_serializable:
+  json_serializable: ^6.8.0
   riverpod_generator: ^4.0.0+1
 
 flutter:
