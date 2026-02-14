@@ -1,0 +1,34 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\003-workers-advanced-userlimiterdo-jobcoordinatordo/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\003-workers-advanced-userlimiterdo-jobcoordinatordo/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\003-workers-advanced-userlimiterdo-jobcoordinatordo/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\003-workers-advanced-userlimiterdo-jobcoordinatordo/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\003-workers-advanced-userlimiterdo-jobcoordinatordo/**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\003-workers-advanced-userlimiterdo-jobcoordinatordo\\.auto-claude\\specs\\003-workers-advanced-userlimiterdo-jobcoordinatordo/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\003-workers-advanced-userlimiterdo-jobcoordinatordo\\.auto-claude\\specs\\003-workers-advanced-userlimiterdo-jobcoordinatordo/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\003-workers-advanced-userlimiterdo-jobcoordinatordo\\.auto-claude\\specs\\003-workers-advanced-userlimiterdo-jobcoordinatordo/**)",
+      "Read(C:\\DK\\S3\\.auto-claude/**)",
+      "Write(C:\\DK\\S3\\.auto-claude/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)"
+    ]
+  }
+}
