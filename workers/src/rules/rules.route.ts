@@ -255,5 +255,45 @@ app.put('/:id', async (c) => {
 });
 
 // DELETE /rules/:id
+app.delete('/:id', async (c) => {
+  try {
+    const user = c.get('user');
+    if (!user || !user.userId) {
+      return c.json(error(ERR.AUTH_REQUIRED, 'Authentication required'), 401);
+    }
+
+    const ruleId = c.req.param('id');
+
+    // Query the specific rule to verify it exists and belongs to the user
+    const rule = await c.env.DB
+      .prepare('SELECT id, user_id FROM rules WHERE id = ?')
+      .bind(ruleId)
+      .first<{
+        id: string;
+        user_id: string;
+      }>();
+
+    // Check if rule exists
+    if (!rule) {
+      return c.json(error(ERR.RULE_NOT_FOUND, 'Rule not found'), 404);
+    }
+
+    // Check if rule belongs to the user
+    if (rule.user_id !== user.userId) {
+      return c.json(error(ERR.RULE_FORBIDDEN, 'Access denied to this rule'), 403);
+    }
+
+    // Delete the rule
+    await c.env.DB
+      .prepare('DELETE FROM rules WHERE id = ?')
+      .bind(ruleId)
+      .run();
+
+    return c.json(ok({ id: ruleId, deleted: true }));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return c.json(error(ERR.INTERNAL_ERROR, message), 500);
+  }
+});
 
 export default app;
