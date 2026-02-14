@@ -10,7 +10,7 @@ part 'presets_provider.g.dart';
 /// Used in domain selection screen to display available domains
 /// (e.g., "건축/인테리어", "쇼핑/셀러").
 ///
-/// Returns: Future<List<Preset>> with id, name, conceptCount fields.
+/// Returns: Future with List of Preset objects containing id, name, conceptCount fields.
 ///
 /// Usage:
 /// ```dart
