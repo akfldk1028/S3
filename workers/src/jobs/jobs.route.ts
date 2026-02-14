@@ -349,7 +349,82 @@ app.post('/:id/execute', async (c) => {
   }
 });
 
-// GET /jobs/:id
+// GET /jobs/:id - Get job status and progress
+app.get('/:id', async (c) => {
+  try {
+    // 1. Get job ID from URL params
+    const jobId = c.req.param('id');
+
+    // 2. Get JobCoordinatorDO stub
+    const jobCoordinatorId = c.env.JOB_COORDINATOR.idFromName(jobId);
+    const jobCoordinatorStub = c.env.JOB_COORDINATOR.get(jobCoordinatorId);
+
+    // 3. Get job state
+    const stateResponse = await jobCoordinatorStub.fetch('http://internal/state', {
+      method: 'GET',
+    });
+
+    // 4. Handle 404 if job not found
+    if (!stateResponse.ok) {
+      const errorResult = await stateResponse.json<{ error: string }>();
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'JOB_NOT_FOUND',
+            message: errorResult.error || 'Job not found',
+          },
+        },
+        404
+      );
+    }
+
+    const jobState = await stateResponse.json<{
+      jobId: string;
+      userId: string;
+      status: string;
+      totalItems: number;
+      doneItems: number;
+      failedItems: number;
+    }>();
+
+    // 5. Return job status and progress
+    return c.json({
+      success: true,
+      data: {
+        jobId: jobState.jobId,
+        status: jobState.status,
+        progress: {
+          done: jobState.doneItems,
+          failed: jobState.failedItems,
+          total: jobState.totalItems,
+        },
+      },
+      error: null,
+      meta: {
+        request_id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        data: null,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown error occurred',
+        },
+        meta: {
+          request_id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+        },
+      },
+      500
+    );
+  }
+});
+
 // POST /jobs/:id/callback
 // POST /jobs/:id/cancel
 
