@@ -27,6 +27,22 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Env, JobCoordinatorState, JobItemState, JobStatus } from '../_shared/types';
 
 export class JobCoordinatorDO extends DurableObject<Env> {
+  /**
+   * State Machine: Valid transitions map
+   *
+   * Terminal states (done, failed, canceled) have no valid transitions
+   * Non-terminal states can always transition to 'canceled'
+   */
+  private static readonly validTransitions: Record<JobStatus, JobStatus[]> = {
+    created: ['uploaded', 'canceled'],
+    uploaded: ['queued', 'canceled'],
+    queued: ['running', 'canceled'],
+    running: ['done', 'failed', 'canceled'],
+    done: [], // terminal
+    failed: [], // terminal
+    canceled: [], // terminal
+  };
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
@@ -70,5 +86,48 @@ export class JobCoordinatorDO extends DurableObject<Env> {
     });
   }
 
-  // TODO: implement FSM + idempotency + alarm
+  /**
+   * Transition state with validation
+   *
+   * @param newStatus Target status to transition to
+   * @throws Error if transition is invalid (e.g., terminal state or invalid flow)
+   * @returns true if transition was executed, false if already in target state
+   */
+  private async transitionState(newStatus: JobStatus): Promise<boolean> {
+    // Get current state
+    const cursor = await this.ctx.storage.sql.exec(
+      'SELECT status FROM job_state LIMIT 1'
+    );
+    const row = cursor.toArray()[0] as { status: JobStatus } | undefined;
+
+    if (!row) {
+      throw new Error('Job state not initialized');
+    }
+
+    const currentStatus = row.status;
+
+    // Already in target state - idempotent
+    if (currentStatus === newStatus) {
+      return false;
+    }
+
+    // Validate transition
+    const allowedTransitions = JobCoordinatorDO.validTransitions[currentStatus];
+    if (!allowedTransitions.includes(newStatus)) {
+      throw new Error(
+        `Invalid state transition: ${currentStatus} → ${newStatus}. ` +
+        `Allowed transitions from ${currentStatus}: [${allowedTransitions.join(', ')}]`
+      );
+    }
+
+    // Execute validated transition
+    await this.ctx.storage.sql.exec(
+      'UPDATE job_state SET status = ?1',
+      newStatus
+    );
+
+    return true;
+  }
+
+  // TODO: implement FSM methods (create, markUploaded, markQueued, etc.) + idempotency + alarm
 }
