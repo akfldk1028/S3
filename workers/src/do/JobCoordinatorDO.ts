@@ -1,7 +1,7 @@
 /**
  * JobCoordinatorDO — job당 1개 Durable Object
  *
- * SQLite-backed FSM + 멱등성 Ring Buffer (size 512) + Alarm D1 flush
+ * SQLite-backed FSM + 멱등성 Ring Buffer (size 1000, TTL 24h) + Alarm D1 flush
  *
  * TODO: Auto-Claude 구현
  * - blockConcurrencyWhile → SQLite 초기화 (job_state, job_items, seen_keys 테이블)
@@ -20,7 +20,7 @@
  *   running → failed (failed > threshold)
  *   any non-terminal → canceled
  * - alarm() → D1 flush (jobs_log + job_items_log INSERT) + UserLimiterDO.release()
- * - 멱등성: RingBuffer(512) — seen_keys 테이블에 idempotency_key 저장
+ * - 멱등성: RingBuffer(1000, max age 24h) — seen_keys 테이블에 idempotency_key 저장
  */
 
 import { DurableObject } from 'cloudflare:workers';
@@ -76,7 +76,7 @@ export class JobCoordinatorDO extends DurableObject<Env> {
         );
       `);
 
-      // Idempotency RingBuffer - stores last 512 callback keys to prevent duplicate processing
+      // Idempotency RingBuffer - stores last 1000 callback keys (max age 24h) to prevent duplicate processing
       await this.ctx.storage.sql.exec(`
         CREATE TABLE IF NOT EXISTS seen_keys (
           idempotency_key TEXT PRIMARY KEY,
@@ -164,20 +164,30 @@ export class JobCoordinatorDO extends DurableObject<Env> {
       return false;
     }
 
-    // Record idempotency key
+    // Record idempotency key with current timestamp
+    const now = Date.now();
     await this.ctx.storage.sql.exec(
       'INSERT INTO seen_keys (idempotency_key, timestamp) VALUES (?1, ?2)',
       payload.idempotency_key,
-      Date.now()
+      now
     );
 
-    // Evict old keys from RingBuffer (keep last 512 entries)
+    // Evict old keys from RingBuffer (>1000 entries OR >24 hours)
+    const twentyFourHoursAgo = now - (24 * 60 * 60 * 1000);
+
+    // Delete entries older than 24 hours
+    await this.ctx.storage.sql.exec(
+      'DELETE FROM seen_keys WHERE timestamp < ?1',
+      twentyFourHoursAgo
+    );
+
+    // Keep only last 1000 entries (by timestamp)
     await this.ctx.storage.sql.exec(`
       DELETE FROM seen_keys
       WHERE idempotency_key NOT IN (
         SELECT idempotency_key FROM seen_keys
         ORDER BY timestamp DESC
-        LIMIT 512
+        LIMIT 1000
       )
     `);
 
