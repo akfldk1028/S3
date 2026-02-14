@@ -15,7 +15,7 @@ part 'api_client_provider.g.dart';
 /// final user = await apiClient.getMe();
 /// ```
 @riverpod
-ApiClient apiClient(ApiClientRef ref) {
+ApiClient apiClient(Ref ref) {
   // Phase 1: Return mock implementation
   return MockApiClient();
 
