@@ -58,9 +58,10 @@ workers/src/
 import { sign, verify } from 'hono/jwt';
 import type { JwtPayload } from './types';
 
-export async function signJwt(payload: Omit<JwtPayload, 'iat' | 'exp'>, secret: string): Promise<string> {
+export async function signJwt(userId: string, secret: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  return sign({ ...payload, iat: now, exp: now + 2592000 }, secret); // 30일
+  return sign({ sub: userId, iat: now, exp: now + 2592000 }, secret); // 30일 (MVP)
+  // v2: exp: now + 1800 (30분) + refresh token
 }
 
 export async function verifyJwt(token: string, secret: string): Promise<JwtPayload> {
@@ -197,6 +198,42 @@ npx wrangler dev
 # 타입 체크
 npx tsc --noEmit
 ```
+
+---
+
+## Cloudflare MCP 활용 (필수)
+
+> Cloudflare를 몰라도 MCP가 대신해줍니다. 아래 패턴을 꼭 활용하세요.
+
+### 코드 작성 전: 공식 문서 먼저
+
+```
+"Hono에서 미들웨어 작성하는 방법 알려줘"
+→ context7: resolve-library-id → query-docs
+
+"D1에서 prepare().bind().run() 사용법 알려줘"
+→ cloudflare-observability: search_cloudflare_documentation
+```
+
+### 배포 후: 에러 확인
+
+```
+"s3-api Workers에서 최근 에러 보여줘"
+→ cloudflare-observability: query_worker_observability
+
+"배포된 코드 확인해줘"
+→ cloudflare-observability: workers_get_worker_code
+```
+
+### JWT 구현 시 참고
+
+```
+"hono/jwt에서 sign과 verify 사용법"
+→ context7로 Hono 문서 조회
+```
+
+> **중요 변경 (v3.0)**: JWT에 `plan` 필드를 넣지 않음. `sub`(user_id), `iat`, `exp`만.
+> plan은 UserLimiterDO가 Source of Truth. auth middleware에서 `c.set('user', { userId })`만 설정.
 
 ---
 

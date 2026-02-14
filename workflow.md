@@ -162,6 +162,33 @@ rule_slots_used: int       // free 최대 2, pro 최대 20
 locks: Set<job_id>
 ```
 
+### 5.1.1 크레딧 원자성 (reserve / commit / rollback)
+
+```
+reserve(jobId, itemCount):
+  1. credits >= itemCount 확인 → 실패 시 402 CREDITS_EXHAUSTED
+  2. active_jobs < max_concurrency 확인 → 실패 시 429 CONCURRENCY_LIMIT
+  3. credits -= itemCount (예약 차감)
+  4. active_jobs++
+  5. locks.add(jobId)
+  → DO 상태에 즉시 반영 (낙관적 차감)
+
+commit(jobId, doneItems, failedItems):
+  1. 부분 환불: credits += failedItems (실패한 항목만 환불)
+  2. active_jobs--
+  3. locks.delete(jobId)
+  → Job 정상 완료 시 호출
+
+rollback(jobId, totalItems):
+  1. 전액 환불: credits += totalItems
+  2. active_jobs--
+  3. locks.delete(jobId)
+  → Job 취소 또는 전체 실패 시 호출
+```
+
+> **핵심**: reserve 시점에 크레딧을 차감하고, 실패/취소 시 환불.
+> 이 패턴으로 "크레딧 부족한데 Job이 실행되는" 경쟁 조건 방지.
+
 ### 5.2 DO: JobCoordinator (job당 1개)
 
 ```
@@ -180,6 +207,26 @@ seen_idempotency_keys: RingBuffer
 ```
 
 > Source of Truth: 실시간 상태 = DO, 영속 기록 = D1
+
+### 5.2.1 D1 Flush 타이밍
+
+```
+매 callback (onItemResult):
+  → D1 job_items_log UPSERT (해당 item만) — 진행 상태 영속화
+  → 실패 시 DO 상태에만 반영 (D1은 최종 flush에서 재시도)
+
+전체 완료 시 (done + failed == total):
+  → D1 batch() 트랜잭션:
+    1. jobs_log INSERT (최종 상태)
+    2. job_items_log UPSERT (모든 item — 확정)
+    3. billing_events INSERT (크레딧 정산)
+  → UserLimiterDO.commit() 또는 rollback() 호출
+  → DO 상태: status → "done" 또는 "failed"
+```
+
+> **MVP 단순화**: 매 callback마다 D1 upsert는 선택사항.
+> 최소한 전체 완료 시 batch flush는 필수.
+> DO가 죽어도 D1에 최종 기록이 남아야 복구 가능.
 
 ### 5.3 D1: 영속 기록
 
@@ -466,6 +513,42 @@ previews/{userId}/{jobId}/{idx}_thumb.jpg            // 미리보기
 | 13 | POST | /jobs/{id}/callback | GPU 콜백 (내부) |
 | 14 | POST | /jobs/{id}/cancel | 취소 |
 
+### 6.6 에러 응답 카탈로그
+
+> 모든 에러는 envelope `{ success: false, data: null, error: { code, message }, meta }` 형식
+
+| HTTP | error.code | 발생 조건 | 관련 엔드포인트 |
+|------|------------|----------|----------------|
+| 400 | `VALIDATION_ERROR` | Zod 스키마 불일치 (body/params) | 모든 POST/PUT |
+| 401 | `AUTH_REQUIRED` | Authorization 헤더 없음 | 인증 필요 엔드포인트 전체 |
+| 401 | `TOKEN_EXPIRED` | JWT exp 초과 | 인증 필요 엔드포인트 전체 |
+| 401 | `TOKEN_INVALID` | JWT 서명 불일치 / 파싱 실패 | 인증 필요 엔드포인트 전체 |
+| 402 | `CREDITS_EXHAUSTED` | 크레딧 부족 (credits < item_count) | POST /jobs |
+| 403 | `RULE_SLOT_FULL` | 룰 슬롯 한도 초과 (free=2, pro=20) | POST /rules |
+| 403 | `CALLBACK_UNAUTHORIZED` | GPU_CALLBACK_SECRET 불일치 | POST /jobs/{id}/callback |
+| 404 | `NOT_FOUND` | 리소스 없음 (job, rule, preset) | GET/PUT/DELETE by ID |
+| 404 | `JOB_NOT_FOUND` | job_id 미존재 | /jobs/{id}/* |
+| 404 | `RULE_NOT_FOUND` | rule_id 미존재 | /rules/{id} |
+| 409 | `INVALID_TRANSITION` | 상태머신 전이 불가 (예: uploaded→created) | confirm-upload, execute, cancel |
+| 409 | `ALREADY_CANCELED` | 이미 취소된 Job | /jobs/{id}/execute, /cancel |
+| 429 | `CONCURRENCY_LIMIT` | 동시 Job 한도 초과 (free=1, pro=3) | POST /jobs |
+| 500 | `INTERNAL_ERROR` | 서버 내부 오류 | 모든 엔드포인트 |
+
+### 6.7 콜백 인증 (GPU Worker → Workers)
+
+```
+1. GPU Worker → POST /jobs/{id}/callback
+2. Headers: { "Authorization": "Bearer <GPU_CALLBACK_SECRET>" }
+3. Workers 미들웨어:
+   a. Authorization header에서 Bearer token 추출
+   b. env.GPU_CALLBACK_SECRET과 일치 여부 검증
+   c. 불일치 → 403 CALLBACK_UNAUTHORIZED
+   d. 일치 → JobCoordinatorDO.onItemResult() 호출
+```
+
+> **중요**: 이 콜백은 JWT 인증이 아님. 단순 shared secret 비교.
+> GPU Worker `.env`의 `GPU_CALLBACK_SECRET`과 Workers `.dev.vars`의 `GPU_CALLBACK_SECRET`이 동일해야 함.
+
 ---
 
 ## 7. Queue 메시지 계약
@@ -596,6 +679,26 @@ Vast Instance     → adapters/queue_pull.py (polling)
 3. Flutter → 이후 모든 요청에 Authorization: Bearer <JWT>
 4. Workers 미들웨어 → JWT 검증 → sub=user_id 추출
 ```
+
+### JWT 규격
+
+| 필드 | 값 | 설명 |
+|------|------|------|
+| `alg` | HS256 | Workers 환경변수 `JWT_SECRET`로 서명 |
+| `sub` | `u_abc123` | 유저 ID |
+| `iat` | Unix timestamp | 발급 시각 |
+| `exp` | iat + 2592000 (30일) | MVP 만료 (v2: 30분 + refresh token) |
+
+> **MVP**: access token 30일 (단순화). plan 정보는 JWT에 넣지 않음 — DO가 Source of Truth.
+> **v2**: access token 30분 + D1 `refresh_tokens` 테이블 + `POST /auth/refresh` 엔드포인트 추가.
+
+### JWT 에러 응답
+
+| 상황 | HTTP | error.code | error.message |
+|------|------|------------|---------------|
+| 토큰 없음 | 401 | `AUTH_REQUIRED` | `Authorization header required` |
+| 토큰 만료 | 401 | `TOKEN_EXPIRED` | `Token expired, re-authenticate` |
+| 토큰 위조/잘못됨 | 401 | `TOKEN_INVALID` | `Invalid token` |
 
 ### v2: 소셜 로그인 추가
 
@@ -783,9 +886,12 @@ C:\DK\S3\clone\Auto-Claude\apps\backend\.venv\Scripts\python.exe ^
   C:\DK\S3\clone\Auto-Claude\apps\backend\runners\daemon_runner.py ^
   --project-dir "C:\DK\S3" ^
   --status-file "C:\DK\S3\.auto-claude\daemon_status.json" ^
-  --use-claude-cli ^
-  --claude-cli-path "C:\Users\User\.local\bin\claude.exe"
+  --use-worktrees ^
+  --skip-qa
 ```
+
+> **중요**: `--use-claude-cli` 사용 금지 — MCP 서버가 전달되지 않는 버그 있음.
+> run.py 모드(기본)를 사용하면 MCP 서버가 정상 연결됨.
 
 ### Task 생성 (Daemon 자동 픽업)
 

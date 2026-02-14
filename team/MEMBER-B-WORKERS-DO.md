@@ -228,6 +228,78 @@ export const CallbackSchema = z.object({
 
 ---
 
+## Cloudflare MCP 활용 (필수)
+
+> Cloudflare를 몰라도 MCP가 대신해줍니다. 아래 패턴을 꼭 활용하세요.
+
+### DO 구현 시: 공식 문서 먼저
+
+```
+"Durable Objects에서 SQLite storage 사용법 알려줘"
+→ cloudflare-observability: search_cloudflare_documentation
+
+"Durable Objects RPC 메서드 호출 방법"
+→ cloudflare-observability: search_cloudflare_documentation
+```
+
+### Queue 연결 시
+
+```
+"Cloudflare Queues에서 producer/consumer 패턴 알려줘"
+→ search_cloudflare_documentation
+
+"Queue message 재시도 정책 설정법"
+→ search_cloudflare_documentation
+```
+
+### 배포 후 에러 확인
+
+```
+"s3-api 최근 에러 로그 보여줘"
+→ query_worker_observability
+```
+
+---
+
+## 콜백 인증 패턴 (GPU Worker → Workers)
+
+> **중요**: callback 엔드포인트는 JWT가 아닌 shared secret으로 인증합니다.
+
+```typescript
+// jobs.route.ts — POST /jobs/:id/callback
+app.post('/:id/callback', async (c) => {
+  // 1. Authorization header에서 Bearer token 추출
+  const authHeader = c.req.header('Authorization');
+  const secret = authHeader?.replace('Bearer ', '');
+
+  // 2. GPU_CALLBACK_SECRET과 비교
+  if (secret !== c.env.GPU_CALLBACK_SECRET) {
+    return error(c, ERR.CALLBACK_UNAUTHORIZED, 403);
+  }
+
+  // 3. 인증 통과 → JobCoordinatorDO.onItemResult() 호출
+  const payload = await c.req.json<CallbackPayload>();
+  // ...
+});
+```
+
+> `GPU_CALLBACK_SECRET`은 Workers `.dev.vars`와 GPU Worker `.env`에 동일한 값으로 설정.
+
+---
+
+## 크레딧 원자성 패턴 (reserve / commit / rollback)
+
+```typescript
+// UserLimiterDO 메서드 매핑:
+// POST /jobs → reserve(jobId, itemCount) — 크레딧 예약 차감
+// Job 완료 → commit(jobId, doneItems, failedItems) — 실패분 환불
+// Job 취소 → rollback(jobId, totalItems) — 전액 환불
+```
+
+> 상세: `workflow.md` 섹션 5.1.1 참조
+
+---
+
 ## 팀원 A와의 인터페이스
 
 **A가 먼저 완성해야 B가 사용하는 것들:**

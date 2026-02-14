@@ -17,5 +17,8 @@ boto3>=1.35.0
 torch>=2.7.0
 torchvision>=0.22.0
 
+# Model hub (SAM3 가중치 다운로드)
+huggingface_hub>=0.25.0
+
 # Testing
 pytest>=8.3.0

@@ -369,11 +369,10 @@ C:\DK\S3\clone\Auto-Claude\apps\backend\.venv\Scripts\python.exe ^
   --project-dir "C:\DK\S3" ^
   --status-file "C:\DK\S3\.auto-claude\daemon_status.json" ^
   --use-worktrees ^
-  --skip-qa ^
-  --use-claude-cli ^
-  --claude-cli-path "C:\Users\User\.local\bin\claude.exe"
+  --skip-qa
 ```
 
+> **주의**: `--use-claude-cli` 사용 금지 — MCP 서버가 전달되지 않는 버그 있음. run.py 모드(기본)가 MCP 완전 지원.
 > `--use-worktrees`/`--skip-qa`는 `projects/S3/project.json`의 daemon 섹션에서도 설정 가능
 
 ### Task 생성

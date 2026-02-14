@@ -78,6 +78,59 @@ gpu-worker/
 
 ---
 
+## Cloudflare MCP 활용 (필수)
+
+> GPU Worker는 Cloudflare 위에서 안 돌지만, **결과를 R2에 올리고 Workers로 콜백**합니다.
+> 콜백 실패 시 Cloudflare MCP로 Workers 쪽 로그를 확인할 수 있습니다.
+
+### 콜백 에러 디버깅
+
+```
+"s3-api Workers에서 callback 관련 에러 로그 보여줘"
+→ cloudflare-observability: query_worker_observability
+
+"R2 presigned URL 만료 시간 문서 찾아줘"
+→ cloudflare-observability: search_cloudflare_documentation
+```
+
+### SAM3 관련 문서
+
+```
+"PyTorch 2.7 CUDA 호환성 알려줘"
+→ context7: resolve-library-id → query-docs
+```
+
+---
+
+## 콜백 인증 (GPU Worker → Workers)
+
+> **중요**: 콜백 시 `GPU_CALLBACK_SECRET`을 Bearer 토큰으로 전송해야 합니다.
+
+```python
+# callback.py — 필수 헤더
+headers = {"Authorization": f"Bearer {os.environ['GPU_CALLBACK_SECRET']}"}
+```
+
+Workers 쪽에서 이 secret을 검증합니다. `.env`의 `GPU_CALLBACK_SECRET` 값이
+Workers `.dev.vars`의 `GPU_CALLBACK_SECRET`과 **반드시 동일**해야 합니다.
+
+## SAM3 모델 다운로드
+
+```python
+# huggingface_hub로 다운로드 (requirements.txt에 추가됨)
+from huggingface_hub import hf_hub_download
+
+model_path = hf_hub_download(
+    repo_id="facebook/sam3",  # 실제 repo_id 확인 필요
+    filename="sam3_model.pth",
+    cache_dir="/models"
+)
+```
+
+> 모델 가중치는 Docker 이미지에 넣지 않음 → `/models` 볼륨 마운트 or 런타임 다운로드
+
+---
+
 ## 구현 순서
 
 ### Step 1: R2 I/O (r2_io.py) — 스토리지 연결

@@ -72,6 +72,84 @@ claude mcp list
 
 ---
 
+## 3.6 Cloudflare MCP 활용 가이드 (필독 — 모든 팀원)
+
+> **Cloudflare를 몰라도 됩니다.** MCP 도구가 대신해줍니다.
+> 하지만 아래 패턴을 반드시 익혀야 작업이 가능합니다.
+
+### 왜 필수인가?
+
+- S3의 Workers, D1, R2, DO, Queues는 **전부 Cloudflare 서비스**
+- 배포 후 에러가 나면 **Cloudflare 로그를 봐야** 원인을 알 수 있음
+- MCP가 Cloudflare 대시보드를 대체 — 브라우저 없이도 로그/코드/문서 조회 가능
+
+### 첫 사용: 계정 연결 (1회만)
+
+리드가 Cloudflare 계정 로그인을 해둘 예정. 각자는 아래 순서로 연결:
+
+```
+Claude Code에서:
+1. "accounts_list를 호출해줘" → 계정 목록 확인
+2. "set_active_account로 S3 계정을 선택해줘" → 활성 계정 설정
+```
+
+### 패턴 1: Workers 배포 후 에러 확인
+
+```
+"s3-api Workers에서 최근 에러 로그를 보여줘"
+
+→ Claude가 자동으로:
+  1. workers_list → Workers 목록 확인
+  2. query_worker_observability → 최근 에러 로그 조회
+  3. 에러 원인 분석 + 해결 방안 제시
+```
+
+### 패턴 2: D1/R2/DO 관련 CF 문서 찾기
+
+```
+"D1에서 batch() 트랜잭션 어떻게 쓰는지 알려줘"
+"Durable Objects에서 SQLite storage 사용법 알려줘"
+"R2 presigned URL 생성 방법 알려줘"
+
+→ Claude가 자동으로:
+  search_cloudflare_documentation 호출 → 공식 문서에서 답변
+```
+
+### 패턴 3: 배포된 Workers 코드 확인
+
+```
+"현재 배포된 s3-api Workers 코드를 보여줘"
+
+→ Claude가 자동으로:
+  workers_get_worker_code → 배포된 실제 코드 표시
+```
+
+### 패턴 4: context7로 라이브러리 문서 조회
+
+```
+"Hono의 미들웨어 작성법 알려줘"
+"Riverpod 3의 @riverpod 사용법 알려줘"
+
+→ Claude가 자동으로:
+  1. resolve-library-id → 라이브러리 ID 확인
+  2. query-docs → 최신 문서에서 답변
+```
+
+### 주요 명령어 요약표
+
+| 하고 싶은 일 | MCP 도구 | 예시 자연어 |
+|-------------|---------|------------|
+| Workers 로그 보기 | `query_worker_observability` | "s3-api 최근 5분 에러 보여줘" |
+| CF 문서 찾기 | `search_cloudflare_documentation` | "D1 batch 트랜잭션 문서" |
+| 배포 코드 보기 | `workers_get_worker_code` | "배포된 Workers 코드 확인" |
+| Workers 목록 | `workers_list` | "내 Workers 목록" |
+| 계정 전환 | `set_active_account` | "S3 계정으로 전환" |
+| 라이브러리 문서 | `resolve-library-id` + `query-docs` | "Hono JWT 사용법" |
+
+> **팁**: Claude에게 한국어로 자연스럽게 요청하면 됩니다. MCP 도구 이름을 외울 필요 없습니다.
+
+---
+
 ## 4. 역할별 환경 설정
 
 ### Workers 팀 (팀원 A, B)

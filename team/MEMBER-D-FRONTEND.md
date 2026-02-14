@@ -14,6 +14,50 @@ S3는 "도메인 팔레트 엔진 기반 세트 생산 앱"이다.
 - **SSoT**: `workflow.md` — 섹션 4(데이터 흐름), 섹션 6(API 스키마)
 - **Tech Stack**: Flutter 3.38.9, Riverpod 3, Freezed 3, GoRouter, ShadcnUI
 
+### 기존 코드 주의사항
+
+> **기존 `frontend/` 코드의 일부는 Supabase 기반(v2.0)으로 작성되어 있습니다.**
+> - `api_endpoints.dart`는 v3.0으로 재작성 완료
+> - 하지만 `auth/`, `providers/` 등에 Supabase SDK 참조가 남아있을 수 있음
+> - **Supabase SDK 참조를 발견하면 무시하고 새로 작성하세요**
+> - v3.0에서는 모든 통신이 Workers REST API (`Dio` HTTP)를 통해 이루어집니다
+> - `supabase_flutter` 패키지 사용 금지 → `dio` + JWT 토큰 사용
+
+---
+
+## Cloudflare MCP 활용 (필수)
+
+> Frontend 팀이라도 Cloudflare MCP가 필수입니다. Workers API 연동 시 에러 디버깅에 씁니다.
+
+### API 연동 실패 시: Workers 로그 확인
+
+```
+"s3-api Workers에서 /auth/anon 관련 에러 보여줘"
+→ cloudflare-observability: query_worker_observability
+
+"Workers에서 400 에러가 나는데 원인 알려줘"
+→ query_worker_observability → 에러 로그 분석
+```
+
+### Flutter/Riverpod 문서 조회
+
+```
+"Riverpod 3에서 @riverpod annotation 사용법"
+→ context7: resolve-library-id → query-docs
+
+"Dio interceptor에서 401 에러 처리 방법"
+→ context7: query-docs
+```
+
+### API 계약 확인
+
+```
+"workflow.md에서 POST /jobs의 request/response 형식 알려줘"
+→ 로컬 파일 읽기 (MCP 불필요)
+```
+
+> **팁**: Workers가 반환하는 에러 코드는 `workflow.md` 섹션 6.6 에러 카탈로그 참조
+
 ---
 
 ## 병렬 작업 전략: UI First → API Later

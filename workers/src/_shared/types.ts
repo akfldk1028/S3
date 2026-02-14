@@ -18,15 +18,15 @@ export type Env = {
 
 // ─── Auth ────────────────────────────────────────────────
 export type JwtPayload = {
-  sub: string;
-  plan: 'free' | 'pro';
+  sub: string;       // user_id
   iat: number;
   exp: number;
+  // plan은 JWT에 넣지 않음 — UserLimiterDO가 Source of Truth
 };
 
 export type AuthUser = {
   userId: string;
-  plan: 'free' | 'pro';
+  // plan은 DO에서 조회 — JWT에 넣지 않으므로 AuthUser에도 불필요
 };
 
 // ─── Plan Limits ─────────────────────────────────────────
@@ -114,6 +114,16 @@ export type Preset = {
   concepts: string[];
   protect_defaults: string[];
   output_templates: Array<{ id: string; name: string; description: string }>;
+};
+
+// ─── Billing ────────────────────────────────────────────
+export type BillingEvent = {
+  id: string;
+  user_id: string;
+  type: 'reserve' | 'commit' | 'rollback' | 'refund';
+  amount: number;
+  ref: string;           // job_id 등 참조
+  created_at: string;
 };
 
 // ─── Rule ────────────────────────────────────────────────
