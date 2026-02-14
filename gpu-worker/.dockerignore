@@ -1,0 +1,48 @@
+# Model cache (3.4GB - download at runtime)
+models/
+*.pth
+*.bin
+*.safetensors
+
+# Tests
+tests/
+.pytest_cache/
+pytest.ini
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Environment & secrets
+.env
+.env.local
+*.key
+*.pem
+
+# Development
+.git/
+.gitignore
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Documentation
+README.md
+docs/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# OS files
+.DS_Store
+Thumbs.db
