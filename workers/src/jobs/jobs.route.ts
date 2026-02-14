@@ -131,7 +131,87 @@ app.post('/', async (c) => {
   }
 });
 
-// POST /jobs/:id/confirm-upload
+// POST /jobs/:id/confirm-upload - Mark items uploaded
+app.post('/:id/confirm-upload', async (c) => {
+  try {
+    // 1. Get job ID from URL params
+    const jobId = c.req.param('id');
+
+    // 2. Parse request body
+    const body = await c.req.json<{
+      totalItems: number;
+    }>();
+
+    const { totalItems } = body;
+
+    // Validate inputs
+    if (!totalItems || typeof totalItems !== 'number' || totalItems < 1) {
+      return c.json(
+        {
+          success: false,
+          error: { code: 'INVALID_TOTAL_ITEMS', message: 'totalItems must be >= 1' },
+        },
+        400
+      );
+    }
+
+    // 3. Get JobCoordinatorDO stub and call confirmUpload
+    const jobCoordinatorId = c.env.JOB_COORDINATOR.idFromName(jobId);
+    const jobCoordinatorStub = c.env.JOB_COORDINATOR.get(jobCoordinatorId);
+
+    const confirmResponse = await jobCoordinatorStub.fetch('http://internal/confirm-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ totalItems }),
+    });
+
+    // 4. Handle error responses (e.g., invalid state transition)
+    if (!confirmResponse.ok) {
+      const errorResult = await confirmResponse.json<{ error: string }>();
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_STATE_TRANSITION',
+            message: errorResult.error || 'Cannot confirm upload - job not in created state',
+          },
+        },
+        400
+      );
+    }
+
+    // 5. Return success response
+    return c.json({
+      success: true,
+      data: {
+        jobId,
+        status: 'uploaded',
+      },
+      error: null,
+      meta: {
+        request_id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        data: null,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown error occurred',
+        },
+        meta: {
+          request_id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+        },
+      },
+      500
+    );
+  }
+});
+
 // POST /jobs/:id/execute
 // GET /jobs/:id
 // POST /jobs/:id/callback
