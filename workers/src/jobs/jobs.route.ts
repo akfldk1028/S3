@@ -485,7 +485,7 @@ app.post('/:id/callback', async (c) => {
             message: errorResult.error || 'Failed to process callback',
           },
         },
-        resultResponse.status
+        500
       );
     }
 
