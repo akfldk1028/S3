@@ -41,6 +41,5 @@ export async function pushToQueue(
   queue: Queue<GpuQueueMessage>,
   message: GpuQueueMessage,
 ): Promise<void> {
-  // TODO: implement
-  throw new Error('Not implemented');
+  await queue.send(message);
 }
