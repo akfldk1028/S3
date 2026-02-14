@@ -3,7 +3,7 @@
   "spec": "007-frontend-flutter-freezed-models",
   "state": "building",
   "subtasks": {
-    "completed": 3,
+    "completed": 7,
     "total": 30,
     "in_progress": 1,
     "failed": 0
@@ -18,8 +18,8 @@
     "max": 1
   },
   "session": {
-    "number": 4,
-    "started_at": "2026-02-14T17:13:11.338892"
+    "number": 1,
+    "started_at": "2026-02-14T20:12:26.254025"
   },
-  "last_update": "2026-02-14T17:21:59.544665"
+  "last_update": "2026-02-14T20:12:26.329937"
 }
