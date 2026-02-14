@@ -574,6 +574,90 @@ app.post('/:id/callback', async (c) => {
   }
 });
 
-// POST /jobs/:id/cancel
+// POST /jobs/:id/cancel - Cancel job and rollback credits
+app.post('/:id/cancel', async (c) => {
+  try {
+    // 1. Get job ID from URL params
+    const jobId = c.req.param('id');
+
+    // 2. Get JobCoordinatorDO stub
+    const jobCoordinatorId = c.env.JOB_COORDINATOR.idFromName(jobId);
+    const jobCoordinatorStub = c.env.JOB_COORDINATOR.get(jobCoordinatorId);
+
+    // 3. Call cancel to update job status
+    const cancelResponse = await jobCoordinatorStub.fetch('http://internal/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    // 4. Handle error responses (e.g., already in terminal state)
+    if (!cancelResponse.ok) {
+      const errorResult = await cancelResponse.json<{ error: string }>();
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_STATE_TRANSITION',
+            message: errorResult.error || 'Cannot cancel - job already in terminal state',
+          },
+        },
+        400
+      );
+    }
+
+    // 5. Get job state to retrieve userId and totalItems
+    const stateResponse = await jobCoordinatorStub.fetch('http://internal/state', {
+      method: 'GET',
+    });
+
+    const jobState = await stateResponse.json<{
+      userId: string;
+      totalItems: number;
+    }>();
+
+    // 6. Get UserLimiterDO stub and rollback credits
+    const userLimiterId = c.env.USER_LIMITER.idFromName(jobState.userId);
+    const userLimiterStub = c.env.USER_LIMITER.get(userLimiterId);
+
+    await userLimiterStub.fetch('http://internal/rollback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jobId,
+        totalItems: jobState.totalItems,
+      }),
+    });
+
+    // 7. Return success response
+    return c.json({
+      success: true,
+      data: {
+        jobId,
+        status: 'canceled',
+      },
+      error: null,
+      meta: {
+        request_id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        data: null,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown error occurred',
+        },
+        meta: {
+          request_id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+        },
+      },
+      500
+    );
+  }
+});
 
 export default app;
