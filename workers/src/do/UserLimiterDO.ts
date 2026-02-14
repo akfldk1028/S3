@@ -138,6 +138,26 @@ export class UserLimiterDO extends DurableObject<Env> {
   }
 
   /**
+   * Check if user can start a new job (concurrency enforcement)
+   * Returns true if active_jobs < maxConcurrency
+   */
+  private async canStartJob(): Promise<boolean> {
+    const state = await this.getUserState();
+    return state.activeJobs < state.maxConcurrency;
+  }
+
+  /**
+   * Check if user can use rule slots (rule slot enforcement)
+   * Returns true if current_rule_slots + delta <= maxRuleSlots
+   *
+   * @param delta - Number of slots to check (can be negative for decrements)
+   */
+  private async canUseRuleSlots(delta: number): Promise<boolean> {
+    const state = await this.getUserState();
+    return (state.ruleSlots + delta) <= state.maxRuleSlots;
+  }
+
+  /**
    * Reserve credits for a job - atomic check-and-decrement
    * CRITICAL: Credits must NEVER go negative
    *
