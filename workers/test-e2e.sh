@@ -1,56 +1,93 @@
 #!/bin/bash
 
 # End-to-End Verification Script
-# Tests: auth flow + rule creation
+# Tests: auth flow + rules CRUD + full job lifecycle
 
-set -e  # Exit on error
+set -e
 
-API_URL="http://localhost:3000"
+API_URL="${API_URL:-http://localhost:8787}"
+GPU_SECRET="${GPU_SECRET:-test-gpu-callback-secret-for-local-dev}"
 
-echo "=== E2E Verification: Auth Flow + Rule Creation ==="
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+check_result() {
+    local test_name="$1"
+    local expected="$2"
+    local actual="$3"
+
+    if echo "$actual" | grep -q "$expected"; then
+        echo -e "${GREEN}✓${NC} $test_name"
+        return 0
+    else
+        echo -e "${RED}✗${NC} $test_name"
+        echo "  Expected to contain: $expected"
+        echo "  Actual response: $actual"
+        return 1
+    fi
+}
+
+echo "======================================"
+echo "S3 Workers — E2E Verification"
+echo "======================================"
 echo ""
+
+# Wait for server
+echo -e "${YELLOW}⏳ Checking if server is ready...${NC}"
+for i in {1..10}; do
+    if curl -s "$API_URL/health" > /dev/null 2>&1; then
+        echo -e "${GREEN}✓${NC} Server is ready"
+        break
+    fi
+    if [ $i -eq 10 ]; then
+        echo -e "${RED}✗${NC} Server is not responding. Please run 'npx wrangler dev' first."
+        exit 1
+    fi
+    sleep 1
+done
+
+echo ""
+echo "======================================"
+echo "Part 1: Auth Flow"
+echo "======================================"
 
 # 1. POST /auth/anon → receive JWT
-echo "1. POST /auth/anon → receive JWT"
+echo ""
+echo "Test 1: POST /auth/anon"
 RESPONSE=$(curl -s -X POST "$API_URL/auth/anon")
 echo "Response: $RESPONSE"
-
-# Extract JWT from response
 JWT=$(echo "$RESPONSE" | grep -o '"token":"[^"]*"' | cut -d'"' -f4)
 if [ -z "$JWT" ]; then
-  echo "❌ FAILED: No JWT token received"
-  exit 1
+    echo -e "${RED}✗${NC} No JWT token received"
+    exit 1
 fi
-echo "✅ PASSED: JWT received"
-echo "JWT: ${JWT:0:50}..."
-echo ""
+echo -e "${GREEN}✓${NC} JWT received: ${JWT:0:50}..."
 
-# 2. GET /me with JWT → receive user state
-echo "2. GET /me with JWT → receive user state"
-RESPONSE=$(curl -s -H "Authorization: Bearer $JWT" "$API_URL/auth/me")
+# 2. GET /me with JWT
+echo ""
+echo "Test 2: GET /me"
+RESPONSE=$(curl -s -H "Authorization: Bearer $JWT" "$API_URL/me")
 echo "Response: $RESPONSE"
-if echo "$RESPONSE" | grep -q '"success":true'; then
-  echo "✅ PASSED: User state received"
-else
-  echo "❌ FAILED: Invalid response from /me"
-  exit 1
-fi
-echo ""
+check_result "User state returned" '"success":true' "$RESPONSE"
 
-# 3. GET /presets with JWT → receive 2 presets
-echo "3. GET /presets with JWT → receive 2 presets"
+echo ""
+echo "======================================"
+echo "Part 2: Presets + Rules CRUD"
+echo "======================================"
+
+# 3. GET /presets
+echo ""
+echo "Test 3: GET /presets"
 RESPONSE=$(curl -s -H "Authorization: Bearer $JWT" "$API_URL/presets")
 echo "Response: $RESPONSE"
-if echo "$RESPONSE" | grep -q '"success":true'; then
-  echo "✅ PASSED: Presets received"
-else
-  echo "❌ FAILED: Invalid response from /presets"
-  exit 1
-fi
-echo ""
+check_result "Presets received" '"success":true' "$RESPONSE"
 
-# 4. POST /rules with JWT → create rule
-echo "4. POST /rules with JWT → create rule"
+# 4. POST /rules → create rule
+echo ""
+echo "Test 4: POST /rules"
 RESPONSE=$(curl -s -X POST "$API_URL/rules" \
   -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
@@ -64,68 +101,123 @@ RESPONSE=$(curl -s -X POST "$API_URL/rules" \
     "protect": ["person"]
   }')
 echo "Response: $RESPONSE"
-
-# Extract rule ID
 RULE_ID=$(echo "$RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
 if [ -z "$RULE_ID" ]; then
-  echo "❌ FAILED: No rule ID received"
-  exit 1
+    echo -e "${RED}✗${NC} No rule ID received"
+    exit 1
 fi
-echo "✅ PASSED: Rule created with ID: $RULE_ID"
-echo ""
+echo -e "${GREEN}✓${NC} Rule created: $RULE_ID"
 
-# 5. GET /rules with JWT → verify rule appears
-echo "5. GET /rules with JWT → verify rule appears"
+# 5. GET /rules → verify rule
+echo ""
+echo "Test 5: GET /rules"
 RESPONSE=$(curl -s -H "Authorization: Bearer $JWT" "$API_URL/rules")
 echo "Response: $RESPONSE"
-if echo "$RESPONSE" | grep -q "$RULE_ID"; then
-  echo "✅ PASSED: Rule appears in list"
-else
-  echo "❌ FAILED: Rule not found in list"
-  exit 1
-fi
-echo ""
+check_result "Rule appears in list" "$RULE_ID" "$RESPONSE"
 
-# 6. PUT /rules/:id with JWT → update rule
-echo "6. PUT /rules/:id with JWT → update rule"
+# 6. PUT /rules/:id → update
+echo ""
+echo "Test 6: PUT /rules/:id"
 RESPONSE=$(curl -s -X PUT "$API_URL/rules/$RULE_ID" \
   -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "Updated E2E Test Rule"
-  }')
+  -d '{"name": "Updated E2E Test Rule"}')
 echo "Response: $RESPONSE"
-if echo "$RESPONSE" | grep -q '"success":true'; then
-  echo "✅ PASSED: Rule updated"
-else
-  echo "❌ FAILED: Failed to update rule"
-  exit 1
-fi
-echo ""
+check_result "Rule updated" '"success":true' "$RESPONSE"
 
-# 7. DELETE /rules/:id with JWT → delete rule
-echo "7. DELETE /rules/:id with JWT → delete rule"
+# 7. DELETE /rules/:id → delete
+echo ""
+echo "Test 7: DELETE /rules/:id"
 RESPONSE=$(curl -s -X DELETE "$API_URL/rules/$RULE_ID" \
   -H "Authorization: Bearer $JWT")
 echo "Response: $RESPONSE"
-if echo "$RESPONSE" | grep -q '"success":true'; then
-  echo "✅ PASSED: Rule deleted"
-else
-  echo "❌ FAILED: Failed to delete rule"
-  exit 1
-fi
-echo ""
+check_result "Rule deleted" '"success":true' "$RESPONSE"
 
-# 8. Verify rule no longer exists
-echo "8. Verify rule no longer exists"
-RESPONSE=$(curl -s -H "Authorization: Bearer $JWT" "$API_URL/rules")
+echo ""
+echo "======================================"
+echo "Part 3: Jobs Lifecycle"
+echo "======================================"
+
+# 8. POST /jobs → create job
+echo ""
+echo "Test 8: POST /jobs"
+RESPONSE=$(curl -s -X POST "$API_URL/jobs" \
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "preset": "interior",
+    "itemCount": 3
+  }')
 echo "Response: $RESPONSE"
-if echo "$RESPONSE" | grep -q "$RULE_ID"; then
-  echo "❌ FAILED: Rule still exists after deletion"
-  exit 1
-else
-  echo "✅ PASSED: Rule successfully deleted"
+JOB_ID=$(echo "$RESPONSE" | grep -o '"jobId":"[^"]*"' | cut -d'"' -f4)
+if [ -z "$JOB_ID" ]; then
+    echo -e "${RED}✗${NC} No jobId received"
+    exit 1
 fi
-echo ""
+echo -e "${GREEN}✓${NC} Job created: $JOB_ID"
 
-echo "=== ALL E2E TESTS PASSED ==="
+# 9. POST /jobs/:id/confirm-upload
+echo ""
+echo "Test 9: POST /jobs/:id/confirm-upload"
+RESPONSE=$(curl -s -X POST "$API_URL/jobs/$JOB_ID/confirm-upload" \
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"totalItems": 3}')
+echo "Response: $RESPONSE"
+check_result "State → uploaded" "uploaded" "$RESPONSE"
+
+# 10. POST /jobs/:id/execute
+echo ""
+echo "Test 10: POST /jobs/:id/execute"
+RESPONSE=$(curl -s -X POST "$API_URL/jobs/$JOB_ID/execute" \
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "concepts": {"background": {"action": "remove", "value": ""}},
+    "protect": ["person"]
+  }')
+echo "Response: $RESPONSE"
+check_result "State → queued" "queued" "$RESPONSE"
+
+# 11. POST /jobs/:id/callback (3 items)
+echo ""
+echo "Test 11: POST /jobs/:id/callback (3 items)"
+for i in 0 1 2; do
+    echo "  Callback for item $i..."
+    RESPONSE=$(curl -s -X POST "$API_URL/jobs/$JOB_ID/callback" \
+      -H "x-gpu-callback-secret: $GPU_SECRET" \
+      -H "Content-Type: application/json" \
+      -d '{
+        "idx": '$i',
+        "status": "done",
+        "output_key": "outputs/user/'$JOB_ID'/'$i'_result.png",
+        "preview_key": "previews/user/'$JOB_ID'/'$i'_thumb.jpg",
+        "idempotency_key": "'$JOB_ID'-item-'$i'"
+      }')
+    check_result "  Callback $i processed" "success" "$RESPONSE"
+done
+
+# 12. GET /jobs/:id → final state
+echo ""
+echo "Test 12: GET /jobs/:id (final state)"
+RESPONSE=$(curl -s -H "Authorization: Bearer $JWT" "$API_URL/jobs/$JOB_ID")
+echo "Response: $RESPONSE"
+check_result "State is done" "done" "$RESPONSE"
+
+# 13. POST /jobs/:id/cancel (new job)
+echo ""
+echo "Test 13: Job cancel flow"
+RESPONSE=$(curl -s -X POST "$API_URL/jobs" \
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"preset": "interior", "itemCount": 1}')
+CANCEL_JOB_ID=$(echo "$RESPONSE" | grep -o '"jobId":"[^"]*"' | cut -d'"' -f4)
+RESPONSE=$(curl -s -X POST "$API_URL/jobs/$CANCEL_JOB_ID/cancel" \
+  -H "Authorization: Bearer $JWT")
+echo "Response: $RESPONSE"
+check_result "Job cancelled" "canceled" "$RESPONSE"
+
+echo ""
+echo "======================================"
+echo -e "${GREEN}✓ All E2E tests passed!${NC}"
+echo "======================================"

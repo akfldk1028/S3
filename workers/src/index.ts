@@ -21,11 +21,11 @@ import { ok, error } from './_shared/response';
 import { ERR } from './_shared/errors';
 
 // Import route handlers
-import authRoutes from './auth/auth.route';
-import presetsRoutes from './presets/presets.route';
-import rulesRoutes from './rules/rules.route';
-import jobsRoutes from './jobs/jobs.route';
-import userRoutes from './user/user.route';
+import authRoute from './auth/auth.route';
+import presetsRoute from './presets/presets.route';
+import rulesRoute from './rules/rules.route';
+import jobsRoute from './jobs/jobs.route';
+import userRoute from './user/user.route';
 
 const app = new Hono<{ Bindings: Env; Variables: { user: AuthUser } }>();
 
@@ -40,11 +40,11 @@ app.get('/health', (c) => {
 });
 
 // Mount route handlers
-app.route('/auth', authRoutes);
-app.route('/presets', presetsRoutes);
-app.route('/rules', rulesRoutes);
-app.route('/jobs', jobsRoutes);
-app.route('/user', userRoutes);
+app.route('/auth', authRoute);
+app.route('/presets', presetsRoute);
+app.route('/rules', rulesRoute);
+app.route('/jobs', jobsRoute);
+app.route('/user', userRoute);
 
 // 404 handler
 app.notFound((c) => {
@@ -53,6 +53,7 @@ app.notFound((c) => {
 
 // Global error handler
 app.onError((err, c) => {
+  console.error('Unhandled error:', err);
   const message = err instanceof Error ? err.message : 'Internal server error';
   return c.json(error(ERR.INTERNAL_ERROR, message), 500);
 });
