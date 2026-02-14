@@ -46,5 +46,14 @@ class R2Client:
             raise RuntimeError(f"Failed to download {key} from R2: {error_code} - {str(e)}")
 
     def upload(self, key: str, data: bytes, content_type: str = "image/png") -> None:
-        # TODO: implement
-        raise NotImplementedError
+        """Upload file to R2 with specified content type."""
+        try:
+            self.s3_client.put_object(
+                Bucket=self.bucket,
+                Key=key,
+                Body=data,
+                ContentType=content_type
+            )
+        except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
+            raise RuntimeError(f"Failed to upload {key} to R2: {error_code} - {str(e)}")
