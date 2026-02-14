@@ -11,7 +11,7 @@
  */
 
 import { Hono } from 'hono';
-import type { Env, AuthUser, GpuQueueMessage } from '../_shared/types';
+import type { Env, AuthUser, GpuQueueMessage, CallbackPayload, JobStatus } from '../_shared/types';
 import { generateUploadUrls, pushToQueue } from './jobs.service';
 
 const app = new Hono<{ Bindings: Env; Variables: { user: AuthUser } }>();
@@ -425,7 +425,155 @@ app.get('/:id', async (c) => {
   }
 });
 
-// POST /jobs/:id/callback
+// POST /jobs/:id/callback - GPU Worker callback with idempotency
+app.post('/:id/callback', async (c) => {
+  try {
+    // 1. Validate GPU_CALLBACK_SECRET header
+    const secret = c.req.header('x-gpu-callback-secret');
+    if (!secret || secret !== c.env.GPU_CALLBACK_SECRET) {
+      return c.json(
+        {
+          success: false,
+          error: { code: 'UNAUTHORIZED', message: 'Invalid or missing GPU callback secret' },
+        },
+        401
+      );
+    }
+
+    // 2. Get job ID from URL params
+    const jobId = c.req.param('id');
+
+    // 3. Parse callback payload
+    const payload = await c.req.json<CallbackPayload>();
+
+    // Validate payload
+    if (
+      typeof payload.idx !== 'number' ||
+      !payload.status ||
+      !['done', 'failed'].includes(payload.status) ||
+      !payload.idempotency_key
+    ) {
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'INVALID_PAYLOAD',
+            message: 'Callback payload must include idx, status (done|failed), and idempotency_key',
+          },
+        },
+        400
+      );
+    }
+
+    // 4. Get JobCoordinatorDO stub and call onItemResult
+    const jobCoordinatorId = c.env.JOB_COORDINATOR.idFromName(jobId);
+    const jobCoordinatorStub = c.env.JOB_COORDINATOR.get(jobCoordinatorId);
+
+    const resultResponse = await jobCoordinatorStub.fetch('http://internal/on-item-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!resultResponse.ok) {
+      const errorResult = await resultResponse.json<{ error: string }>();
+      return c.json(
+        {
+          success: false,
+          error: {
+            code: 'COORDINATOR_ERROR',
+            message: errorResult.error || 'Failed to process callback',
+          },
+        },
+        resultResponse.status
+      );
+    }
+
+    const resultData = await resultResponse.json<{
+      status: JobStatus;
+      doneItems: number;
+      failedItems: number;
+      totalItems: number;
+    }>();
+
+    // 5. If job is in final state (done/failed/canceled), commit or rollback credits
+    if (['done', 'failed', 'canceled'].includes(resultData.status)) {
+      // Get job coordinator state to retrieve userId
+      const statusResponse = await jobCoordinatorStub.fetch('http://internal/status', {
+        method: 'GET',
+      });
+
+      const statusData = await statusResponse.json<{
+        userId: string;
+      }>();
+
+      const userId = statusData.userId;
+
+      // Get UserLimiterDO stub
+      const userLimiterId = c.env.USER_LIMITER.idFromName(userId);
+      const userLimiterStub = c.env.USER_LIMITER.get(userLimiterId);
+
+      // Commit credits (refunds failed items, releases job slot)
+      if (resultData.status === 'done' || resultData.status === 'failed') {
+        await userLimiterStub.fetch('http://internal/commit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId,
+            doneItems: resultData.doneItems,
+            failedItems: resultData.failedItems,
+          }),
+        });
+      } else if (resultData.status === 'canceled') {
+        // Rollback all credits
+        await userLimiterStub.fetch('http://internal/rollback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId,
+            totalItems: resultData.totalItems,
+          }),
+        });
+      }
+    }
+
+    // 6. Return success response
+    return c.json({
+      success: true,
+      data: {
+        jobId,
+        status: resultData.status,
+        progress: {
+          done: resultData.doneItems,
+          failed: resultData.failedItems,
+          total: resultData.totalItems,
+        },
+      },
+      error: null,
+      meta: {
+        request_id: crypto.randomUUID(),
+        timestamp: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    return c.json(
+      {
+        success: false,
+        data: null,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown error occurred',
+        },
+        meta: {
+          request_id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+        },
+      },
+      500
+    );
+  }
+});
+
 // POST /jobs/:id/cancel
 
 export default app;
