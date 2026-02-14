@@ -99,6 +99,37 @@ app.post('/', async (c) => {
 });
 
 // GET /rules
+app.get('/', async (c) => {
+  try {
+    const user = c.get('user');
+    if (!user || !user.userId) {
+      return c.json(error(ERR.AUTH_REQUIRED, 'Authentication required'), 401);
+    }
+
+    // Query all rules for the user
+    const result = await c.env.DB
+      .prepare('SELECT id, user_id, name, preset_id, concepts_json, protect_json, created_at, updated_at FROM rules WHERE user_id = ? ORDER BY created_at DESC')
+      .bind(user.userId)
+      .all<{
+        id: string;
+        user_id: string;
+        name: string;
+        preset_id: string;
+        concepts_json: string;
+        protect_json: string | null;
+        created_at: string;
+        updated_at: string | null;
+      }>();
+
+    const rules = result.results || [];
+
+    return c.json(ok({ rules }));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return c.json(error(ERR.INTERNAL_ERROR, message), 500);
+  }
+});
+
 // PUT /rules/:id
 // DELETE /rules/:id
 
