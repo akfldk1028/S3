@@ -11,11 +11,60 @@ TODO: Auto-Claude 구현
 - 최소: RTX 4090 (16GB), CUDA 12.1+, Python 3.12+, PyTorch 2.7+
 """
 
+import os
+import torch
+from transformers import Sam3Processor, Sam3Model
+
 
 class SAM3Segmenter:
     def __init__(self, model_path: str = "/models/sam3"):
-        # TODO: load SAM3 model
-        pass
+        """
+        Initialize SAM3 segmenter with model loaded from HuggingFace Hub.
+
+        Args:
+            model_path: Cache directory for model weights (default: /models/sam3)
+                       Can be overridden by MODEL_CACHE_DIR env variable.
+
+        Raises:
+            ValueError: If HF_TOKEN is not set or SAM3 access not approved
+            RuntimeError: If model loading fails
+        """
+        # Use MODEL_CACHE_DIR env variable if set, otherwise use model_path parameter
+        cache_dir = os.getenv("MODEL_CACHE_DIR", model_path)
+
+        # Auto-detect device (CUDA if available, fallback to CPU)
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # Get HuggingFace token (REQUIRED - SAM3 is a gated model)
+        hf_token = os.getenv("HF_TOKEN")
+        if not hf_token:
+            raise ValueError(
+                "HF_TOKEN environment variable is required. "
+                "SAM3 is a gated model - get token from https://huggingface.co/settings/tokens "
+                "and request access at https://huggingface.co/facebook/sam3"
+            )
+
+        try:
+            # Load SAM3 processor from HuggingFace Hub
+            self.processor = Sam3Processor.from_pretrained(
+                "facebook/sam3",
+                token=hf_token,
+                cache_dir=cache_dir,
+            )
+
+            # Load SAM3 model from HuggingFace Hub and move to device
+            self.model = Sam3Model.from_pretrained(
+                "facebook/sam3",
+                token=hf_token,
+                cache_dir=cache_dir,
+            ).to(self.device)
+
+        except Exception as e:
+            raise RuntimeError(
+                f"Failed to load SAM3 model from HuggingFace Hub. "
+                f"Ensure HF_TOKEN is valid and you have access to facebook/sam3. "
+                f"Error: {str(e)}"
+            )
 
     def segment(self, image, concepts: list[str], protect: list[str]) -> dict:
         """Return concept masks and protect masks."""
