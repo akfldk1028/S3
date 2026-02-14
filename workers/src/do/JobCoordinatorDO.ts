@@ -24,7 +24,7 @@
  */
 
 import { DurableObject } from 'cloudflare:workers';
-import type { Env, JobCoordinatorState, JobItemState, JobStatus } from '../_shared/types';
+import type { Env, JobCoordinatorState, JobItemState, JobStatus, CallbackPayload } from '../_shared/types';
 
 export class JobCoordinatorDO extends DurableObject<Env> {
   /**
@@ -129,5 +129,113 @@ export class JobCoordinatorDO extends DurableObject<Env> {
     return true;
   }
 
-  // TODO: implement FSM methods (create, markUploaded, markQueued, etc.) + idempotency + alarm
+  /**
+   * Mark upload complete and set total item count
+   *
+   * @param totalItems Number of items uploaded
+   * @throws Error if not in 'created' state
+   */
+  async confirmUpload(totalItems: number): Promise<void> {
+    // Validate and transition to 'uploaded'
+    await this.transitionState('uploaded');
+
+    // Set total_items count
+    await this.ctx.storage.sql.exec(
+      'UPDATE job_state SET total_items = ?1',
+      totalItems
+    );
+  }
+
+  /**
+   * Handle callback from GPU Worker - update item status and progress
+   *
+   * @param payload Callback payload with item result
+   * @returns true if processed, false if duplicate (idempotent)
+   */
+  async handleCallback(payload: CallbackPayload): Promise<boolean> {
+    // Check idempotency - if we've seen this key before, skip processing
+    const checkCursor = await this.ctx.storage.sql.exec(
+      'SELECT idempotency_key FROM seen_keys WHERE idempotency_key = ?1',
+      payload.idempotency_key
+    );
+
+    if (checkCursor.toArray().length > 0) {
+      // Duplicate callback - already processed
+      return false;
+    }
+
+    // Record idempotency key
+    await this.ctx.storage.sql.exec(
+      'INSERT INTO seen_keys (idempotency_key, timestamp) VALUES (?1, ?2)',
+      payload.idempotency_key,
+      Date.now()
+    );
+
+    // Evict old keys from RingBuffer (keep last 512 entries)
+    await this.ctx.storage.sql.exec(`
+      DELETE FROM seen_keys
+      WHERE idempotency_key NOT IN (
+        SELECT idempotency_key FROM seen_keys
+        ORDER BY timestamp DESC
+        LIMIT 512
+      )
+    `);
+
+    // Update item status in job_items table
+    await this.ctx.storage.sql.exec(
+      `UPDATE job_items
+       SET status = ?1,
+           output_key = ?2,
+           preview_key = ?3,
+           error = ?4
+       WHERE idx = ?5`,
+      payload.status,
+      payload.output_key || '',
+      payload.preview_key || '',
+      payload.error || null,
+      payload.idx
+    );
+
+    // Increment done_items or failed_items counter
+    if (payload.status === 'done') {
+      await this.ctx.storage.sql.exec(
+        'UPDATE job_state SET done_items = done_items + 1'
+      );
+    } else if (payload.status === 'failed') {
+      await this.ctx.storage.sql.exec(
+        'UPDATE job_state SET failed_items = failed_items + 1'
+      );
+    }
+
+    // Auto-transition to 'running' on first callback if in 'queued' state
+    const stateCursor = await this.ctx.storage.sql.exec(
+      'SELECT status FROM job_state LIMIT 1'
+    );
+    const stateRow = stateCursor.toArray()[0] as { status: JobStatus } | undefined;
+
+    if (stateRow?.status === 'queued') {
+      await this.transitionState('running');
+    }
+
+    // Check if all items are complete
+    const progressCursor = await this.ctx.storage.sql.exec(
+      'SELECT total_items, done_items, failed_items FROM job_state LIMIT 1'
+    );
+    const progressRow = progressCursor.toArray()[0] as
+      | { total_items: number; done_items: number; failed_items: number }
+      | undefined;
+
+    if (progressRow) {
+      const { total_items, done_items, failed_items } = progressRow;
+
+      // Auto-transition to 'done' when all items are processed
+      if (done_items + failed_items === total_items && total_items > 0) {
+        await this.transitionState('done');
+      }
+    }
+
+    return true;
+  }
+
+  // TODO: implement remaining FSM methods (create, markQueued, getStatus, cancel) + alarm
 }
