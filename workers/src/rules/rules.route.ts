@@ -11,10 +11,93 @@
 
 import { Hono } from 'hono';
 import type { Env, AuthUser } from '../_shared/types';
+import { ok, error } from '../_shared/response';
+import { ERR } from '../_shared/errors';
+import { PLAN_LIMITS } from '../_shared/types';
+import { CreateRuleSchema } from './rules.validator';
+import { PRESETS } from '../presets/presets.data';
 
 const app = new Hono<{ Bindings: Env; Variables: { user: AuthUser } }>();
 
 // POST /rules
+app.post('/', async (c) => {
+  try {
+    const user = c.get('user');
+    if (!user || !user.userId) {
+      return c.json(error(ERR.AUTH_REQUIRED, 'Authentication required'), 401);
+    }
+
+    // Parse and validate request body
+    const body = await c.req.json().catch(() => ({}));
+    const parsed = CreateRuleSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        error(ERR.VALIDATION_FAILED, parsed.error.errors.map((e) => e.message).join(', ')),
+        400
+      );
+    }
+
+    const { name, preset_id, concepts, protect } = parsed.data;
+
+    // Validate preset exists
+    if (!PRESETS[preset_id]) {
+      return c.json(error(ERR.INVALID_PRESET, `Preset '${preset_id}' not found`), 400);
+    }
+
+    // Get user plan to check rule slot limit
+    const userRow = await c.env.DB
+      .prepare('SELECT plan FROM users WHERE id = ?')
+      .bind(user.userId)
+      .first<{ plan: 'free' | 'pro' }>();
+
+    if (!userRow) {
+      return c.json(error(ERR.NOT_FOUND, 'User not found'), 404);
+    }
+
+    // Check current rule count against plan limits
+    const ruleCountResult = await c.env.DB
+      .prepare('SELECT COUNT(*) as count FROM rules WHERE user_id = ?')
+      .bind(user.userId)
+      .first<{ count: number }>();
+
+    const currentRuleCount = ruleCountResult?.count || 0;
+    const maxRuleSlots = PLAN_LIMITS[userRow.plan].maxRuleSlots;
+
+    if (currentRuleCount >= maxRuleSlots) {
+      return c.json(
+        error(ERR.RULE_SLOT_LIMIT, `Rule slot limit reached (${maxRuleSlots} for ${userRow.plan} plan)`),
+        403
+      );
+    }
+
+    // Create rule in D1
+    const ruleId = crypto.randomUUID();
+    const conceptsJson = JSON.stringify(concepts);
+    const protectJson = JSON.stringify(protect);
+
+    await c.env.DB
+      .prepare(
+        'INSERT INTO rules (id, user_id, name, preset_id, concepts_json, protect_json) VALUES (?, ?, ?, ?, ?, ?)'
+      )
+      .bind(ruleId, user.userId, name, preset_id, conceptsJson, protectJson)
+      .run();
+
+    return c.json(
+      ok({
+        id: ruleId,
+        user_id: user.userId,
+        name,
+        preset_id,
+        concepts_json: conceptsJson,
+        protect_json: protectJson,
+      })
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Internal server error';
+    return c.json(error(ERR.INTERNAL_ERROR, message), 500);
+  }
+});
+
 // GET /rules
 // PUT /rules/:id
 // DELETE /rules/:id
