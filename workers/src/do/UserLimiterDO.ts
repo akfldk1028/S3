@@ -14,6 +14,8 @@ const PLAN_LIMITS = {
 } as const;
 
 export class UserLimiterDO extends DurableObject<Env> {
+  private locks: Set<string> = new Set();
+
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
 
@@ -51,6 +53,18 @@ export class UserLimiterDO extends DurableObject<Env> {
         const { jobId, itemCount } = await request.json() as { jobId: string; itemCount: number };
         const result = await this.reserve(jobId, itemCount);
         return new Response(JSON.stringify(result), { status: result.allowed ? 200 : 403 });
+      }
+
+      if (url.pathname === '/commit' && method === 'POST') {
+        const { jobId } = await request.json() as { jobId: string };
+        await this.commit(jobId);
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
+      }
+
+      if (url.pathname === '/rollback' && method === 'POST') {
+        const { jobId, totalItems } = await request.json() as { jobId: string; totalItems: number };
+        await this.rollback(jobId, totalItems);
+        return new Response(JSON.stringify({ success: true }), { status: 200 });
       }
 
       if (url.pathname === '/release' && method === 'POST') {
@@ -126,6 +140,13 @@ export class UserLimiterDO extends DurableObject<Env> {
   /**
    * Reserve credits for a job - atomic check-and-decrement
    * CRITICAL: Credits must NEVER go negative
+   *
+   * Steps:
+   * 1. Check credits >= itemCount
+   * 2. Check active_jobs < max_concurrency
+   * 3. Atomic decrement of credits
+   * 4. Increment active_jobs
+   * 5. Add jobId to locks
    */
   async reserve(jobId: string, itemCount: number): Promise<{ allowed: boolean; reason?: string }> {
     const state = await this.getUserState();
@@ -153,7 +174,50 @@ export class UserLimiterDO extends DurableObject<Env> {
       state.userId
     );
 
+    // Add lock to track this job
+    this.locks.add(jobId);
+
     return { allowed: true };
+  }
+
+  /**
+   * Commit a job - no-op (job completed successfully)
+   *
+   * Steps:
+   * 1. Decrement active_jobs
+   * 2. Remove jobId from locks
+   *
+   * Note: Credits were already deducted in reserve(), so no refund needed
+   */
+  async commit(jobId: string): Promise<void> {
+    // Remove lock
+    this.locks.delete(jobId);
+
+    // Decrement active_jobs
+    await this.ctx.storage.sql.exec(
+      `UPDATE user_state SET active_jobs = active_jobs - 1 WHERE active_jobs > 0`
+    );
+  }
+
+  /**
+   * Rollback a job - refund ALL credits atomically
+   *
+   * Steps:
+   * 1. Full refund: credits += totalItems
+   * 2. Decrement active_jobs
+   * 3. Remove jobId from locks
+   *
+   * Called when job is canceled or completely failed
+   */
+  async rollback(jobId: string, totalItems: number): Promise<void> {
+    // Remove lock
+    this.locks.delete(jobId);
+
+    // Atomic refund of all credits and decrement of active_jobs
+    await this.ctx.storage.sql.exec(
+      `UPDATE user_state SET credits = credits + ?, active_jobs = active_jobs - 1 WHERE active_jobs > 0`,
+      totalItems
+    );
   }
 
   /**
