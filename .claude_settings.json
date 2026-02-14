@@ -1,0 +1,34 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\006-gpu-worker-sam3-segmenter/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\006-gpu-worker-sam3-segmenter/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\006-gpu-worker-sam3-segmenter/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\006-gpu-worker-sam3-segmenter/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\006-gpu-worker-sam3-segmenter/**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\006-gpu-worker-sam3-segmenter\\.auto-claude\\specs\\006-gpu-worker-sam3-segmenter/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\006-gpu-worker-sam3-segmenter\\.auto-claude\\specs\\006-gpu-worker-sam3-segmenter/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\006-gpu-worker-sam3-segmenter\\.auto-claude\\specs\\006-gpu-worker-sam3-segmenter/**)",
+      "Read(C:\\DK\\S3\\.auto-claude/**)",
+      "Write(C:\\DK\\S3\\.auto-claude/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)"
+    ]
+  }
+}

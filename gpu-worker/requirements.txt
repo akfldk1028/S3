@@ -16,6 +16,7 @@ boto3>=1.35.0
 # AI/ML — SAM3 (848M params, 3.4GB)
 torch>=2.7.0
 torchvision>=0.22.0
+transformers>=4.50.0
 
 # Model hub (SAM3 가중치 다운로드)
 huggingface_hub>=0.25.0
