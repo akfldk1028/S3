@@ -5,14 +5,19 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../features/auth/pages/screens/login_screen.dart';
 import '../features/home/pages/screens/home_screen.dart';
 import '../features/profile/pages/screens/profile_screen.dart';
+import '../features/splash/splash_screen.dart';
 
 part 'app_router.g.dart';
 
 @riverpod
 GoRouter appRouter(Ref ref) {
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: '/splash',
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(
         path: '/',
         builder: (context, state) => const HomeScreen(),
