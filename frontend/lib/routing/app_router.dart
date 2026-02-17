@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../features/auth/pages/screens/login_screen.dart';
+import '../features/history/history_screen.dart';
 import '../features/home/pages/screens/home_screen.dart';
 import '../features/profile/pages/screens/profile_screen.dart';
 
@@ -24,6 +25,10 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/history',
+        builder: (context, state) => const HistoryScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
