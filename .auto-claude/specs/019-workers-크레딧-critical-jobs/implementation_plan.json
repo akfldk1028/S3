@@ -205,7 +205,9 @@
             "command": "cd workers && npx tsc --noEmit",
             "expected": "Exit code 0, no errors printed"
           },
-          "status": "pending"
+          "status": "completed",
+          "notes": "TypeScript compile check passed (npx tsc --noEmit, exit code 0, no errors). All 5 bug fixes verified: [CRED-1] INSERT OR IGNORE in UserLimiterDO.init() L101; [CRED-2] release(doneItems, failedItems, totalItems) with refund=totalItems-doneItems-failedItems in UserLimiterDO.ts L349/354, /release handler destructures failedItems L170, JobCoordinatorDO.alarm() passes failedItems: jobState.failedItems L173; [CRED-3] ITEM_LIMIT check before reserve() in jobs.route.ts L48/63; [SEC-1] callback verifies job existence via DO state + terminal state idempotent handling L191-194; [SEC-2] JOB_FORBIDDEN ownership checks in confirm-upload L113, execute L142, cancel L228.",
+          "updated_at": "2026-02-18T00:00:00.000000+00:00"
         }
       ]
     }
