@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/foundation.dart';
 
 import '../../core/models/job.dart';
@@ -62,9 +60,6 @@ class WorkspaceState {
 
   /// Number of consecutive network failures during polling (for UI feedback)
   final int networkRetryCount;
-
-  // Sentinel object used to distinguish "don't change" from explicit null
-  static final _sentinel = Object();
 
   /// Returns a copy of this state with the specified fields replaced.
   ///
