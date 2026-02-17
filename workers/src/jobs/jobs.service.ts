@@ -21,7 +21,10 @@ export async function generateUploadUrls(
 export async function pushToQueue(
   queue: Queue<GpuQueueMessage>,
   message: GpuQueueMessage,
+  deduplicationId?: string,
 ): Promise<void> {
-  // TODO: implement
-  throw new Error('Not implemented');
+  await queue.send(message, {
+    contentType: 'json',
+    ...(deduplicationId ? { deduplicationId } : {}),
+  });
 }
