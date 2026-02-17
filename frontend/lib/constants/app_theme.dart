@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' show Brightness;
 import 'package:shadcn_ui/shadcn_ui.dart';
 
 class AppTheme {
