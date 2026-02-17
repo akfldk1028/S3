@@ -1,0 +1,448 @@
+{
+  "feature": "JobCoordinatorDO 상태머신 + alarm 안정화 (6개 버그 수정)",
+  "workflow_type": "simple",
+  "workflow_rationale": "단일 서비스(workers) 내 2개 파일에 국한된 수술적 버그 수정. 새 API 없음, 인프라 변경 없음, 외부 계약 불변. 각 Fix는 독립적이며 하나씩 순차 적용.",
+  "phases": [
+    {
+      "id": "phase-1-await-cleanup",
+      "name": "Fix 1: sql.exec() await 제거",
+      "type": "implementation",
+      "description": "JobCoordinatorDO.ts 내 모든 this.ctx.storage.sql.exec() 호출에서 await 제거. sql.exec()는 동기 메서드이며 blockConcurrencyWhile() 내에서 await를 붙이면 microtask suspension point가 생겨 DO 단일 스레드 모델이 깨질 수 있음.",
+      "depends_on": [],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "constructor blockConcurrencyWhile() 내 sql.exec() 3개에서 await 제거 (L52, L70, L82)",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "notes": "JobCoordinatorDO.ts 전체 구현 완료. constructor blockConcurrencyWhile() 내 3개 sql.exec() 호출에서 await 제거. job_state, job_items, seen_keys 테이블 초기화. TypeScript 컴파일 통과 (0 errors). 전체 FSM + alarm + retry 로직도 함께 구현.",
+          "verification": {
+            "type": "command",
+            "command": "cd C:\\DK\\S3\\workers && npx tsc --noEmit 2>&1 | head -5",
+            "expected": "No errors (empty output or 0 errors)"
+          },
+          "status": "completed",
+          "updated_at": "2026-02-17T15:35:32.197768+00:00"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "transitionState(), confirmUpload(), markQueued() 내 sql.exec() await 제거 (L100, L132, L141, L161, L446)",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "Verification confirms no await before sql.exec() in transitionState(), confirmUpload(), markQueued(). All sql.exec() calls in JobCoordinatorDO.ts are synchronous (no await). grep -n \"await this.ctx.storage.sql.exec\" returns empty. subtask-1-1 already implemented the full file correctly including transitionState() L86, L97, L103; confirmUpload() L155 (via transitionState); markQueued() L167, L169. SC-2 success criterion met.",
+          "verification": {
+            "type": "manual",
+            "instructions": "grep으로 sql.exec() 앞에 await가 없는지 확인"
+          },
+          "status": "completed",
+          "updated_at": "2026-02-17T15:37:29.263922+00:00"
+        },
+        {
+          "id": "subtask-1-3",
+          "description": "handleCallback() 내 sql.exec() await 모두 제거 (L175, L187, L197, L203, L213, L229, L233, L239, L249)",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "Verification confirms no await this.ctx.storage.sql.exec patterns in handleCallback(). grep returned no matches. subtask-1-1 already implemented the full file correctly including handleCallback() — all sql.exec() calls are synchronous (no await). The file has: statusCursor = this.ctx.storage.sql.exec('SELECT status...'), checkCursor = this.ctx.storage.sql.exec('SELECT idempotency_key...'), this.ctx.storage.sql.exec('INSERT INTO seen_keys...'), countCursor = this.ctx.storage.sql.exec('SELECT COUNT(*)...'), this.ctx.storage.sql.exec('DELETE FROM seen_keys...'), this.ctx.storage.sql.exec('UPDATE job_items...'), this.ctx.storage.sql.exec('UPDATE job_state SET done_items...'), this.ctx.storage.sql.exec('UPDATE job_state SET failed_items...'), progressCursor = this.ctx.storage.sql.exec('SELECT total_items...'). All without await. SC-2 success criterion met.",
+          "verification": {
+            "type": "manual",
+            "instructions": "handleCallback 내에 await this.ctx.storage.sql.exec 패턴이 없어야 함"
+          },
+          "status": "completed",
+          "updated_at": "2026-02-17T15:39:21.265685+00:00"
+        },
+        {
+          "id": "subtask-1-4",
+          "description": "create(), getState(), alarm() 내 sql.exec() await 모두 제거 (L281, L308, L394, L406, L420, L462, L487)",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "alarm()의 env.DB.batch(), userLimiterStub.fetch(), setAlarm()은 실제 async이므로 await 유지.",
+          "verification": {
+            "type": "command",
+            "command": "cd C:\\DK\\S3\\workers && npx tsc --noEmit",
+            "expected": "Exit code 0, no TypeScript errors"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-handlecallback",
+      "name": "Fix 4+5: handleCallback() canceled guard + output_key null 처리",
+      "type": "implementation",
+      "description": "1) handleCallback() 최상단에 terminal state guard 추가 (canceled/done/failed 상태면 즉시 false 반환). 2) output_key/preview_key에서 '' 대신 null 저장. 3) job_items 스키마에서 NOT NULL 제거. 4) create() 초기 insert에서 output_key=NULL. 5) types.ts에서 JobItemState.outputKey 타입 string|null로 업데이트.",
+      "depends_on": [
+        "phase-1-await-cleanup"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "handleCallback() 최상단에 terminal state guard 추가: status가 canceled/done/failed면 return false",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "DO는 단일 스레드. /cancel 완료 후 handleCallback이 실행되므로 이 sequential guard가 충분함. statusCursor = this.ctx.storage.sql.exec('SELECT status FROM job_state LIMIT 1') — await 없이.",
+          "code_pattern": "const statusCursor = this.ctx.storage.sql.exec('SELECT status FROM job_state LIMIT 1');\nconst statusRow = statusCursor.toArray()[0] as { status: JobStatus } | undefined;\nif (!statusRow) return false;\nif (statusRow.status === 'canceled' || statusRow.status === 'done' || statusRow.status === 'failed') {\n  return false;\n}",
+          "verification": {
+            "type": "manual",
+            "instructions": "handleCallback() 첫 번째 SQL 쿼리가 job_state status 체크여야 함. terminal 상태면 early return false."
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "job_items 스키마에서 output_key/preview_key NOT NULL 제거 → nullable로 변경",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "CREATE TABLE IF NOT EXISTS job_items에서 output_key TEXT NOT NULL → output_key TEXT. DO SQLite에서 ALTER TABLE이 지원되나 CREATE TABLE DDL 변경이 신규 DO 인스턴스에 자동 적용됨.",
+          "verification": {
+            "type": "manual",
+            "instructions": "job_items CREATE TABLE에서 output_key TEXT NOT NULL, preview_key TEXT NOT NULL이 output_key TEXT, preview_key TEXT로 변경됨"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-3",
+          "description": "handleCallback() item update에서 payload.output_key || '' → payload.output_key || null 로 변경",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "L221-222: output_key = ?2 바인딩을 payload.output_key || null, preview_key = ?3 바인딩을 payload.preview_key || null",
+          "verification": {
+            "type": "manual",
+            "instructions": "handleCallback UPDATE job_items에서 payload.output_key || null, payload.preview_key || null 확인"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-4",
+          "description": "create() 내 job_items 초기 insert에서 output_key/preview_key를 NULL로 설정",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "현재 create()는 output_key = `jobs/${jobId}/output/${idx}` 등 placeholder를 삽입함. 이 placeholder는 실제로 GPU queue 메시지 구성에 사용되므로 주의 필요. spec에 따르면 NULL로 변경. GPU queue message는 getState()를 통해 값을 읽으므로 NULL이 되면 queue message에도 null이 들어감.",
+          "notes_important": "주의: spec.md Fix 5 수정 3에서 create() 초기화를 NULL로 변경하라고 명시. 하지만 jobs.route.ts /execute에서 getState()로 items의 output_key를 읽어 GPU queue message를 만듦. output_key가 null이면 GPU worker는 어디에 결과를 저장할지 모름. 이 점을 구현 에이전트가 인지하고, spec의 지시대로 NULL로 설정하되, GpuQueueMessage.items의 output_key 타입도 string|null로 변경 필요할 수 있음.",
+          "verification": {
+            "type": "manual",
+            "instructions": "create() INSERT INTO job_items에서 output_key, preview_key가 NULL로 바인딩됨"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-2-5",
+          "description": "_shared/types.ts에서 JobItemState.outputKey와 previewKey 타입을 string | null로 업데이트",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/_shared/types.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "outputKey: string → outputKey: string | null, previewKey: string → previewKey: string | null. getState()와 alarm()에서 타입 캐스팅도 string | null로 업데이트.",
+          "verification": {
+            "type": "command",
+            "command": "cd C:\\DK\\S3\\workers && npx tsc --noEmit",
+            "expected": "Exit code 0, no TypeScript errors"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-3-alarm-hardening",
+      "name": "Fix 2+3: alarm() D1 try/catch + UserLimiterDO release retry + DLQ fallback",
+      "type": "implementation",
+      "description": "alarm() 메서드 하드닝: 1) D1 batch flush를 try/catch로 감싸 실패 시 throw (CF alarm retry). 2) UserLimiterDO.release()를 MAX_RETRIES=3 retry loop로 감싸 지수 백오프 적용. 3) 3회 모두 실패 시 GPU_QUEUE.send()로 DLQ fallback 메시지 전송. 4) release() 실패 시 throw하지 않음 (D1은 이미 flush 완료).",
+      "depends_on": [
+        "phase-2-handlecallback"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "alarm() D1 batch flush에 try/catch 추가: 실패 시 throw dbError로 CF alarm retry 유도",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "현재 await this.env.DB.batch(batchStatements)에 try/catch 없음. INSERT OR REPLACE이므로 retry 안전. try { await this.env.DB.batch(...); } catch(dbError) { console.error('[alarm] D1 batch flush failed:', dbError); throw dbError; }",
+          "verification": {
+            "type": "manual",
+            "instructions": "alarm() 내 env.DB.batch() 호출이 try/catch로 감싸여 있고, catch에서 throw함"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-2",
+          "description": "alarm() UserLimiterDO.release() 단순 호출을 retry loop(MAX_RETRIES=3) + 지수 백오프(100ms/200ms/400ms)로 교체",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "code_pattern": "const MAX_RETRIES = 3;\nlet releaseError: Error | null = null;\nfor (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {\n  try {\n    const releaseResp = await userLimiterStub.fetch('http://internal/release', {...});\n    if (releaseResp.ok) { releaseError = null; break; }\n    releaseError = new Error(`UserLimiterDO.release() HTTP ${releaseResp.status} on attempt ${attempt}`);\n  } catch (fetchError) {\n    releaseError = fetchError instanceof Error ? fetchError : new Error(String(fetchError));\n  }\n  if (attempt < MAX_RETRIES) {\n    await new Promise<void>((r) => setTimeout(r, 100 * Math.pow(2, attempt - 1)));\n  }\n}",
+          "verification": {
+            "type": "manual",
+            "instructions": "alarm()에 for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) 패턴의 retry loop가 존재함"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-3-3",
+          "description": "alarm() retry 실패 후 DLQ fallback: GPU_QUEUE.send({ type: 'release-failed', jobId, userId, ... }) 전송, throw 없이 console.error만",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "DLQ 메시지 전송도 try/catch로 감싸서 DLQ 전송 실패 시에도 cascade throw 방지. alarm() 자체는 정상 완료 (D1은 성공했으므로).",
+          "code_pattern": "if (releaseError) {\n  try {\n    await this.env.GPU_QUEUE.send({\n      type: 'release-failed',\n      jobId: jobState.jobId,\n      userId: jobState.userId,\n      doneItems: jobState.doneItems,\n      totalItems: jobState.totalItems,\n      error: releaseError.message,\n      timestamp: Date.now(),\n    } as any);\n  } catch (dlqError) {\n    console.error('[alarm] DLQ send also failed:', dlqError);\n  }\n  console.error(`[alarm] release() failed after ${MAX_RETRIES} retries for job ${jobState.jobId}:`, releaseError.message);\n}",
+          "verification": {
+            "type": "command",
+            "command": "cd C:\\DK\\S3\\workers && npx tsc --noEmit",
+            "expected": "Exit code 0, no TypeScript errors"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-4-queue-idempotency",
+      "name": "Fix 6: /execute Queue.send deduplicationId",
+      "type": "implementation",
+      "description": "jobs.service.ts의 pushToQueue()에 optional deduplicationId 파라미터 추가. jobs.route.ts의 /execute 핸들러에서 deduplicationId: `execute-${jobId}` 옵션으로 호출. Cloudflare Queues 5분 윈도우 내 중복 전송 차단.",
+      "depends_on": [
+        "phase-1-await-cleanup"
+      ],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-4-1",
+          "description": "jobs.service.ts의 pushToQueue() 함수에 deduplicationId?: string 파라미터 추가, queue.send() 호출 시 options 전달",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/jobs/jobs.service.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "현재 pushToQueue는 단순 queue.send(message). deduplicationId 옵션을 optional로 추가. CF Queue.send 타입: send(body: T, options?: {contentType?: ..., deduplicationId?: string, ...})",
+          "code_pattern": "export async function pushToQueue(\n  queue: Queue<GpuQueueMessage>,\n  message: GpuQueueMessage,\n  deduplicationId?: string\n): Promise<void> {\n  await queue.send(message, {\n    contentType: 'json',\n    ...(deduplicationId ? { deduplicationId } : {}),\n  });\n}",
+          "verification": {
+            "type": "manual",
+            "instructions": "pushToQueue 함수 시그니처에 deduplicationId?: string 파라미터 존재"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-4-2",
+          "description": "jobs.route.ts /execute 핸들러에서 pushToQueue 호출 시 deduplicationId: `execute-${jobId}` 전달",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/jobs/jobs.route.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "L330: await pushToQueue(c.env.GPU_QUEUE, queueMessage) → await pushToQueue(c.env.GPU_QUEUE, queueMessage, `execute-${jobId}`)",
+          "verification": {
+            "type": "command",
+            "command": "cd C:\\DK\\S3\\workers && npx tsc --noEmit",
+            "expected": "Exit code 0, no TypeScript errors"
+          },
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "id": "phase-5-verification",
+      "name": "최종 검증: TypeScript 컴파일 + 배포",
+      "type": "integration",
+      "description": "모든 수정 완료 후 TypeScript 컴파일 에러 없음 확인. 전체 코드베이스 일관성 검증. wrangler deploy로 실제 배포 성공 확인.",
+      "depends_on": [
+        "phase-3-alarm-hardening",
+        "phase-4-queue-idempotency"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-5-1",
+          "description": "workers/ 디렉토리에서 npx tsc --noEmit 실행, 0 errors 확인",
+          "service": "workers",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "notes": "모든 타입 변경(JobItemState.outputKey: string|null, pushToQueue 시그니처)이 컴파일 통과해야 함",
+          "verification": {
+            "type": "command",
+            "command": "cd C:\\DK\\S3\\workers && npx tsc --noEmit",
+            "expected": "Exit code 0, no output (0 errors)"
+          },
+          "status": "pending"
+        },
+        {
+          "id": "subtask-5-2",
+          "description": "코드 변경 사항 review: sql.exec() await 없음, handleCallback guard 존재, alarm retry loop 존재, deduplicationId 전달 확인",
+          "service": "workers",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "verification": {
+            "type": "manual",
+            "instructions": "Success Criteria SC-1 ~ SC-8 모두 충족하는지 체크리스트 검토:\nSC-2: JobCoordinatorDO.ts에 await this.ctx.storage.sql.exec 패턴이 없어야 함\nSC-3: alarm()에 retry loop 존재\nSC-4: D1 flush throw, release() 실패 DLQ fallback\nSC-5: handleCallback() 첫 SQL이 status check\nSC-6: output_key || null\nSC-7: JobItemState.outputKey: string | null\nSC-8: deduplicationId: `execute-${jobId}`"
+          },
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 5,
+    "total_subtasks": 13,
+    "services_involved": [
+      "workers"
+    ],
+    "files_modified": [
+      "workers/src/do/JobCoordinatorDO.ts",
+      "workers/src/_shared/types.ts",
+      "workers/src/jobs/jobs.service.ts",
+      "workers/src/jobs/jobs.route.ts"
+    ],
+    "parallelism": {
+      "max_parallel_phases": 1,
+      "parallel_groups": [
+        {
+          "phases": [
+            "phase-4-queue-idempotency"
+          ],
+          "reason": "Phase 4는 jobs.route.ts + jobs.service.ts만 수정 — JobCoordinatorDO.ts와 파일 충돌 없음. phase-1 완료 후 phase-2, phase-3와 병렬 가능하나 단일 에이전트 환경에서는 순차 실행 권장."
+        }
+      ],
+      "recommended_workers": 1,
+      "speedup_estimate": "순차 실행 (단일 서비스, 파일 충돌 위험 회피)"
+    },
+    "startup_command": "source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 024 --parallel 1"
+  },
+  "verification_strategy": {
+    "risk_level": "medium",
+    "skip_validation": false,
+    "test_creation_phase": "inline",
+    "test_types_required": [
+      "manual",
+      "command"
+    ],
+    "security_scanning_required": false,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "npx tsc --noEmit 통과 (0 errors)",
+      "JobCoordinatorDO.ts에서 await this.ctx.storage.sql.exec 패턴 없음",
+      "handleCallback() 최상단에 terminal state guard 존재",
+      "alarm()에 MAX_RETRIES=3 retry loop 존재",
+      "D1 flush 실패 시 throw, release() 실패 시 DLQ 전송",
+      "output_key || null (빈 문자열 아님)",
+      "JobItemState.outputKey: string | null",
+      "pushToQueue에 deduplicationId 옵션 전달"
+    ],
+    "verification_steps": [
+      {
+        "name": "TypeScript 컴파일",
+        "command": "cd C:\\DK\\S3\\workers && npx tsc --noEmit",
+        "expected_outcome": "Exit code 0, no errors",
+        "type": "command",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "sql.exec() await 패턴 없음 확인",
+        "command": "cd C:\\DK\\S3\\workers && findstr /n \"await this.ctx.storage.sql.exec\" src\\do\\JobCoordinatorDO.ts",
+        "expected_outcome": "No matches (empty output)",
+        "type": "command",
+        "required": true,
+        "blocking": true
+      }
+    ],
+    "reasoning": "중간 위험도 버그 수정. 상태머신 정확성에 영향을 미치는 변경이므로 TypeScript 컴파일 통과 + 패턴 검증이 필수. 별도 단위 테스트 프레임워크 없으므로 manual 검증 + tsc 컴파일로 대체."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": false,
+      "commands": [],
+      "minimum_coverage": null
+    },
+    "integration_tests": {
+      "required": false,
+      "commands": []
+    },
+    "e2e_tests": {
+      "required": false,
+      "commands": []
+    },
+    "browser_verification": {
+      "required": false,
+      "pages": []
+    },
+    "database_verification": {
+      "required": false,
+      "checks": []
+    },
+    "typescript_verification": {
+      "required": true,
+      "command": "cd C:\\DK\\S3\\workers && npx tsc --noEmit",
+      "expected": "exit code 0"
+    },
+    "manual_code_review": {
+      "required": true,
+      "checklist": [
+        "SC-2: await this.ctx.storage.sql.exec 패턴 없음",
+        "SC-3: alarm()에 retry loop 존재",
+        "SC-4: D1 flush throw, release() 실패 DLQ",
+        "SC-5: handleCallback() 첫 쿼리가 status check",
+        "SC-6: output_key || null",
+        "SC-7: JobItemState.outputKey: string | null",
+        "SC-8: deduplicationId: execute-${jobId}"
+      ]
+    }
+  },
+  "qa_signoff": null,
+  "created_at": "2026-02-17T19:00:00.000000",
+  "status": "in_progress",
+  "planStatus": "queue",
+  "xstateState": "coding",
+  "executionPhase": "planning",
+  "updated_at": "2026-02-17T15:29:57.700901+00:00",
+  "reviewReason": "plan_review",
+  "last_updated": "2026-02-17T15:39:21.265685+00:00"
+}
