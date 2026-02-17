@@ -5,29 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../auth/pages/providers/auth_provider.dart';
-
-// Gradient colors matching WsColors spec:
-// accent1 = 0xFF667EEA (indigo-blue)
-// accent2 = 0xFFFF6B9D (pink)
-const _gradientAccent1 = Color(0xFF667EEA);
-const _gradientAccent2 = Color(0xFFFF6B9D);
-
-// Background color matching WsColors.bg
-const _bgDark = Color(0xFF0F0F17);
-
-/// Gradient definition matching WsColors.gradientPrimary
-const _gradientPrimary = LinearGradient(
-  begin: Alignment.topLeft,
-  end: Alignment.bottomRight,
-  colors: [_gradientAccent1, _gradientAccent2],
-);
+import '../workspace/theme.dart';
 
 /// Animated splash screen shown on app launch.
 ///
-/// Displays a full-screen gradient background with the S3 logo/text
-/// that fades in and scales up over 800 ms. After a total of 2 seconds,
-/// navigates to the workspace ('/') if an auth token is present, or to
-/// the login screen ('/login') otherwise.
+/// Displays a full-screen gradient background ([WsColors.gradientPrimary])
+/// with the S3 logo/text that fades in and scales up over 800 ms.
+/// After a total of 2 seconds, navigates to the workspace ('/') if an
+/// auth token is present, or to the login screen ('/login') otherwise.
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -114,11 +99,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     });
 
     return Scaffold(
-      backgroundColor: _bgDark,
+      backgroundColor: WsColors.bg,
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(gradient: _gradientPrimary),
+        decoration: const BoxDecoration(gradient: WsColors.gradientPrimary),
         child: Center(
           child: FadeTransition(
             opacity: _fadeAnimation,
@@ -155,7 +140,7 @@ class _SplashLogo extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: _gradientAccent1.withValues(alpha: 0.4),
+                color: WsColors.accent1.withValues(alpha: 0.4),
                 blurRadius: 32,
                 spreadRadius: 4,
               ),

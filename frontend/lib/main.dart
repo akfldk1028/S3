@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
 import 'app.dart';
 import 'core/widgets/error_boundary.dart';
@@ -10,7 +9,6 @@ import 'core/widgets/error_boundary.dart';
 void main() {
   runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
-    await Hive.initFlutter();
     runApp(
       const ErrorBoundary(
         child: ProviderScope(
@@ -19,6 +17,6 @@ void main() {
       ),
     );
   }, (error, stack) {
-    debugPrint('Zone error: $error');
+    debugPrint('Zone error: $error\n$stack');
   });
 }
