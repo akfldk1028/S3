@@ -171,18 +171,7 @@ class SettingsScreen extends ConsumerWidget {
             // ── Plan Section ───────────────────────────────────────────────
             const _SectionHeader(title: 'PLAN'),
             const SizedBox(height: 12),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: WsTheme.cardDecoration,
-              child: const Text(
-                'Plan comparison — coming in next subtask',
-                style: TextStyle(
-                  color: WsColors.textSecondary,
-                  fontSize: 14,
-                ),
-              ),
-            ),
+            _PlanComparisonCard(user: user),
             const SizedBox(height: 24),
 
             // ── Preferences Section ────────────────────────────────────────
@@ -400,6 +389,184 @@ class _RuleSlotsRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Plan comparison card: FREE vs PRO two-column layout with CTA or success text.
+///
+/// FREE column uses accent1 header; PRO column uses accent2 header.
+/// Shows gradient upgrade button when user.plan == 'free',
+/// or a 'You are on Pro' success label when user.plan == 'pro'.
+class _PlanComparisonCard extends StatelessWidget {
+  final User user;
+
+  const _PlanComparisonCard({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    final isPro = user.plan.toLowerCase() == 'pro';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: WsTheme.cardDecoration,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Two-Column Comparison ──────────────────────────────────────
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: const [
+                Expanded(child: _PlanColumn(isProColumn: false)),
+                SizedBox(width: 12),
+                Expanded(child: _PlanColumn(isProColumn: true)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // ── CTA or Pro Confirmation ────────────────────────────────────
+          if (!isPro)
+            const _UpgradeButton()
+          else
+            const Center(
+              child: Text(
+                'You are on Pro',
+                style: TextStyle(
+                  color: WsColors.success,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Single plan column (FREE or PRO) with header and feature list.
+class _PlanColumn extends StatelessWidget {
+  final bool isProColumn;
+
+  const _PlanColumn({required this.isProColumn});
+
+  @override
+  Widget build(BuildContext context) {
+    final headerColor = isProColumn ? WsColors.accent2 : WsColors.accent1;
+    final title = isProColumn ? 'PRO' : 'FREE';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: headerColor.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(WsTheme.radiusSm),
+        border: Border.all(
+          color: headerColor.withValues(alpha: 0.30),
+          width: 0.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Column Header ──────────────────────────────────────────────
+          Text(
+            title,
+            style: TextStyle(
+              color: headerColor,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // ── Feature Rows ───────────────────────────────────────────────
+          _FeatureRow(
+            label: isProColumn ? '20 rule slots' : '2 rule slots',
+          ),
+          const SizedBox(height: 6),
+          _FeatureRow(
+            label: isProColumn ? '200 batch images' : '10 batch images',
+          ),
+          const SizedBox(height: 6),
+          _FeatureRow(
+            label: isProColumn ? '3 concurrent jobs' : '1 concurrent job',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Feature row with check icon and label text.
+class _FeatureRow extends StatelessWidget {
+  final String label;
+
+  const _FeatureRow({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(
+          Icons.check_circle_outline,
+          color: WsColors.textSecondary,
+          size: 13,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              color: WsColors.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Gradient CTA button for upgrading from FREE to PRO.
+///
+/// Uses WsColors.gradientPrimary (accent1 → accent2).
+class _UpgradeButton extends StatelessWidget {
+  const _UpgradeButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        gradient: WsColors.gradientPrimary,
+        borderRadius: BorderRadius.circular(WsTheme.radius),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(WsTheme.radius),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(WsTheme.radius),
+          onTap: () {
+            // TODO: navigate to upgrade / billing page
+          },
+          child: const Center(
+            child: Text(
+              'Upgrade to Pro',
+              style: TextStyle(
+                color: WsColors.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
