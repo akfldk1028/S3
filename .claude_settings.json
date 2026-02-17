@@ -1,0 +1,34 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527\\.auto-claude\\specs\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527\\.auto-claude\\specs\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527\\.auto-claude\\specs\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Read(C:\\DK\\S3\\.auto-claude/**)",
+      "Write(C:\\DK\\S3\\.auto-claude/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)"
+    ]
+  }
+}
