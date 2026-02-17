@@ -1,8 +1,12 @@
+import 'dart:io';
 import 'dart:ui';
 
 import 'package:before_after/before_after.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gal/gal.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/models/job_item.dart';
 import '../theme.dart';
@@ -303,11 +307,11 @@ class _ResultsOverlayState extends ConsumerState<ResultsOverlay> {
     );
   }
 
-  /// Shares all result URLs as text.
-  ///
-  /// TODO(subtask-2-3): Replace stub with Share.shareXFiles() implementation.
-  void _export(List<JobItem> items) {
-    // Placeholder — per-image share/download implemented in subtask-2-3.
+  /// Shares all result URLs as text via the OS share sheet.
+  Future<void> _export(List<JobItem> items) async {
+    if (items.isEmpty) return;
+    final text = items.map((e) => e.resultUrl).join('\n');
+    await Share.share('S3 Results:\n$text');
   }
 }
 
@@ -464,6 +468,24 @@ class _GalleryPageState extends State<_GalleryPage> {
   /// Slider position: 0.0 = all before, 1.0 = all after. Default at 50%.
   double _sliderValue = 0.5;
 
+  /// Dio instance for downloading images to temp files.
+  late final Dio _dio;
+
+  /// GlobalKey for the share button — used to derive iPad share popover origin.
+  final GlobalKey _shareKey = GlobalKey();
+
+  @override
+  void initState() {
+    super.initState();
+    _dio = Dio();
+  }
+
+  @override
+  void dispose() {
+    _dio.close();
+    super.dispose();
+  }
+
   /// Whether the original (before) bytes are available for this item.
   ///
   /// [JobItem.idx] is 1-based; guard by comparing `idx - 1` against length.
@@ -472,7 +494,160 @@ class _GalleryPageState extends State<_GalleryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return _hasOriginal ? _buildBeforeAfter() : _buildAfterOnly();
+    return Stack(
+      children: [
+        // ── Image content (before/after or after-only) ────────────────────
+        Positioned.fill(
+          child: _hasOriginal ? _buildBeforeAfter() : _buildAfterOnly(),
+        ),
+
+        // ── Glassmorphism action bar (bottom-centre) ──────────────────────
+        Positioned(
+          bottom: 24,
+          left: 0,
+          right: 0,
+          child: Center(child: _buildActionBar(context)),
+        ),
+      ],
+    );
+  }
+
+  // ── Action bar ────────────────────────────────────────────────────────────
+
+  /// Glassmorphism action bar with Share and Download buttons.
+  ///
+  /// Placed at the bottom-centre of the fullscreen page so it floats over
+  /// the image without obscuring the Before/After slider.
+  Widget _buildActionBar(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(WsTheme.radiusSm),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          decoration: WsTheme.glassDecoration,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                key: _shareKey,
+                onPressed: () => _shareImage(context),
+                icon: const Icon(
+                  Icons.share_rounded,
+                  color: WsColors.text,
+                  size: 22,
+                ),
+                tooltip: 'Share',
+                padding: const EdgeInsets.all(12),
+                constraints: const BoxConstraints(),
+              ),
+              Container(
+                width: 0.5,
+                height: 24,
+                color: WsColors.glassBorder,
+              ),
+              IconButton(
+                onPressed: () => _downloadImage(context),
+                icon: const Icon(
+                  Icons.download_rounded,
+                  color: WsColors.text,
+                  size: 22,
+                ),
+                tooltip: 'Save to gallery',
+                padding: const EdgeInsets.all(12),
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Share ─────────────────────────────────────────────────────────────────
+
+  /// Downloads [widget.item.resultUrl] to a temp file, then opens the OS share
+  /// sheet via [Share.shareXFiles].
+  ///
+  /// iPad safety: derives [sharePositionOrigin] from the share button's
+  /// [RenderBox] so the popover anchors correctly on iPad.
+  ///
+  /// The temp file is always deleted in `finally`.
+  Future<void> _shareImage(BuildContext context) async {
+    final tmpPath =
+        '${Directory.systemTemp.path}/s3_share_${widget.item.idx}.jpg';
+
+    // Derive iPad-safe popover origin BEFORE any await so the BuildContext
+    // is accessed synchronously (avoids use_build_context_synchronously lint).
+    Rect? sharePositionOrigin;
+    final keyContext = _shareKey.currentContext;
+    if (keyContext != null) {
+      final box = keyContext.findRenderObject() as RenderBox?;
+      if (box != null) {
+        final topLeft = box.localToGlobal(Offset.zero);
+        sharePositionOrigin = Rect.fromLTWH(
+          topLeft.dx,
+          topLeft.dy,
+          box.size.width,
+          box.size.height,
+        );
+      }
+    }
+
+    try {
+      await _dio.download(widget.item.resultUrl, tmpPath);
+      await Share.shareXFiles(
+        [XFile(tmpPath)],
+        subject: 'S3 Result',
+        sharePositionOrigin: sharePositionOrigin,
+      );
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to share image')),
+        );
+      }
+    } finally {
+      final f = File(tmpPath);
+      if (await f.exists()) await f.delete();
+    }
+  }
+
+  // ── Download ──────────────────────────────────────────────────────────────
+
+  /// Downloads [widget.item.resultUrl] and saves it to the device gallery via
+  /// [Gal.putImage].
+  ///
+  /// Shows a success [SnackBar] on completion or an error [SnackBar] when a
+  /// [GalException] is raised (e.g. permission denied).
+  ///
+  /// The temp file is always deleted in `finally`.
+  Future<void> _downloadImage(BuildContext context) async {
+    final tmpPath =
+        '${Directory.systemTemp.path}/s3_dl_${widget.item.idx}.jpg';
+    try {
+      await _dio.download(widget.item.resultUrl, tmpPath);
+      await Gal.putImage(tmpPath, album: 'S3');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Saved to gallery')),
+        );
+      }
+    } on GalException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Save failed: ${e.type}')),
+        );
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Download failed')),
+        );
+      }
+    } finally {
+      final f = File(tmpPath);
+      if (await f.exists()) await f.delete();
+    }
   }
 
   /// Full before/after comparison slider.
