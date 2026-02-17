@@ -12,8 +12,25 @@
 
 import { Hono } from 'hono';
 import type { Env, AuthUser } from '../_shared/types';
+import { authMiddleware } from '../middleware/auth.middleware';
+import { ok } from '../_shared/response';
 
 const app = new Hono<{ Bindings: Env; Variables: { user: AuthUser } }>();
+
+// GET /jobs — list jobs for authenticated user
+app.get('/', authMiddleware, async (c) => {
+  const user = c.get('user');
+
+  const { results } = await c.env.DB.prepare(
+    `SELECT job_id, status, preset, created_at, progress_done, progress_failed, progress_total
+     FROM jobs
+     WHERE user_id = ?
+     ORDER BY created_at DESC
+     LIMIT 50`,
+  ).bind(user.userId).all();
+
+  return c.json(ok(results));
+});
 
 // POST /jobs
 // POST /jobs/:id/confirm-upload
