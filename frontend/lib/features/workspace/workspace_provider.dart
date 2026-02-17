@@ -1,5 +1,6 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../core/api/api_client.dart';
 import 'workspace_state.dart';
 
 part 'workspace_provider.g.dart';
@@ -35,6 +36,30 @@ class Workspace extends _$Workspace {
   void removePrompt(String prompt) {
     state = state.copyWith(
       customPrompts: state.customPrompts.where((p) => p != prompt).toList(),
+    );
+  }
+
+  // ── Job Execution ─────────────────────────────────────────────────────────
+
+  /// Uploads selected images and triggers job execution via [ApiClient].
+  ///
+  /// Passes [WorkspaceState.customPrompts] as the [prompts] parameter to
+  /// [ApiClient.executeJob], so SAM3 uses them during segmentation.
+  /// Omits the key entirely when [customPrompts] is empty — matching the
+  /// conditional map entry in [S3ApiClient].
+  Future<void> uploadAndProcess({
+    required ApiClient apiClient,
+    required Map<String, ConceptAction> concepts,
+    List<String>? protect,
+    String? ruleId,
+  }) async {
+    if (state.activeJobId == null) return;
+    await apiClient.executeJob(
+      state.activeJobId!,
+      concepts: concepts,
+      protect: protect,
+      ruleId: ruleId,
+      prompts: state.customPrompts.isEmpty ? null : state.customPrompts,
     );
   }
 }
