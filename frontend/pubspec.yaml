@@ -34,6 +34,10 @@ dependencies:
   freezed_annotation: ^3.1.0
   json_annotation: ^4.9.0
 
+  # UI Polish
+  shimmer: ^3.0.0
+  connectivity_plus: ^7.0.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -45,5 +49,28 @@ dev_dependencies:
   json_serializable:
   riverpod_generator: ^4.0.0+1
 
+  # Icon Generation
+  flutter_launcher_icons: ^0.14.4
+
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/icon/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  web:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+    background_color: "#0F0F17"
+    theme_color: "#667EEA"
+  windows:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+    icon_size: 48
+  macos:
+    generate: true
+    image_path: "assets/icon/app_icon.png"
+  image_path: "assets/icon/app_icon.png"
