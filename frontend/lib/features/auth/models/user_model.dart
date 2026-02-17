@@ -1,3 +1,8 @@
+// ignore_for_file: non_abstract_class_inherits_abstract_member
+// Freezed v3.x generates mixins with abstract getters; concrete implementations
+// are always provided by the private _$Foo implementation class via factory
+// constructors, so this lint is a false positive for @freezed classes.
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'user_model.freezed.dart';

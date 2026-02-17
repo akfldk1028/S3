@@ -19,7 +19,7 @@ class LoginMutation extends _$LoginMutation {
     try {
       final dio = ref.read(dioProvider);
       final response = await dio.post(
-        ApiEndpoints.login,
+        ApiEndpoints.authAnon,
         data: {
           'email': email,
           'password': password,
