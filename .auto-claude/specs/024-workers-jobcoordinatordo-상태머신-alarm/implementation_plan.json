@@ -139,12 +139,13 @@
           ],
           "files_to_create": [],
           "patterns_from": [],
-          "notes": "L221-222: output_key = ?2 바인딩을 payload.output_key || null, preview_key = ?3 바인딩을 payload.preview_key || null",
+          "notes": "Verification confirms handleCallback() UPDATE job_items already correctly uses payload.output_key || null (line 242) and payload.preview_key || null (line 243). This was implemented by subtask-1-1 which wrote the full JobCoordinatorDO.ts file. TypeScript compilation passes (0 errors, npx tsc --noEmit). SC-6 criterion met: payload.output_key || null, payload.preview_key || null in UPDATE statement.",
           "verification": {
             "type": "manual",
             "instructions": "handleCallback UPDATE job_items에서 payload.output_key || null, payload.preview_key || null 확인"
           },
-          "status": "pending"
+          "status": "completed",
+          "updated_at": "2026-02-17T15:46:45.712486+00:00"
         },
         {
           "id": "subtask-2-4",
@@ -155,13 +156,14 @@
           ],
           "files_to_create": [],
           "patterns_from": [],
-          "notes": "현재 create()는 output_key = `jobs/${jobId}/output/${idx}` 등 placeholder를 삽입함. 이 placeholder는 실제로 GPU queue 메시지 구성에 사용되므로 주의 필요. spec에 따르면 NULL로 변경. GPU queue message는 getState()를 통해 값을 읽으므로 NULL이 되면 queue message에도 null이 들어감.",
+          "notes": "Verification confirms create() INSERT INTO job_items at line 143 already uses NULL, NULL for output_key and preview_key: VALUES (?1, 'pending', ?2, NULL, NULL). This was implemented by subtask-1-1 which wrote the full JobCoordinatorDO.ts file. job_items schema also confirms output_key TEXT (nullable) at line 59, preview_key TEXT (nullable) at line 60. TypeScript compilation passes (0 errors). SC-6 criterion met for the create() portion.",
           "notes_important": "주의: spec.md Fix 5 수정 3에서 create() 초기화를 NULL로 변경하라고 명시. 하지만 jobs.route.ts /execute에서 getState()로 items의 output_key를 읽어 GPU queue message를 만듦. output_key가 null이면 GPU worker는 어디에 결과를 저장할지 모름. 이 점을 구현 에이전트가 인지하고, spec의 지시대로 NULL로 설정하되, GpuQueueMessage.items의 output_key 타입도 string|null로 변경 필요할 수 있음.",
           "verification": {
             "type": "manual",
             "instructions": "create() INSERT INTO job_items에서 output_key, preview_key가 NULL로 바인딩됨"
           },
-          "status": "pending"
+          "status": "completed",
+          "updated_at": "2026-02-17T15:48:30.404022+00:00"
         },
         {
           "id": "subtask-2-5",
@@ -447,5 +449,5 @@
   "executionPhase": "planning",
   "updated_at": "2026-02-17T15:29:57.700901+00:00",
   "reviewReason": "plan_review",
-  "last_updated": "2026-02-17T15:45:15.112359+00:00"
+  "last_updated": "2026-02-17T15:48:30.404022+00:00"
 }
