@@ -11,6 +11,12 @@ abstract class User with _$User {
     String? name,
     String? profileImage,
     @Default(0) int credits,
+    /// 'free' or 'pro'
+    @Default('free') String plan,
+    /// Number of rule slots currently used
+    @Default(0) int ruleSlotsUsed,
+    /// Maximum rule slots for this plan (2 for free, 20 for pro)
+    @Default(2) int ruleSlotsMax,
   }) = _User;
 
   factory User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);

@@ -400,6 +400,21 @@ class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
   /// Index of the currently selected tab (0–3).
   int _selectedTab = 0;
 
+  /// PageController for the slide-animated panel PageView.
+  late PageController _pageController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   /// Currently selected domain in the Palette panel.
   String? _selectedDomain;
 
@@ -415,9 +430,9 @@ class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
   /// Tab definitions for the four pipeline sections.
   static const _tabs = <_TabItem>[
     _TabItem(label: 'Palette', icon: Icons.palette_rounded),
-    _TabItem(label: 'Instances', icon: Icons.auto_awesome_motion_rounded),
+    _TabItem(label: 'Instances', icon: Icons.layers_rounded),
     _TabItem(label: 'Protect', icon: Icons.shield_rounded),
-    _TabItem(label: 'Rules', icon: Icons.rule_rounded),
+    _TabItem(label: 'Rules', icon: Icons.auto_fix_high_rounded),
   ];
 
   /// Available domain options shown in the Palette panel.
@@ -453,6 +468,14 @@ class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
     final hasPhotos = ws.selectedImages.isNotEmpty;
     final isDesktop = MediaQuery.of(context).size.width >= 768;
 
+    // Compute whether to show the PRO badge on the Rules tab and Save Rule button.
+    // Free-plan users who have reached their rule slot limit see the badge.
+    final userAsync = ref.watch(userProvider);
+    final showRulesBadge = userAsync.maybeWhen(
+      data: (user) => user.plan != 'pro' && user.ruleSlotsUsed >= user.ruleSlotsMax,
+      orElse: () => false,
+    );
+
     // Hidden on desktop, when no photos are selected, or after processing completes.
     if (isDesktop || !hasPhotos || ws.phase == WorkspacePhase.done) {
       return const SizedBox.shrink();
@@ -473,8 +496,11 @@ class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(context).size.height * 0.6,
             ),
-            child: IndexedStack(
-              index: _selectedTab,
+            // PageView with NeverScrollableScrollPhysics gives 300ms slide animation
+            // when tabs are tapped, while preventing direct swipe navigation.
+            child: PageView(
+              controller: _pageController,
+              physics: const NeverScrollableScrollPhysics(),
               children: [
                 // index 0 — Palette panel: domain + concept selection.
                 _PalettePanel(
@@ -508,8 +534,8 @@ class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
                     }
                   }),
                 ),
-                // index 3 — Rules panel: active rules + save rule button.
-                const _RulesPanelWrapper(),
+                // index 3 — Rules panel: active rules + save rule button with ProBadge.
+                _RulesPanelWrapper(showProBadge: showRulesBadge),
               ],
             ),
           ),
@@ -518,8 +544,15 @@ class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
         _TabStrip(
           tabs: _tabs,
           selectedIndex: _selectedTab,
-          onTap: (i) => setState(() => _selectedTab = i),
-          showRulesBadge: false,
+          onTap: (i) {
+            setState(() => _selectedTab = i);
+            _pageController.animateToPage(
+              i,
+              duration: const Duration(milliseconds: 300),
+              curve: Curves.easeInOut,
+            );
+          },
+          showRulesBadge: showRulesBadge,
         ),
       ],
     );
@@ -776,19 +809,22 @@ class _ProtectPanelWrapper extends StatelessWidget {
 
 /// Rules tab panel (index 3) wrapping [RulesSection].
 ///
-/// [RulesSection] reads workspace state internally via Riverpod; no data
-/// needs to be passed from the parent.
+/// When [showProBadge] is true (Free-plan user at rule-slot limit), passes
+/// the flag down to [RulesSection] so the Save Rule button renders a PRO badge.
 class _RulesPanelWrapper extends StatelessWidget {
-  const _RulesPanelWrapper();
+  const _RulesPanelWrapper({required this.showProBadge});
+
+  /// Whether to show the PRO badge overlay on the Save Rule button.
+  final bool showProBadge;
 
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(height: WsTheme.spacingSm),
-        RulesSection(),
+        const SizedBox(height: WsTheme.spacingSm),
+        RulesSection(showProBadgeOnSave: showProBadge),
       ],
     );
   }

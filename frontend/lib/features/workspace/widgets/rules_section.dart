@@ -4,14 +4,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../theme.dart';
 import '../workspace_provider.dart';
 import '../workspace_state.dart';
+import 'mobile_pipeline_tabs.dart' show ProBadge;
 
 /// Workspace rules management section.
 ///
 /// Renders a list of active rules and a "Save Rule" button.
-/// When the user is on the Free plan and has used all rule slots,
-/// the Save Rule button shows a PRO badge (provided by the parent).
+/// When [showProBadgeOnSave] is true (Free-plan user at rule-slot limit),
+/// the Save Rule button is overlaid with a gradient diamond PRO badge.
 class RulesSection extends ConsumerWidget {
-  const RulesSection({super.key});
+  const RulesSection({super.key, this.showProBadgeOnSave = false});
+
+  /// When true, renders a [ProBadge] overlay on the Save Rule button.
+  final bool showProBadgeOnSave;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -57,7 +61,10 @@ class RulesSection extends ConsumerWidget {
         const SizedBox(height: 12),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _SaveRuleButton(),
+          child: ProBadge(
+            showBadge: showProBadgeOnSave,
+            child: _SaveRuleButton(),
+          ),
         ),
         const SizedBox(height: 8),
       ],
@@ -67,8 +74,7 @@ class RulesSection extends ConsumerWidget {
 
 /// Internal "Save Rule" button widget.
 ///
-/// The parent [MobilePipelineTabs] wraps this with a [ProBadge] when
-/// the Free plan limit is reached.
+/// Wrapped with [ProBadge] in [RulesSection] when the Free plan limit is reached.
 class _SaveRuleButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
