@@ -8,7 +8,7 @@ import 'theme.dart';
 import 'workspace_provider.dart';
 import 'workspace_state.dart';
 import 'widgets/action_bar.dart';
-import 'widgets/mobile_bottom_sheet.dart';
+import 'widgets/mobile_pipeline_tabs.dart';
 import 'widgets/photo_grid.dart';
 import 'widgets/progress_overlay.dart';
 import 'widgets/results_overlay.dart';
@@ -20,7 +20,7 @@ import 'widgets/top_bar.dart';
 /// Handles:
 /// - Anonymous auth gate (auto-login on mount)
 /// - Responsive layout: desktop (≥ 600 px) shows [SidePanel] inline;
-///   mobile (< 600 px) hides [SidePanel] and exposes it via FAB → [MobileBottomSheet]
+///   mobile (< 600 px) hides [SidePanel] and shows [MobilePipelineTabs] strip
 /// - SNOW-style photo-first UX: full-screen empty state until photos are added
 class WorkspaceScreen extends ConsumerStatefulWidget {
   const WorkspaceScreen({super.key});
@@ -210,38 +210,6 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
           ],
         ),
       ),
-      // ── FAB (mobile only) ─────────────────────────────────────────────────
-      // The FAB is only shown on mobile (!isDesktop) and only when the user has
-      // photos. It opens [MobileBottomSheet] so the user can access settings
-      // that are normally in [SidePanel] on desktop.
-      //
-      // Padding(bottom: 80) ensures the FAB does not overlap the last photo
-      // thumbnail in [PhotoGrid].
-      floatingActionButton: !isDesktop && showControls
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: 80.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: WsColors.gradientPrimary,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: WsColors.accent1.withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: FloatingActionButton.small(
-                  onPressed: () => MobileBottomSheet.show(context),
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  child: const Icon(Icons.tune_rounded,
-                      color: Colors.white, size: 20),
-                ),
-              ),
-            )
-          : null,
     );
   }
 
@@ -289,12 +257,20 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
     // ── Mobile layout ───────────────────────────────────────────────────────
     // SidePanel is intentionally NOT included — the 280 px panel would push
     // PhotoGrid completely off-screen on 375 px viewports.
-    return Stack(
+    // MobilePipelineTabs handles its own visibility conditions internally.
+    return Column(
       children: [
-        const PhotoGrid(),
-        if (ws.phase == WorkspacePhase.processing) const ProgressOverlay(),
-        if (ws.errorMessage != null)
-          _ErrorBanner(message: ws.errorMessage!),
+        Expanded(
+          child: Stack(
+            children: [
+              const PhotoGrid(),
+              if (ws.phase == WorkspacePhase.processing) const ProgressOverlay(),
+              if (ws.errorMessage != null)
+                _ErrorBanner(message: ws.errorMessage!),
+            ],
+          ),
+        ),
+        const MobilePipelineTabs(),
       ],
     );
   }
