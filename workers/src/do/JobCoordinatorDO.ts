@@ -354,8 +354,8 @@ export class JobCoordinatorDO extends DurableObject<Env> {
       idx: r.idx,
       status: r.status as 'pending' | 'done' | 'failed',
       inputKey: r.input_key,
-      outputKey: r.output_key ?? '',
-      previewKey: r.preview_key ?? '',
+      outputKey: r.output_key,
+      previewKey: r.preview_key,
       error: r.error ?? undefined,
     }));
 
