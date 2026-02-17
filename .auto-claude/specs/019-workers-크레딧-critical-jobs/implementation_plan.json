@@ -1,0 +1,358 @@
+{
+  "feature": "Workers Security + Credit CRITICAL Fixes",
+  "workflow_type": "feature",
+  "workflow_rationale": "5개의 보안 취약점 및 크레딧 로직 버그 수정. 신규 ownership check 로직 추가를 포함하므로 feature로 분류. 3개 파일(jobs.route.ts, UserLimiterDO.ts, JobCoordinatorDO.ts) 수정만 필요하며 단일 서비스(workers)만 관여.",
+  "created_at": "2026-02-17T09:46:59.001090+00:00",
+  "status": "in_progress",
+  "planStatus": "queue",
+  "xstateState": "coding",
+  "executionPhase": "planning",
+  "updated_at": "2026-02-17T18:26:30.378512+00:00",
+  "phases": [
+    {
+      "id": "phase-1-do-credit-fixes",
+      "name": "DO Credit Logic Fixes",
+      "type": "implementation",
+      "description": "UserLimiterDO.ts의 INSERT OR IGNORE 수정, release() failedItems 파라미터 추가, JobCoordinatorDO.ts의 alarm()에서 failedItems 전달 수정",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-1-1",
+          "description": "[CRED-1 + CRED-2] UserLimiterDO.ts: init()를 INSERT OR IGNORE로 변경하고, release() 시그니처를 (doneItems, failedItems, totalItems)로 확장하여 refund = totalItems - doneItems - failedItems로 수정. /release fetch 핸들러에서 failedItems destructuring 추가.",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/UserLimiterDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "workers/src/_shared/types.ts"
+          ],
+          "implementation_notes": [
+            "L104: INSERT OR REPLACE → INSERT OR IGNORE (1줄 수정)",
+            "release() 메서드: (doneItems: number, totalItems: number) → (doneItems: number, failedItems: number, totalItems: number)",
+            "refund 공식: totalItems - doneItems → totalItems - doneItems - failedItems",
+            "/release fetch 핸들러: body에서 failedItems도 destructuring",
+            "WHERE active_jobs > 0 조건 유지 (언더플로 방지)"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd workers && npx tsc --noEmit 2>&1 | head -20",
+            "expected": "No TypeScript errors"
+          },
+          "status": "completed",
+          "notes": "Implemented full UserLimiterDO.ts from stub. CRED-1: init() uses INSERT OR IGNORE to preserve existing credits. CRED-2: release() signature extended to (doneItems, failedItems, totalItems) with refund = totalItems - doneItems - failedItems. /release fetch handler destructures failedItems. TypeScript compile check passes (npx tsc --noEmit exit 0).",
+          "updated_at": "2026-02-17T10:27:15.750049+00:00"
+        },
+        {
+          "id": "subtask-1-2",
+          "description": "[CRED-2 연동] JobCoordinatorDO.ts: alarm()에서 UserLimiterDO /release 호출 시 body에 failedItems: jobState.failedItems 추가하여 새 release() 시그니처와 일치시킴.",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/do/JobCoordinatorDO.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "workers/src/do/UserLimiterDO.ts"
+          ],
+          "implementation_notes": [
+            "alarm() 내 /release fetch 호출 찾기 (L320~350 근처)",
+            "body JSON에 failedItems: jobState.failedItems 추가",
+            "기존 doneItems, totalItems와 함께 3개 파라미터 전달",
+            "alarm()은 terminal state일 때만 실행되므로 failedItems는 최종값"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd workers && npx tsc --noEmit 2>&1 | head -20",
+            "expected": "No TypeScript errors"
+          },
+          "status": "completed",
+          "notes": "Implemented full JobCoordinatorDO.ts with FSM, SQLite tables, idempotency RingBuffer(512), and alarm() that calls UserLimiterDO /release with correct body { doneItems, failedItems, totalItems } matching CRED-2 signature. TypeScript: no errors.",
+          "updated_at": "2026-02-17T10:31:52.854765+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-2-route-security-fixes",
+      "name": "Route Security + Validation Fixes",
+      "type": "implementation",
+      "description": "jobs.route.ts에 itemCount 상한 검증(CRED-3), execute/cancel/confirm-upload 소유권 확인(SEC-2), callback job 존재 확인(SEC-1) 추가",
+      "depends_on": [],
+      "parallel_safe": true,
+      "subtasks": [
+        {
+          "id": "subtask-2-1",
+          "description": "[CRED-3] POST /jobs 핸들러에 itemCount 상한 검증 추가. reserve() 호출 전 getUserState를 먼저 호출하여 plan별 maxItems 초과 시 400 + ERR.ITEM_LIMIT 반환.",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/jobs/jobs.route.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "workers/src/_shared/types.ts",
+            "workers/src/_shared/errors.ts",
+            "workers/src/_shared/response.ts"
+          ],
+          "implementation_notes": [
+            "POST / 핸들러: reserve() 호출 전 삽입",
+            "userLimiterStub.fetch('http://internal/getUserState', { method: 'GET' }) 호출",
+            "userStateResponse.ok 체크 → 실패 시 400 반환 (User not initialized)",
+            "const userState = await userStateResponse.json<UserLimiterState>()",
+            "PLAN_LIMITS import from '_shared/types.ts' (이미 export됨)",
+            "const maxItems = PLAN_LIMITS[userState.plan].maxItems",
+            "if (itemCount > maxItems) → error(ERR.ITEM_LIMIT, ...) with 400",
+            "ERR.ITEM_LIMIT은 errors.ts에 이미 존재"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "jobs.route.ts에 getUserState 호출 및 PLAN_LIMITS 비교 로직이 reserve() 호출 전에 존재하는지 코드 검토"
+          },
+          "status": "completed",
+          "notes": "Implemented POST /jobs handler in jobs.route.ts with [CRED-3] itemCount validation. getUserState is called on UserLimiterDO BEFORE reserve(). PLAN_LIMITS[userState.plan].maxItems is compared against itemCount — free=10, pro=200. If exceeded: 400 + ERR.ITEM_LIMIT. Also updated CreateJobSchema in jobs.validator.ts with preset/item_count fields. Stub handlers added for other routes (confirm-upload, execute, GET status, callback, cancel) for other subtasks to implement. TypeScript compile: no errors (npx tsc --noEmit exit 0).",
+          "updated_at": "2026-02-17T10:36:21.670085+00:00"
+        },
+        {
+          "id": "subtask-2-2",
+          "description": "[SEC-2] POST /:id/confirm-upload, POST /:id/execute, POST /:id/cancel에 소유권 확인 추가. c.get('user').userId와 DO state의 userId 비교 후 불일치 시 403 + ERR.JOB_FORBIDDEN.",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/jobs/jobs.route.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "workers/src/_shared/errors.ts",
+            "workers/src/_shared/response.ts",
+            "workers/src/middleware/auth.middleware.ts"
+          ],
+          "implementation_notes": [
+            "confirm-upload: user = c.get('user') 추가, DO /state 조회 신규 추가, userId 비교",
+            "execute: 기존 stateResponse 로직을 핸들러 초반으로 이동하여 소유권 확인에 재사용",
+            "cancel: 기존 stateResponse 로직을 핸들러 초반으로 이동하여 소유권 확인에 재사용",
+            "패턴: const jobState = await stateResponse.json<{userId: string; status: string}>()",
+            "if (jobState.userId !== userId) → error(ERR.JOB_FORBIDDEN, 'You do not own this job') with 403",
+            "stateResponse !ok → error(ERR.JOB_NOT_FOUND, 'Job not found') with 404",
+            "ERR.JOB_FORBIDDEN, ERR.JOB_NOT_FOUND은 errors.ts에 이미 존재"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "confirm-upload, execute, cancel 각 핸들러에서 jobState.userId !== userId 비교 로직과 403 반환이 존재하는지 코드 검토"
+          },
+          "status": "completed",
+          "notes": "confirm-upload, execute, cancel 핸들러에 소유권 확인 로직 구현 완료. getJobCoordinatorStub으로 DO getStatus 호출 → jobState.userId !== userId 비교 → 불일치 시 403 + ERR.JOB_FORBIDDEN 반환. 잡 미존재 시 404 + ERR.JOB_NOT_FOUND 반환. JobCoordinatorState 타입 import 추가.",
+          "updated_at": "2026-02-17T10:37:52.489761+00:00"
+        },
+        {
+          "id": "subtask-2-3",
+          "description": "[SEC-1] POST /:id/callback에 job 존재 확인 추가. GPU_CALLBACK_SECRET 검증 후 DO /state 조회로 job 존재 여부 확인. 없으면 404, terminal state이면 200 무시(idempotent).",
+          "service": "workers",
+          "files_to_modify": [
+            "workers/src/jobs/jobs.route.ts"
+          ],
+          "files_to_create": [],
+          "patterns_from": [
+            "workers/src/_shared/errors.ts",
+            "workers/src/_shared/response.ts"
+          ],
+          "implementation_notes": [
+            "callback 핸들러: secret 검증 직후, handleCallback 호출 전에 삽입",
+            "jobCoordinatorStub.fetch('http://internal/state', { method: 'GET' }) 호출",
+            "stateCheck.ok 체크 → !ok 시 error(ERR.JOB_NOT_FOUND, 'Job not found') with 404",
+            "stateData.status가 ['done', 'failed', 'canceled'] 포함 시 → ok({jobId, message: 'Job already in terminal state, callback ignored'}) with 200",
+            "callback은 auth middleware 제외 경로이므로 c.get('user') 사용 불가",
+            "ERR.JOB_NOT_FOUND는 errors.ts에 이미 존재"
+          ],
+          "verification": {
+            "type": "manual",
+            "instructions": "callback 핸들러에서 secret 검증 후 DO state 조회 및 404/200 처리 로직이 존재하는지 코드 검토"
+          },
+          "status": "completed",
+          "notes": "Implementation already present in jobs.route.ts. POST /:id/callback handler: (1) verifies GPU_CALLBACK_SECRET via x-gpu-callback-secret header → 401 on mismatch, (2) calls getJobCoordinatorStub + fetch http://do/getStatus → 404 ERR.JOB_NOT_FOUND if job doesn't exist, (3) checks terminalStates ['done','failed','canceled'] → 200 ok with idempotent message if already terminal. TypeScript compile check passes (npx tsc --noEmit exit 0).",
+          "updated_at": "2026-02-17T18:27:38.523054+00:00"
+        }
+      ]
+    },
+    {
+      "id": "phase-3-verification",
+      "name": "TypeScript Compile Verification",
+      "type": "integration",
+      "description": "모든 수정 완료 후 TypeScript 컴파일러로 타입 오류 없음을 확인. 3개 수정 파일의 타입 시그니처 변경(release() 파라미터 확장)이 올바르게 연결되었는지 검증.",
+      "depends_on": [
+        "phase-1-do-credit-fixes",
+        "phase-2-route-security-fixes"
+      ],
+      "parallel_safe": false,
+      "subtasks": [
+        {
+          "id": "subtask-3-1",
+          "description": "TypeScript 컴파일 검증 및 최종 코드 리뷰. npx tsc --noEmit 실행 후 0 오류 확인. 5개 버그 수정사항 체크리스트 최종 검토.",
+          "service": "workers",
+          "files_to_modify": [],
+          "files_to_create": [],
+          "patterns_from": [],
+          "checklist": [
+            "UserLimiterDO.init(): INSERT OR IGNORE 사용",
+            "UserLimiterDO.release(): (doneItems, failedItems, totalItems) 3개 파라미터",
+            "UserLimiterDO /release 핸들러: failedItems destructuring",
+            "JobCoordinatorDO.alarm(): release body에 failedItems 포함",
+            "jobs.route.ts POST /: getUserState 후 PLAN_LIMITS 비교 (reserve 전)",
+            "jobs.route.ts /:id/confirm-upload: userId 소유권 확인",
+            "jobs.route.ts /:id/execute: userId 소유권 확인",
+            "jobs.route.ts /:id/cancel: userId 소유권 확인",
+            "jobs.route.ts /:id/callback: DO state 조회 후 존재/terminal 처리"
+          ],
+          "verification": {
+            "type": "command",
+            "command": "cd workers && npx tsc --noEmit",
+            "expected": "Exit code 0, no errors printed"
+          },
+          "status": "pending"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "total_phases": 3,
+    "total_subtasks": 5,
+    "services_involved": [
+      "workers"
+    ],
+    "files_to_modify": [
+      "workers/src/do/UserLimiterDO.ts",
+      "workers/src/do/JobCoordinatorDO.ts",
+      "workers/src/jobs/jobs.route.ts"
+    ],
+    "bugs_fixed": {
+      "CRED-1": "UserLimiterDO.init() INSERT OR REPLACE → INSERT OR IGNORE",
+      "CRED-2": "UserLimiterDO.release() + JobCoordinatorDO.alarm() failedItems 연동",
+      "CRED-3": "POST /jobs itemCount 상한 검증 (free=10, pro=200)",
+      "SEC-1": "POST /:id/callback job 존재 확인 (404 + terminal state 무시)",
+      "SEC-2": "execute/cancel/confirm-upload 소유권 확인 (403)"
+    },
+    "parallelism": {
+      "max_parallel_phases": 2,
+      "parallel_groups": [
+        {
+          "phases": [
+            "phase-1-do-credit-fixes",
+            "phase-2-route-security-fixes"
+          ],
+          "reason": "Phase 1은 UserLimiterDO.ts + JobCoordinatorDO.ts 수정, Phase 2는 jobs.route.ts 수정. 완전히 다른 파일 세트이므로 충돌 없이 병렬 실행 가능."
+        }
+      ],
+      "recommended_workers": 2,
+      "speedup_estimate": "1.5x faster than sequential (2 parallel phases then 1 final verification)"
+    },
+    "startup_command": "source auto-claude/.venv/bin/activate && python auto-claude/run.py --spec 019 --parallel 2"
+  },
+  "verification_strategy": {
+    "risk_level": "high",
+    "skip_validation": false,
+    "test_creation_phase": "post_implementation",
+    "test_types_required": [
+      "unit",
+      "integration"
+    ],
+    "security_scanning_required": true,
+    "staging_deployment_required": false,
+    "acceptance_criteria": [
+      "npx tsc --noEmit 에러 없음",
+      "INSERT OR IGNORE 문자열이 UserLimiterDO.ts에 존재",
+      "release() 메서드가 3개 파라미터(doneItems, failedItems, totalItems)를 가짐",
+      "JobCoordinatorDO.alarm()의 /release 호출 body에 failedItems 포함",
+      "jobs.route.ts POST / 핸들러에 PLAN_LIMITS 비교 로직 존재",
+      "confirm-upload/execute/cancel에 jobState.userId 비교 로직 존재",
+      "callback 핸들러에 DO /state 조회 및 404 처리 로직 존재",
+      "에러 코드가 errors.ts 상수 사용 (ERR.JOB_FORBIDDEN, ERR.ITEM_LIMIT 등)"
+    ],
+    "verification_steps": [
+      {
+        "name": "TypeScript Compile Check",
+        "command": "cd workers && npx tsc --noEmit",
+        "expected_outcome": "Exit code 0, no type errors",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "INSERT OR IGNORE Check",
+        "command": "grep -n \"INSERT OR IGNORE\" workers/src/do/UserLimiterDO.ts",
+        "expected_outcome": "Line found with INSERT OR IGNORE",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "release() failedItems Signature Check",
+        "command": "grep -n \"failedItems\" workers/src/do/UserLimiterDO.ts",
+        "expected_outcome": "failedItems appears in release() signature and formula",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "alarm() failedItems Check",
+        "command": "grep -n \"failedItems\" workers/src/do/JobCoordinatorDO.ts",
+        "expected_outcome": "failedItems in release body",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "Ownership Check Exists",
+        "command": "grep -n \"JOB_FORBIDDEN\" workers/src/jobs/jobs.route.ts",
+        "expected_outcome": "Multiple ownership check lines found",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      },
+      {
+        "name": "itemCount Limit Check Exists",
+        "command": "grep -n \"ITEM_LIMIT\" workers/src/jobs/jobs.route.ts",
+        "expected_outcome": "ITEM_LIMIT error code used in route",
+        "type": "test",
+        "required": true,
+        "blocking": true
+      }
+    ],
+    "reasoning": "High-risk security and credit-logic patches require thorough verification. TypeScript compile check catches type-level errors (e.g. wrong number of args to release()). Manual grep-based checks verify specific fix presence. No staging needed — Workers deploys are instant and these are isolated bug fixes."
+  },
+  "qa_acceptance": {
+    "unit_tests": {
+      "required": true,
+      "commands": [
+        "cd workers && npx tsc --noEmit"
+      ],
+      "minimum_coverage": null
+    },
+    "integration_tests": {
+      "required": true,
+      "commands": [
+        "grep -n \"INSERT OR IGNORE\" workers/src/do/UserLimiterDO.ts",
+        "grep -n \"failedItems\" workers/src/do/UserLimiterDO.ts",
+        "grep -n \"failedItems\" workers/src/do/JobCoordinatorDO.ts",
+        "grep -n \"JOB_FORBIDDEN\" workers/src/jobs/jobs.route.ts",
+        "grep -n \"ITEM_LIMIT\" workers/src/jobs/jobs.route.ts",
+        "grep -n \"JOB_NOT_FOUND\" workers/src/jobs/jobs.route.ts"
+      ],
+      "services_to_test": [
+        "workers"
+      ]
+    },
+    "e2e_tests": {
+      "required": false,
+      "commands": [],
+      "flows": []
+    },
+    "browser_verification": {
+      "required": false,
+      "pages": []
+    },
+    "database_verification": {
+      "required": false,
+      "checks": []
+    }
+  },
+  "qa_signoff": null,
+  "reviewReason": "plan_review",
+  "last_updated": "2026-02-17T18:27:38.523054+00:00"
+}
