@@ -174,13 +174,14 @@
           ],
           "files_to_create": [],
           "patterns_from": [],
-          "notes": "outputKey: string → outputKey: string | null, previewKey: string → previewKey: string | null. getState()와 alarm()에서 타입 캐스팅도 string | null로 업데이트.",
+          "notes": "Updated JobItemState.outputKey and JobItemState.previewKey from `string` to `string | null` in workers/src/_shared/types.ts. TypeScript type check (npx tsc --noEmit) passes with exit code 0.",
           "verification": {
             "type": "command",
             "command": "cd C:\\DK\\S3\\workers && npx tsc --noEmit",
             "expected": "Exit code 0, no TypeScript errors"
           },
-          "status": "pending"
+          "status": "completed",
+          "updated_at": "2026-02-17T15:49:53.965186+00:00"
         }
       ]
     },
@@ -203,12 +204,13 @@
           ],
           "files_to_create": [],
           "patterns_from": [],
-          "notes": "현재 await this.env.DB.batch(batchStatements)에 try/catch 없음. INSERT OR REPLACE이므로 retry 안전. try { await this.env.DB.batch(...); } catch(dbError) { console.error('[alarm] D1 batch flush failed:', dbError); throw dbError; }",
+          "notes": "Verification confirms alarm() D1 batch flush already correctly wrapped in try/catch with throw dbError at lines 453-459. Implementation was done by subtask-1-1 which wrote the full JobCoordinatorDO.ts file. try { await this.env.DB.batch(batchStatements); } catch (dbError) { console.error('[alarm] D1 batch flush failed:', dbError); throw dbError; }. TypeScript compilation passes (0 errors).",
           "verification": {
             "type": "manual",
             "instructions": "alarm() 내 env.DB.batch() 호출이 try/catch로 감싸여 있고, catch에서 throw함"
           },
-          "status": "pending"
+          "status": "completed",
+          "updated_at": "2026-02-18T00:00:00.000000+00:00"
         },
         {
           "id": "subtask-3-2",
@@ -224,7 +226,9 @@
             "type": "manual",
             "instructions": "alarm()에 for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) 패턴의 retry loop가 존재함"
           },
-          "status": "pending"
+          "status": "completed",
+          "updated_at": "2026-02-18T00:00:00.000000+00:00",
+          "notes": "Verification confirms alarm() already has MAX_RETRIES=3 retry loop for UserLimiterDO.release() with exponential backoff (100ms/200ms/400ms). Lines 465-498. Implementation was done by subtask-1-1 which wrote the full JobCoordinatorDO.ts file."
         },
         {
           "id": "subtask-3-3",
@@ -235,14 +239,15 @@
           ],
           "files_to_create": [],
           "patterns_from": [],
-          "notes": "DLQ 메시지 전송도 try/catch로 감싸서 DLQ 전송 실패 시에도 cascade throw 방지. alarm() 자체는 정상 완료 (D1은 성공했으므로).",
+          "notes": "Verification confirms alarm() DLQ fallback already correctly implemented at lines 500-520. GPU_QUEUE.send({ type: 'release-failed', ... }) wrapped in try/catch, alarm does NOT throw after D1 flush success. console.error logged. Implementation was done by subtask-1-1. TypeScript compilation passes (0 errors, npx tsc --noEmit exit code 0). SC-3, SC-4 success criteria met.",
           "code_pattern": "if (releaseError) {\n  try {\n    await this.env.GPU_QUEUE.send({\n      type: 'release-failed',\n      jobId: jobState.jobId,\n      userId: jobState.userId,\n      doneItems: jobState.doneItems,\n      totalItems: jobState.totalItems,\n      error: releaseError.message,\n      timestamp: Date.now(),\n    } as any);\n  } catch (dlqError) {\n    console.error('[alarm] DLQ send also failed:', dlqError);\n  }\n  console.error(`[alarm] release() failed after ${MAX_RETRIES} retries for job ${jobState.jobId}:`, releaseError.message);\n}",
           "verification": {
             "type": "command",
             "command": "cd C:\\DK\\S3\\workers && npx tsc --noEmit",
             "expected": "Exit code 0, no TypeScript errors"
           },
-          "status": "pending"
+          "status": "completed",
+          "updated_at": "2026-02-18T00:00:00.000000+00:00"
         }
       ]
     },
@@ -449,5 +454,5 @@
   "executionPhase": "planning",
   "updated_at": "2026-02-17T15:29:57.700901+00:00",
   "reviewReason": "plan_review",
-  "last_updated": "2026-02-17T15:48:30.404022+00:00"
+  "last_updated": "2026-02-17T15:49:53.965186+00:00"
 }
