@@ -1,0 +1,25 @@
+{
+  "active": true,
+  "spec": "026-flutter-\ubaa8\ubc14\uc77c-\ud30c\uc774\ud504\ub77c\uc778-pro",
+  "state": "paused",
+  "subtasks": {
+    "completed": 0,
+    "total": 9,
+    "in_progress": 1,
+    "failed": 0
+  },
+  "phase": {
+    "current": "",
+    "id": 0,
+    "total": 0
+  },
+  "workers": {
+    "active": 0,
+    "max": 1
+  },
+  "session": {
+    "number": 1,
+    "started_at": "2026-02-17T19:34:35.684297"
+  },
+  "last_update": "2026-02-17T19:34:35.816029"
+}
