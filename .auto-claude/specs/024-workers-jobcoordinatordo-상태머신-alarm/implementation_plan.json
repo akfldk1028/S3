@@ -104,13 +104,14 @@
           ],
           "files_to_create": [],
           "patterns_from": [],
-          "notes": "DO는 단일 스레드. /cancel 완료 후 handleCallback이 실행되므로 이 sequential guard가 충분함. statusCursor = this.ctx.storage.sql.exec('SELECT status FROM job_state LIMIT 1') — await 없이.",
+          "notes": "Terminal state guard already correctly implemented in handleCallback() at lines 182-201. First SQL query is SELECT status FROM job_state LIMIT 1 (no await). Guards against canceled/done/failed returning false immediately. This was implemented by subtask-1-1 which wrote the full file. TypeScript compilation passes (0 errors). SC-5 criterion met: statusCursor = this.ctx.storage.sql.exec('SELECT status FROM job_state LIMIT 1'), statusRow check with !statusRow return false, and status === 'canceled' || status === 'done' || status === 'failed' return false.",
           "code_pattern": "const statusCursor = this.ctx.storage.sql.exec('SELECT status FROM job_state LIMIT 1');\nconst statusRow = statusCursor.toArray()[0] as { status: JobStatus } | undefined;\nif (!statusRow) return false;\nif (statusRow.status === 'canceled' || statusRow.status === 'done' || statusRow.status === 'failed') {\n  return false;\n}",
           "verification": {
             "type": "manual",
             "instructions": "handleCallback() 첫 번째 SQL 쿼리가 job_state status 체크여야 함. terminal 상태면 early return false."
           },
-          "status": "pending"
+          "status": "completed",
+          "updated_at": "2026-02-17T15:43:28.509957+00:00"
         },
         {
           "id": "subtask-2-2",
@@ -445,5 +446,5 @@
   "executionPhase": "planning",
   "updated_at": "2026-02-17T15:29:57.700901+00:00",
   "reviewReason": "plan_review",
-  "last_updated": "2026-02-17T15:41:13.199121+00:00"
+  "last_updated": "2026-02-17T15:43:28.509957+00:00"
 }
