@@ -7,11 +7,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'app.dart';
 import 'core/widgets/error_boundary.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Hive.initFlutter();
-
-  runZonedGuarded(() {
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    await Hive.initFlutter();
     runApp(
       const ErrorBoundary(
         child: ProviderScope(

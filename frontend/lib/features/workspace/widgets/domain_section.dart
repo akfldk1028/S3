@@ -8,7 +8,7 @@ import '../../../common_widgets/shimmer_list.dart';
 /// Returns an empty list by default. Replace with a real API call when the
 /// preset data source is available.
 final presetsProvider = FutureProvider<List<String>>((ref) async {
-  // TODO: Replace with actual presets API call.
+  // TODO(spec-018): Replace with actual presets API call once presets API is implemented.
   return <String>[];
 });
 
