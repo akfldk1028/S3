@@ -58,8 +58,13 @@ flutter:
   assets:
     - assets/icon/
 
+# To regenerate app icons after updating assets/icon/app_icon.png, run:
+#   dart run flutter_launcher_icons
 flutter_launcher_icons:
+  image_path: "assets/icon/app_icon.png"
   android: true
+  adaptive_icon_background: "#667EEA"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
   ios: true
   web:
     generate: true
@@ -73,4 +78,3 @@ flutter_launcher_icons:
   macos:
     generate: true
     image_path: "assets/icon/app_icon.png"
-  image_path: "assets/icon/app_icon.png"
