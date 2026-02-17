@@ -5,6 +5,10 @@
  * - device_hash (optional) 받음
  * - auth.service.ts → D1 user 생성 + JWT 발급
  * - Response: { user_id, token }
+ *
+ * Bug 3 verified: No duplicate GET /me handler present.
+ * The canonical GET /me handler lives in user.route.ts (mounted at /me in index.ts).
+ * No ERR import exists — no unused imports.
  */
 
 import { Hono } from 'hono';
