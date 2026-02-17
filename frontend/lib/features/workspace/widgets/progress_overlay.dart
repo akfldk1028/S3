@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -67,7 +68,7 @@ class ProgressOverlay extends StatelessWidget {
       child: Center(
         child: status == OverlayStatus.waiting
             ? _buildWaiting()
-            : _buildProgress(),
+            : _ProgressCard(progressValue: progressValue),
       ),
     );
   }
@@ -132,12 +133,57 @@ class ProgressOverlay extends StatelessWidget {
       ],
     );
   }
+}
 
-  // ── Progress sub-view (L80 – L140) ──────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// _ProgressCard
+// ─────────────────────────────────────────────────────────────────────────────
 
-  /// Running phase — determinate sweep ring with percentage + status pill.
-  Widget _buildProgress() {
-    final pct = (progressValue * 100).round();
+/// Running phase — determinate [_SweepRingPainter] ring with percentage label
+/// and an [AnimatedSwitcher] carousel that cycles through processing status
+/// messages every 3 seconds.
+class _ProgressCard extends StatefulWidget {
+  const _ProgressCard({required this.progressValue});
+
+  /// Fractional progress in range [0.0, 1.0].
+  final double progressValue;
+
+  @override
+  State<_ProgressCard> createState() => _ProgressCardState();
+}
+
+class _ProgressCardState extends State<_ProgressCard> {
+  static const List<String> _messages = [
+    'Detecting walls...',
+    'Generating masks...',
+    'Applying rules...',
+    'Finalizing...',
+  ];
+
+  int _msgIndex = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) {
+        setState(() {
+          _msgIndex = (_msgIndex + 1) % _messages.length;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = (widget.progressValue * 100).round();
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -152,7 +198,7 @@ class ProgressOverlay extends StatelessWidget {
               // Gradient arc driven by progressValue.
               CustomPaint(
                 size: const Size(96, 96),
-                painter: _SweepRingPainter(progressValue),
+                painter: _SweepRingPainter(widget.progressValue),
               ),
 
               // Percentage text inside the ring.
@@ -170,36 +216,23 @@ class ProgressOverlay extends StatelessWidget {
 
         const SizedBox(height: WsTheme.spacingXl),
 
-        // ── Static status pill ───────────────────────────────────────────
-        // NOTE: This pill is replaced by the AnimatedSwitcher message
-        // carousel in subtask-3-2.
-        Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: WsTheme.spacingLg,
-            vertical: WsTheme.spacingSm,
-          ),
-          decoration: BoxDecoration(
-            color: WsColors.statusRunning.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(WsTheme.borderRadiusPill),
-            border: Border.all(
-              color: WsColors.statusRunning.withValues(alpha: 0.40),
-              width: 1.0,
-            ),
-          ),
-          child: const Text(
-            'RUNNING',
-            style: TextStyle(
-              color: WsColors.statusRunning,
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
+        // ── Animated message carousel ────────────────────────────────────
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: Text(
+            _messages[_msgIndex],
+            key: ValueKey(_msgIndex),
+            style: const TextStyle(
+              color: WsColors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ),
 
         const SizedBox(height: WsTheme.spacingLg),
 
-        // Sub-label under the pill.
+        // Sub-label under the message carousel.
         const Text(
           'Processing your workspace…',
           style: TextStyle(
