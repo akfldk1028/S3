@@ -10,9 +10,12 @@ class ApiEndpoints {
   /// 프로덕션: https://s3-api.your-domain.workers.dev
   static const baseUrl = 'http://localhost:8787';
 
-  // ── Auth (1개) ────────────────────────────────────────
+  // ── Auth (2개) ────────────────────────────────────────
   /// POST — 익명 유저 생성 + JWT 발급
   static const authAnon = '/auth/anon';
+
+  /// POST — 이메일/패스워드 로그인 + JWT 발급
+  static const login = '/auth/login';
 
   // ── User (1개) ────────────────────────────────────────
   /// GET — 유저 상태 (credits, plan, rule_slots)
