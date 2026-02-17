@@ -220,7 +220,7 @@ class _User implements User {
 @override final  String email;
 @override final  String? name;
 @override final  String? profileImage;
-@override @JsonKey() final  int credits;
+@override@JsonKey() final  int credits;
 
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.

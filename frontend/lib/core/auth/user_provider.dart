@@ -10,8 +10,8 @@ import '../../features/auth/queries/get_me_query.dart';
 /// final credits = ref.read(userProvider).valueOrNull?.credits ?? 0;
 /// ```
 ///
-/// Returns AsyncValue<User> — use .valueOrNull to access the User synchronously
-/// without triggering an async load.
+/// Returns `AsyncValue<User>` — use `.valueOrNull` to access the User
+/// synchronously without triggering an async load.
 class _UserNotifier extends AsyncNotifier<User> {
   @override
   Future<User> build() {
