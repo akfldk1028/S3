@@ -438,11 +438,12 @@ class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
             ],
           ),
         ),
-        // Tab strip: 56 px glassmorphism bar (implemented in subtask-2-2).
+        // Tab strip: 56 px glassmorphism bar.
         _TabStrip(
           tabs: _tabs,
           selectedIndex: _selectedTab,
           onTap: (i) => setState(() => _selectedTab = i),
+          showRulesBadge: false,
         ),
       ],
     );
@@ -450,74 +451,115 @@ class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// _TabStrip (stub — fleshed out in subtask-2-2)
+// _TabStrip
 // ─────────────────────────────────────────────────────────────────────────────
 
 /// 56 px glassmorphism bottom tab bar with 4 equally-spaced pipeline tabs.
 ///
-/// The selected tab renders its icon and label with a gradient; unselected
-/// tabs use [WsColors.textMuted]. The Rules tab (index 3) shows a [ProBadge]
-/// overlay when the free plan's rule slot limit is reached.
+/// The selected tab renders its icon and label through a [ShaderMask] so they
+/// appear in [WsColors.gradientPrimary]. Unselected tabs use
+/// [WsColors.textMuted]. The strip sits above the system navigation bar via
+/// [SafeArea] (top padding suppressed).
 ///
-/// Full visual implementation is completed in subtask-2-2.
+/// The Rules tab (index 3) shows a [ProBadge] overlay when [showRulesBadge]
+/// is true (i.e. the free plan's rule-slot limit is reached).
+///
+/// Glassmorphism is achieved with [ClipRect] + [BackdropFilter] blur so that
+/// whatever is rendered beneath the bar appears frosted.
 class _TabStrip extends StatelessWidget {
   const _TabStrip({
     required this.tabs,
     required this.selectedIndex,
     required this.onTap,
+    this.showRulesBadge = false,
   });
 
   final List<_TabItem> tabs;
   final int selectedIndex;
   final ValueChanged<int> onTap;
 
+  /// When true, wraps the Rules tab (index 3) with a [ProBadge] diamond.
+  final bool showRulesBadge;
+
   @override
   Widget build(BuildContext context) {
-    // TODO(subtask-2-2): Implement 56 px glassmorphism tab strip with
-    // BackdropFilter blur, gradient-selected icons/labels, and SafeArea.
-    return Container(
-      height: 56,
-      decoration: const BoxDecoration(
-        color: WsColors.surface,
-        border: Border(
-          top: BorderSide(color: WsColors.glassBorder, width: 0.5),
-        ),
-      ),
-      child: Row(
-        children: [
-          for (int i = 0; i < tabs.length; i++)
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onTap(i),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      tabs[i].icon,
-                      size: 18,
-                      color: i == selectedIndex
-                          ? WsColors.accent1
-                          : WsColors.textMuted,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      tabs[i].label,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: i == selectedIndex
-                            ? WsColors.accent1
-                            : WsColors.textMuted,
-                      ),
-                    ),
-                  ],
-                ),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: SafeArea(
+          top: false,
+          child: Container(
+            height: 56,
+            decoration: const BoxDecoration(
+              color: WsColors.glassWhite,
+              border: Border(
+                top: BorderSide(color: WsColors.glassBorder, width: 0.5),
               ),
             ),
-        ],
+            child: Row(
+              children: [
+                for (int i = 0; i < tabs.length; i++)
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onTap(i),
+                      child: _buildTabCell(i),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
+  }
+
+  /// Builds a single tab cell (icon + label), with optional [ProBadge].
+  Widget _buildTabCell(int index) {
+    final isSelected = index == selectedIndex;
+
+    final icon = isSelected
+        ? ShaderMask(
+            shaderCallback: (bounds) =>
+                WsColors.gradientPrimary.createShader(bounds),
+            blendMode: BlendMode.srcIn,
+            child: Icon(tabs[index].icon, size: 18, color: Colors.white),
+          )
+        : Icon(tabs[index].icon, size: 18, color: WsColors.textMuted);
+
+    final label = isSelected
+        ? ShaderMask(
+            shaderCallback: (bounds) =>
+                WsColors.gradientPrimary.createShader(bounds),
+            blendMode: BlendMode.srcIn,
+            child: Text(
+              tabs[index].label,
+              style: const TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          )
+        : Text(
+            tabs[index].label,
+            style: const TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.w500,
+              color: WsColors.textMuted,
+            ),
+          );
+
+    final cell = Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
+      children: [icon, const SizedBox(height: 2), label],
+    );
+
+    // Wrap the Rules tab (index 3) with a ProBadge when applicable.
+    if (index == 3) {
+      return ProBadge(showBadge: showRulesBadge, child: cell);
+    }
+    return cell;
   }
 }
