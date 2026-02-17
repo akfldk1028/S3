@@ -1,11 +1,11 @@
 {
-    "name": "s3_frontend",
-    "short_name": "s3_frontend",
+    "name": "S3 — Domain Palette Engine",
+    "short_name": "S3",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0F0F17",
     "theme_color": "#667EEA",
-    "description": "A new Flutter project.",
+    "description": "Domain palette engine for automated image set production",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
