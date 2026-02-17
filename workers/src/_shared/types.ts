@@ -66,8 +66,8 @@ export type JobItemState = {
   idx: number;
   status: 'pending' | 'done' | 'failed';
   inputKey: string;
-  outputKey: string;
-  previewKey: string;
+  outputKey: string | null;
+  previewKey: string | null;
   error?: string;
 };
 
