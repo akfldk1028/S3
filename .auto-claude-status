@@ -1,0 +1,25 @@
+{
+  "active": true,
+  "spec": "022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback",
+  "state": "paused",
+  "subtasks": {
+    "completed": 0,
+    "total": 9,
+    "in_progress": 1,
+    "failed": 0
+  },
+  "phase": {
+    "current": "",
+    "id": 0,
+    "total": 0
+  },
+  "workers": {
+    "active": 0,
+    "max": 1
+  },
+  "session": {
+    "number": 1,
+    "started_at": "2026-02-17T19:34:32.830700"
+  },
+  "last_update": "2026-02-17T19:34:32.960942"
+}

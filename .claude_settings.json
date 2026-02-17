@@ -1,0 +1,34 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback/**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback\\.auto-claude\\specs\\022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback\\.auto-claude\\specs\\022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback\\.auto-claude\\specs\\022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback/**)",
+      "Read(C:\\DK\\S3\\.auto-claude/**)",
+      "Write(C:\\DK\\S3\\.auto-claude/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)"
+    ]
+  }
+}
