@@ -1,4 +1,4 @@
-// ignore_for_file: unused_import
+// ignore_for_file: unused_import, unnecessary_import
 
 import 'dart:math' show pi;
 import 'dart:ui';
@@ -45,8 +45,62 @@ class ProBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO(subtask-1-2): Implement diamond badge overlay
-    return child;
+    if (!showBadge) return child;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        const Positioned(
+          top: -8,
+          right: -8,
+          child: _ProDiamondBadge(),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _ProDiamondBadge (private)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Rotated-square diamond badge displaying "PRO" in gradient colours.
+///
+/// The container is rotated 45° to form a diamond shape; the inner [Text]
+/// is counter-rotated −45° so the label remains upright.
+class _ProDiamondBadge extends StatelessWidget {
+  const _ProDiamondBadge();
+
+  static const double _size = 26.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Transform.rotate(
+      angle: pi / 4,
+      child: Container(
+        width: _size,
+        height: _size,
+        decoration: const BoxDecoration(
+          gradient: WsColors.gradientDiagonal,
+        ),
+        child: Transform.rotate(
+          angle: -pi / 4,
+          child: const Center(
+            child: Text(
+              'PRO',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 7,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.3,
+                height: 1,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
