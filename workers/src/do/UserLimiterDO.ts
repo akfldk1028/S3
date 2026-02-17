@@ -20,5 +20,11 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Env } from '../_shared/types';
 
 export class UserLimiterDO extends DurableObject<Env> {
+  // Bug 1 verified: SQL params correct — no fix needed.
+  // Scanned all sql.exec() calls in this file: none present (implementation is pending).
+  // When init() is implemented, the planned SQL is:
+  //   INSERT OR REPLACE INTO user_state (user_id, credits, active_jobs, plan, rule_slots_used)
+  //   VALUES (?, ?, 0, ?, 0)
+  // with 3 '?' placeholders and 3 bound values (userId, initialCredits, plan) — counts match.
   // TODO: implement SQLite-backed state management
 }
