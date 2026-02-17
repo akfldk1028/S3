@@ -10,7 +10,7 @@
  */
 
 import { Hono } from 'hono';
-import type { Env, AuthUser, UserLimiterState } from '../_shared/types';
+import type { Env, AuthUser, UserLimiterState, JobCoordinatorState } from '../_shared/types';
 import { PLAN_LIMITS } from '../_shared/types';
 import { ERR } from '../_shared/errors';
 import { ok, error } from '../_shared/response';
@@ -98,14 +98,61 @@ app.post('/', async (c) => {
 
 // POST /jobs/:id/confirm-upload
 app.post('/:id/confirm-upload', async (c) => {
-  // TODO: [SEC-2] Ownership check + markUploaded
-  return c.json(error(ERR.INTERNAL_ERROR, 'Not implemented'), 501);
+  const userId = c.get('user').userId;
+  const jobId = c.req.param('id');
+
+  const stub = getJobCoordinatorStub(c.env, jobId);
+
+  const stateResponse = await stub.fetch('http://do/getStatus', { method: 'GET' });
+  if (!stateResponse.ok) {
+    return c.json(error(ERR.JOB_NOT_FOUND, 'Job not found'), 404);
+  }
+
+  const jobState = await stateResponse.json<JobCoordinatorState>();
+  if (jobState.userId !== userId) {
+    return c.json(error(ERR.JOB_FORBIDDEN, 'Access denied'), 403);
+  }
+
+  const markResponse = await stub.fetch('http://do/markUploaded', { method: 'POST' });
+  if (!markResponse.ok) {
+    const body = await markResponse.json<{ code?: string; message?: string }>();
+    return c.json(
+      error(body.code ?? ERR.INTERNAL_ERROR, body.message ?? 'Failed to mark uploaded'),
+      400,
+    );
+  }
+
+  return c.json(ok({ job_id: jobId }));
 });
 
 // POST /jobs/:id/execute
 app.post('/:id/execute', async (c) => {
-  // TODO: [SEC-2] Ownership check + markQueued + Queue push
-  return c.json(error(ERR.INTERNAL_ERROR, 'Not implemented'), 501);
+  const userId = c.get('user').userId;
+  const jobId = c.req.param('id');
+
+  const stub = getJobCoordinatorStub(c.env, jobId);
+
+  const stateResponse = await stub.fetch('http://do/getStatus', { method: 'GET' });
+  if (!stateResponse.ok) {
+    return c.json(error(ERR.JOB_NOT_FOUND, 'Job not found'), 404);
+  }
+
+  const jobState = await stateResponse.json<JobCoordinatorState>();
+  if (jobState.userId !== userId) {
+    return c.json(error(ERR.JOB_FORBIDDEN, 'Access denied'), 403);
+  }
+
+  const markResponse = await stub.fetch('http://do/markQueued', { method: 'POST' });
+  if (!markResponse.ok) {
+    const body = await markResponse.json<{ code?: string; message?: string }>();
+    return c.json(
+      error(body.code ?? ERR.INTERNAL_ERROR, body.message ?? 'Failed to mark queued'),
+      400,
+    );
+  }
+
+  // TODO: Push to GPU_QUEUE after markQueued succeeds
+  return c.json(ok({ job_id: jobId }));
 });
 
 // GET /jobs/:id
@@ -122,8 +169,31 @@ app.post('/:id/callback', async (c) => {
 
 // POST /jobs/:id/cancel
 app.post('/:id/cancel', async (c) => {
-  // TODO: [SEC-2] Ownership check + cancel
-  return c.json(error(ERR.INTERNAL_ERROR, 'Not implemented'), 501);
+  const userId = c.get('user').userId;
+  const jobId = c.req.param('id');
+
+  const stub = getJobCoordinatorStub(c.env, jobId);
+
+  const stateResponse = await stub.fetch('http://do/getStatus', { method: 'GET' });
+  if (!stateResponse.ok) {
+    return c.json(error(ERR.JOB_NOT_FOUND, 'Job not found'), 404);
+  }
+
+  const jobState = await stateResponse.json<JobCoordinatorState>();
+  if (jobState.userId !== userId) {
+    return c.json(error(ERR.JOB_FORBIDDEN, 'Access denied'), 403);
+  }
+
+  const cancelResponse = await stub.fetch('http://do/cancel', { method: 'POST' });
+  if (!cancelResponse.ok) {
+    const body = await cancelResponse.json<{ code?: string; message?: string }>();
+    return c.json(
+      error(body.code ?? ERR.INTERNAL_ERROR, body.message ?? 'Failed to cancel job'),
+      400,
+    );
+  }
+
+  return c.json(ok({ job_id: jobId }));
 });
 
 export default app;
