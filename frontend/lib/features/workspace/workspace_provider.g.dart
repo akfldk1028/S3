@@ -53,7 +53,7 @@ final class WorkspaceProvider
   }
 }
 
-String _$workspaceHash() => r'885f375c0f45098bd982bbab86533cc21b702043';
+String _$workspaceHash() => r'1624bdf1c295be6fdb02dabbb961df268face1ce';
 
 /// Riverpod notifier that manages the [WorkspaceState] for the workspace feature.
 ///

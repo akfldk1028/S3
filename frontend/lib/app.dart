@@ -11,7 +11,7 @@ class App extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
 
-    return ShadApp.materialRouter(
+    return ShadApp.router(
       title: 'S3 Frontend',
       theme: ShadThemeData(
         brightness: Brightness.light,
