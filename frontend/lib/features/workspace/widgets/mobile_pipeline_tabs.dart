@@ -131,8 +131,229 @@ class PlanComparisonSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO(subtask-1-3): Implement Free vs Pro comparison table
-    return const SizedBox.shrink();
+    return Container(
+      decoration: BoxDecoration(
+        color: WsColors.surface,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(WsTheme.radiusLg),
+        ),
+        border: const Border(
+          top: BorderSide(color: WsColors.glassBorder, width: 0.5),
+        ),
+      ),
+      padding: EdgeInsets.only(
+        top: 12,
+        left: 20,
+        right: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 28,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: WsColors.glassBorder,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Title
+          const Text(
+            'Plans',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: WsColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Compare Free and Pro features.',
+            style: TextStyle(
+              fontSize: 13,
+              color: WsColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Comparison table
+          const _ComparisonTable(),
+          const SizedBox(height: 20),
+          // Upgrade CTA
+          SizedBox(
+            width: double.infinity,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: WsColors.gradientPrimary,
+                borderRadius: BorderRadius.circular(WsTheme.radiusSm),
+              ),
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(WsTheme.radiusSm),
+                  ),
+                ),
+                child: const Text(
+                  'Upgrade to Pro',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _ComparisonTable (private)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Two-column plan feature comparison table used by [PlanComparisonSheet].
+///
+/// Renders a header row (Free | Pro) followed by feature rows for:
+/// Rule Slots, Batch Size, and Concurrent Jobs.
+class _ComparisonTable extends StatelessWidget {
+  const _ComparisonTable();
+
+  // Plan feature rows: [label, freeValue, proValue]
+  static const _rows = <(String, String, String)>[
+    ('Rule Slots', '2', '20'),
+    ('Batch Size', '10 photos', '200 photos'),
+    ('Concurrent Jobs', '1', '3'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: WsColors.glassWhite,
+        borderRadius: BorderRadius.circular(WsTheme.radius),
+        border: Border.all(color: WsColors.glassBorder, width: 0.5),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header row
+          _buildHeaderRow(),
+          const Divider(color: WsColors.glassBorder, height: 1, thickness: 0.5),
+          // Feature rows
+          for (int i = 0; i < _rows.length; i++) ...[
+            _buildFeatureRow(_rows[i]),
+            if (i < _rows.length - 1)
+              const Divider(
+                  color: WsColors.glassBorder, height: 1, thickness: 0.5),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          // Feature label column (spacer)
+          const Expanded(child: SizedBox.shrink()),
+          // Free column header
+          Expanded(
+            child: Center(
+              child: Text(
+                'Free',
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: WsColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+          // Pro column header with gradient text
+          Expanded(
+            child: Center(
+              child: ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) =>
+                    WsColors.gradientPrimary.createShader(bounds),
+                child: const Text(
+                  'Pro',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeatureRow((String, String, String) row) {
+    final (label, freeVal, proVal) = row;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          // Feature label
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: WsColors.textPrimary,
+              ),
+            ),
+          ),
+          // Free value
+          Expanded(
+            child: Center(
+              child: Text(
+                freeVal,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: WsColors.textSecondary,
+                ),
+              ),
+            ),
+          ),
+          // Pro value (gradient highlight)
+          Expanded(
+            child: Center(
+              child: ShaderMask(
+                blendMode: BlendMode.srcIn,
+                shaderCallback: (bounds) =>
+                    WsColors.gradientPrimary.createShader(bounds),
+                child: Text(
+                  proVal,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
