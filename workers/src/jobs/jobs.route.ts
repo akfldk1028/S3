@@ -10,7 +10,7 @@
  */
 
 import { Hono } from 'hono';
-import type { Env, AuthUser, UserLimiterState, JobCoordinatorState } from '../_shared/types';
+import type { Env, AuthUser, UserLimiterState, JobCoordinatorState, CallbackPayload, JobStatus } from '../_shared/types';
 import { PLAN_LIMITS } from '../_shared/types';
 import { ERR } from '../_shared/errors';
 import { ok, error } from '../_shared/response';
@@ -163,8 +163,52 @@ app.get('/:id', async (c) => {
 
 // POST /jobs/:id/callback
 app.post('/:id/callback', async (c) => {
-  // TODO: [SEC-1] GPU_CALLBACK_SECRET verification + job existence check + onItemResult
-  return c.json(error(ERR.INTERNAL_ERROR, 'Not implemented'), 501);
+  const jobId = c.req.param('id');
+
+  // [SEC-1] Verify GPU_CALLBACK_SECRET
+  const secret = c.req.header('x-gpu-callback-secret');
+  if (!secret || secret !== c.env.GPU_CALLBACK_SECRET) {
+    return c.json(error(ERR.CALLBACK_UNAUTHORIZED, 'Invalid callback secret'), 401);
+  }
+
+  // Parse callback payload
+  let payload: CallbackPayload;
+  try {
+    payload = await c.req.json<CallbackPayload>();
+  } catch {
+    return c.json(error(ERR.VALIDATION_FAILED, 'Invalid JSON body'), 400);
+  }
+
+  // Check job existence via DO state
+  const stub = getJobCoordinatorStub(c.env, jobId);
+  const stateResponse = await stub.fetch('http://do/getStatus', { method: 'GET' });
+  if (!stateResponse.ok) {
+    return c.json(error(ERR.JOB_NOT_FOUND, 'Job not found'), 404);
+  }
+
+  const jobState = await stateResponse.json<JobCoordinatorState>();
+
+  // If already in terminal state, return 200 (idempotent)
+  const terminalStates: JobStatus[] = ['done', 'failed', 'canceled'];
+  if (terminalStates.includes(jobState.status)) {
+    return c.json(ok({ job_id: jobId, message: 'Job already in terminal state, callback ignored' }));
+  }
+
+  // Forward item result to DO
+  const resultResponse = await stub.fetch('http://do/onItemResult', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resultResponse.ok) {
+    const body = await resultResponse.json<{ code?: string; message?: string }>();
+    return c.json(
+      error(body.code ?? ERR.INTERNAL_ERROR, body.message ?? 'Failed to process callback'),
+      400,
+    );
+  }
+
+  return c.json(ok({ job_id: jobId }));
 });
 
 // POST /jobs/:id/cancel
