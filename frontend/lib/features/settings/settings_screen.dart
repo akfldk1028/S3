@@ -183,7 +183,7 @@ class SettingsScreen extends ConsumerWidget {
             // ── Danger Zone ────────────────────────────────────────────────
             const _SectionHeader(title: 'SIGN OUT'),
             const SizedBox(height: 12),
-            const _LogoutTile(),
+            _LogoutTile(user: user),
             const SizedBox(height: 40),
           ],
         ),
@@ -592,24 +592,75 @@ class _SectionHeader extends StatelessWidget {
 }
 
 /// Logout row — tapping calls authProvider.logout() and navigates to /auth.
-/// Full confirmation dialog is added in subtask-2-4.
+///
+/// If user has active jobs, shows a confirmation AlertDialog first.
+/// Uses GestureDetector so the entire tile area is tappable.
 class _LogoutTile extends ConsumerWidget {
-  const _LogoutTile();
+  final User user;
+
+  const _LogoutTile({required this.user});
+
+  Future<void> _handleLogout(BuildContext context, WidgetRef ref) async {
+    if (user.activeJobs > 0) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: WsColors.card,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(WsTheme.radiusLg),
+            side: const BorderSide(color: WsColors.glassBorder, width: 0.5),
+          ),
+          title: const Text(
+            'Active Jobs Running',
+            style: TextStyle(
+              color: WsColors.textPrimary,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: Text(
+            'You have ${user.activeJobs} active '
+            'job${user.activeJobs > 1 ? 's' : ''} running. '
+            'Logging out will not stop them. Continue?',
+            style: const TextStyle(
+              color: WsColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text(
+                'Cancel',
+                style: TextStyle(color: WsColors.textSecondary),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text(
+                'Logout',
+                style: TextStyle(color: WsColors.error),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+
+    await ref.read(authProvider.notifier).logout();
+    if (context.mounted) context.go('/auth');
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       width: double.infinity,
       decoration: WsTheme.cardDecoration,
-      child: Material(
-        color: Colors.transparent,
+      child: ClipRRect(
         borderRadius: BorderRadius.circular(WsTheme.radius),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(WsTheme.radius),
-          onTap: () async {
-            await ref.read(authProvider.notifier).logout();
-            if (context.mounted) context.go('/auth');
-          },
+        child: GestureDetector(
+          onTap: () => _handleLogout(context, ref),
           child: const Padding(
             padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
@@ -633,7 +684,10 @@ class _LogoutTile extends ConsumerWidget {
   }
 }
 
-/// Preferences card — dark mode toggle placeholder.
+/// Preferences card — dark mode toggle and app version info.
+///
+/// Dark Mode row: tapping the Switch calls themeNotifierProvider.notifier.toggle().
+/// App Version row: displays the current version string right-aligned.
 class _PreferencesCard extends ConsumerWidget {
   const _PreferencesCard();
 
@@ -646,27 +700,70 @@ class _PreferencesCard extends ConsumerWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: WsTheme.cardDecoration,
-      child: Row(
+      child: Column(
         children: [
-          const Icon(
-            Icons.dark_mode_outlined,
-            color: WsColors.textSecondary,
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Text(
-              'Dark Mode',
-              style: TextStyle(
-                color: WsColors.textPrimary,
-                fontSize: 15,
+          // ── Dark Mode Toggle ─────────────────────────────────────────────
+          Row(
+            children: [
+              const Icon(
+                Icons.dark_mode,
+                color: WsColors.textSecondary,
+                size: 20,
               ),
-            ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Dark Mode',
+                  style: TextStyle(
+                    color: WsColors.textPrimary,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+              Switch(
+                value: isDark,
+                onChanged: (_) =>
+                    ref.read(themeProvider.notifier).toggle(),
+                activeThumbColor: WsColors.accent1,
+              ),
+            ],
           ),
-          Switch(
-            value: isDark,
-            onChanged: (_) => ref.read(themeProvider.notifier).toggle(),
-            activeThumbColor: WsColors.accent1,
+
+          const Divider(
+            color: WsColors.glassBorder,
+            height: 1,
+            thickness: 0.5,
+          ),
+
+          // ── App Version ──────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              children: const [
+                Icon(
+                  Icons.info_outline,
+                  color: WsColors.textSecondary,
+                  size: 20,
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'App Version',
+                    style: TextStyle(
+                      color: WsColors.textPrimary,
+                      fontSize: 15,
+                    ),
+                  ),
+                ),
+                Text(
+                  'v0.1.0-beta',
+                  style: TextStyle(
+                    color: WsColors.textSecondary,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
