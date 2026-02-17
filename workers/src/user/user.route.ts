@@ -11,7 +11,7 @@ import { getUserLimiterStub } from '../do/do.helpers';
 
 const app = new Hono<{ Bindings: Env; Variables: { user: AuthUser } }>();
 
-// GET /me
+// GET /me — returns { success: true, data: {...}, error: null, meta: { request_id, timestamp } }
 app.get('/', async (c) => {
   const user = c.var.user;
 
