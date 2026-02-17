@@ -66,7 +66,7 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
   /// Runs the full upload → execute → poll pipeline.
   ///
   /// **Credit pre-flight check**: reads [userProvider] synchronously via
-  /// `ref.read(...).valueOrNull`. If the user has zero or fewer credits,
+  /// `ref.read(...).value`. If the user has zero or fewer credits,
   /// transitions immediately to [WorkspacePhase.error] WITHOUT making any
   /// network calls.
   ///
@@ -80,8 +80,8 @@ class WorkspaceNotifier extends Notifier<WorkspaceState> {
   Future<void> uploadAndProcess() async {
     // ── Step 1: Credit pre-flight check ─────────────────────────────────────
     // Read userProvider synchronously — no network call; uses cached AsyncValue.
-    // If the user data hasn't loaded yet (valueOrNull == null), treat as 0 credits.
-    final credits = ref.read(userProvider).valueOrNull?.credits ?? 0;
+    // If the user data hasn't loaded yet (.value == null), treat as 0 credits.
+    final credits = ref.read(userProvider).value?.credits ?? 0;
     if (credits <= 0) {
       state = state.copyWith(
         phase: WorkspacePhase.error,
