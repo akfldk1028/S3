@@ -1,17 +1,23 @@
 /**
  * Rules Zod Validators
- *
- * TODO: Auto-Claude 구현
- * - CreateRuleSchema: { name, preset_id, concepts (Record<string, {action, value}>), protect (string[]) }
- * - UpdateRuleSchema: { name?, concepts?, protect? }
  */
 
 import { z } from 'zod';
 
+const ConceptEntrySchema = z.object({
+  action: z.string(),
+  value: z.string(),
+});
+
 export const CreateRuleSchema = z.object({
-  // TODO: define schema
+  name: z.string().min(1),
+  preset_id: z.string().min(1),
+  concepts: z.record(z.string(), ConceptEntrySchema),
+  protect: z.array(z.string()).optional().default([]),
 });
 
 export const UpdateRuleSchema = z.object({
-  // TODO: define schema
+  name: z.string().min(1).optional(),
+  concepts: z.record(z.string(), ConceptEntrySchema).optional(),
+  protect: z.array(z.string()).optional(),
 });
