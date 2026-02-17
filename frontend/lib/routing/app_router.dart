@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../features/auth/pages/screens/login_screen.dart';
 import '../features/home/pages/screens/home_screen.dart';
+import '../features/pricing/pricing_screen.dart';
 import '../features/profile/pages/screens/profile_screen.dart';
 
 part 'app_router.g.dart';
@@ -20,6 +21,10 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
+      ),
+      GoRoute(
+        path: '/pricing',
+        builder: (context, state) => const PricingScreen(),
       ),
       GoRoute(
         path: '/profile',
