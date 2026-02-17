@@ -1,174 +1,189 @@
-# S3 Frontend — Flutter App
+# S3 Frontend — Flutter Workspace App
 
-> Flutter 3.38.9 + Riverpod 3 + ShadcnUI 기반 크로스 플랫폼 앱 (iOS/Android/Web)
-
-## Current Status (~30%)
-
-### Implemented
-- [x] 프로젝트 기본 구조 (feature-based architecture)
-- [x] Routing — GoRouter (`/`, `/login`, `/profile`)
-- [x] Auth — LoginScreen + SecureStorage 토큰 관리
-- [x] Theme — ShadcnUI Slate color scheme (Light/Dark)
-- [x] HTTP Client — Dio + Riverpod providers
-- [x] Models — Freezed data classes (User, LoginRequest, LoginResponse)
-
-### TODO
-- [ ] Segmentation feature (핵심 기능)
-  - [ ] SegmentationScreen — 이미지 선택 + 프롬프트 입력
-  - [ ] ResultDetailScreen — 결과 오버레이 표시
-  - [ ] ImagePickerWidget, PromptInputWidget, MaskOverlayWidget, ResultCardWidget
-  - [ ] SegmentationProvider, RunSegmentationMutation
-- [ ] Gallery feature — 결과 목록/갤러리
-- [ ] Supabase Auth 연동 (현재 커스텀 auth → Supabase Auth로 전환)
-- [ ] 실시간 추론 상태 알림 (Supabase Realtime)
-- [ ] 이미지 캐싱 + 오프라인 지원
-- [ ] Error handling + Loading states
-
----
-
-## Tech Stack
-
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `flutter_riverpod` | 3.1.0 | State management |
-| `go_router` | 17.1.0 | Navigation/Routing |
-| `dio` | 5.7.0 | HTTP client |
-| `shadcn_ui` | 0.45.1 | UI component library |
-| `flutter_secure_storage` | 10.0.0 | Secure token storage |
-| `hive_flutter` | 1.1.0 | Local persistence |
-| `freezed_annotation` | 3.1.0 | Data class generation |
+> Flutter 3.38.9 + Riverpod 3 + Freezed 3 — Single-page photo workspace
+>
+> SNOW/B612-inspired dark UI with glassmorphism and gradient accents.
 
 ---
 
 ## Architecture
 
+SNOW/B612-inspired single-page workspace. **Photo-first** — controls appear only after photos are added.
+
+### SNOW-like UX Flow
+
+```
+1. App opens → full-screen photo picker (S3 logo + gradient CTA)
+   • No TopBar, no SidePanel, no ActionBar — just "Add Photos"
+2. User adds photos → controls reveal:
+   • Desktop: TopBar + SidePanel(280px) + PhotoGrid + ActionBar
+   • Mobile: TopBar + PhotoGrid + ActionBar + FAB(controls sheet)
+3. Configure domain → concepts → protect → rules
+4. Tap GO → upload → processing → results overlay
+```
+
+### Widget Tree (after photos added)
+
+```
+WorkspaceScreen
+├── TopBar (glassmorphism, logo, credits)
+├── Row/Stack (responsive)
+│   ├── SidePanel (desktop) / MobileBottomSheet (mobile)
+│   │   ├── DomainSection (preset selector)
+│   │   ├── ConceptsSection (concept chips + instances)
+│   │   ├── ProtectSection (lock toggles)
+│   │   └── RulesSection (rule list + editor)
+│   └── PhotoGrid (add/remove images)
+│       ├── ProgressOverlay (during processing)
+│       └── ResultsOverlay (when done)
+└── ActionBar (phase-aware: GO / Cancel / Retry / New Batch)
+```
+
+### Responsive Layout
+
+- **Desktop** (>= 768px): Side panel (280px) + Photo grid
+- **Mobile** (< 768px): Full-width photo grid + FAB → bottom sheet
+- **Empty state** (both): Full-screen SNOW-style picker with animated gradient
+
+---
+
+## Directory Structure
+
 ```
 lib/
-├── main.dart                     # Entry: Hive init + ProviderScope
-├── app.dart                      # ShadApp root widget
+├── main.dart                          # Entry: ProviderScope + App
+├── app.dart                           # MaterialApp.router + dark theme (WsColors)
 ├── constants/
-│   ├── api_endpoints.dart        # Edge API endpoints
-│   ├── app_colors.dart           # Color palette
-│   └── app_theme.dart            # ShadcnUI theme
+│   ├── api_endpoints.dart             # Workers base URL
+│   └── app_theme.dart                 # ShadcnUI theme
 ├── routing/
-│   └── app_router.dart           # GoRouter configuration
-├── common_widgets/               # Reusable widgets
-├── utils/                        # Helpers
-└── features/
-    ├── auth/                     # 인증
-    │   ├── models/               # Freezed models
-    │   ├── mutations/            # Write operations (login, register)
-    │   ├── queries/              # Read operations (getMe)
-    │   └── pages/
-    │       ├── providers/        # Riverpod providers
-    │       ├── screens/          # Full pages
-    │       └── widgets/          # Feature-specific widgets
-    ├── segmentation/             # ★ 핵심 — 세그멘테이션
-    ├── gallery/                  # 결과 갤러리
-    ├── home/                     # 홈
-    └── profile/                  # 프로필
-```
-
-### Feature 패턴
-
-각 feature는 동일한 구조를 따른다:
-```
-feature/
-├── models/          # Freezed data classes (immutable)
-├── mutations/       # POST/PUT/DELETE operations (Riverpod AsyncNotifier)
-├── queries/         # GET operations (Riverpod FutureProvider)
-└── pages/
-    ├── providers/   # UI state providers
-    ├── screens/     # Full-page widgets (Scaffold)
-    └── widgets/     # Feature-specific reusable widgets
-```
-
----
-
-## Code Patterns
-
-### Riverpod Provider (Query)
-```dart
-@riverpod
-Future<List<ResultSummary>> getResults(Ref ref, {int page = 1}) async {
-  final dio = ref.read(dioProvider);
-  final response = await dio.get(ApiEndpoints.results, queryParameters: {'page': page});
-  final envelope = ApiResponse.fromJson(response.data);
-  return (envelope.data as List).map((e) => ResultSummary.fromJson(e)).toList();
-}
-```
-
-### Freezed Model
-```dart
-@freezed
-class SegmentationResult with _$SegmentationResult {
-  const factory SegmentationResult({
-    required String id,
-    required String sourceImageUrl,
-    required String maskImageUrl,
-    required String textPrompt,
-    required List<String> labels,
-    required String status,
-    required DateTime createdAt,
-  }) = _SegmentationResult;
-
-  factory SegmentationResult.fromJson(Map<String, dynamic> json) =>
-      _$SegmentationResultFromJson(json);
-}
-```
-
-### ShadcnUI 사용법
-```dart
-ShadButton(
-  onPressed: () => ref.read(loginMutationProvider.notifier).login(email, password),
-  child: const Text('Login'),
-),
+│   └── app_router.dart                # GoRouter: / → WorkspaceScreen
+├── core/
+│   ├── api/
+│   │   ├── api_client.dart            # Abstract interface (14 methods)
+│   │   ├── s3_api_client.dart         # Dio implementation + JWT + envelope unwrap
+│   │   └── api_client_provider.dart   # Riverpod provider
+│   ├── auth/
+│   │   ├── auth_provider.dart         # AsyncNotifier<String?> (JWT)
+│   │   └── user_provider.dart         # AsyncNotifier<User>
+│   └── models/
+│       ├── user.dart                  # User + RuleSlots
+│       ├── preset.dart                # Preset + OutputTemplate
+│       ├── rule.dart                  # Rule + ConceptAction
+│       ├── job.dart                   # Job (status, progress, outputs)
+│       ├── job_item.dart              # JobItem (idx, resultUrl, previewUrl)
+│       └── job_progress.dart          # JobProgress (done, failed, total)
+├── features/
+│   ├── workspace/                     # ★ Main feature
+│   │   ├── workspace_screen.dart      # Shell (responsive, auto-login)
+│   │   ├── workspace_state.dart       # Freezed state + SelectedImage
+│   │   ├── workspace_provider.dart    # Upload → poll → done orchestrator
+│   │   ├── preset_detail_provider.dart # Cached preset detail (family)
+│   │   ├── theme.dart                 # WsColors + WsTheme
+│   │   └── widgets/
+│   │       ├── top_bar.dart           # Glassmorphism + gradient logo
+│   │       ├── side_panel.dart        # 4 collapsible sections
+│   │       ├── domain_section.dart    # Domain preset chips
+│   │       ├── concepts_section.dart  # Concept chips + #1~#3 instances
+│   │       ├── protect_section.dart   # Lock/unlock toggles
+│   │       ├── rules_section.dart     # Rule list + save dialog
+│   │       ├── photo_grid.dart        # Image grid + add/remove
+│   │       ├── action_bar.dart        # GO shimmer button + phase states
+│   │       ├── progress_overlay.dart  # Blur + ring + cancel
+│   │       ├── results_overlay.dart   # Gallery + share + new batch
+│   │       └── mobile_bottom_sheet.dart # Draggable bottom sheet
+│   ├── palette/
+│   │   ├── palette_provider.dart      # Concept/protect state
+│   │   └── palette_state.dart         # selectedConcepts + protectConcepts
+│   ├── domain_select/
+│   │   └── presets_provider.dart       # Presets list fetch
+│   ├── rules/
+│   │   └── rules_provider.dart        # Rules CRUD
+│   └── auth/                          # Login screen (fallback)
+└── shared/                            # Reusable components
 ```
 
 ---
 
-## API 연동
+## Theme — SNOW/B612 Style
 
-- **Base URL**: Edge Worker URL (`api_endpoints.dart`) — **Edge = Full API (유일한 API 서버)**
-- **Auth**: **Supabase Auth SDK 직접 사용** (`supabase_flutter` 패키지)
-  - 로그인/회원가입은 HTTP 엔드포인트가 아닌 SDK 메서드 호출
-  - `supabase.auth.signInWithPassword()`, `supabase.auth.signUp()` 등
-- **Edge API 호출**: Supabase JWT → `Authorization: Bearer <token>`
-  - Edge가 모든 비즈니스 로직 처리 (CRUD, R2 업로드, 크레딧 확인, Backend 추론 프록시)
-  - Backend(Vast.ai)를 직접 호출하지 않음
-- **HTTP Client**: Dio + interceptors (token refresh)
-- 상세 API 스펙: `docs/contracts/api-contracts.md`
+Dark color scheme with glassmorphism and gradient accents:
 
-## 의존하는 계약
+| Token | Value | Usage |
+|-------|-------|-------|
+| `WsColors.bg` | `#0F0F17` | Main background |
+| `WsColors.surface` | `#1A1A2E` | Side panel, cards |
+| `WsColors.accent1` | `#667EEA` | Purple-blue (gradient start) |
+| `WsColors.accent2` | `#FF6B9D` | Pink (gradient end) |
+| `WsColors.glassWhite` | `10% white` | Glass surfaces |
+| `WsColors.glassBorder` | `20% white` | Glass borders |
 
-| 대상 | 설명 | 파일 |
-|------|------|------|
-| Frontend → Edge API | 세그멘테이션 요청, 결과 조회 | `docs/contracts/api-contracts.md` |
-| Frontend → Supabase Auth | 로그인/회원가입 (SDK) | `supabase/config.toml` |
-| Frontend → Supabase Realtime | 추론 상태 실시간 구독 | `supabase/migrations/` |
+Effects:
+- **Glassmorphism**: `BackdropFilter` + `ImageFilter.blur` on TopBar, ActionBar, BottomSheet
+- **Gradient text/icons**: `ShaderMask` + `WsColors.gradientPrimary`
+- **Shimmer button**: `AnimationController` pulsing glow shadow on GO button
+
+---
+
+## Providers
+
+| Provider | Type | Purpose |
+|----------|------|---------|
+| `workspaceProvider` | `@riverpod class` | Central orchestrator (state machine) |
+| `paletteProvider` | `@riverpod class` | Concept selection + protect toggles |
+| `presetsProvider` | `@riverpod` | Fetch preset list |
+| `presetDetailProvider` | `@riverpod` (family) | Fetch preset detail by ID |
+| `rulesProvider` | `@riverpod class` | Rules CRUD |
+| `authProvider` | `@riverpod class` | JWT token (login/logout) |
+| `userProvider` | `@riverpod class` | User info (credits, plan) |
+| `apiClientProvider` | `@riverpod` | S3ApiClient instance |
+
+---
+
+## Routes
+
+| Path | Screen | Notes |
+|------|--------|-------|
+| `/` | `WorkspaceScreen` | Main app (auto-login) |
+| `/auth` | `AuthScreen` | Fallback for auth retry |
+| `/jobs/:id` | `JobProgressScreen` | Deep-link only |
+| `/results/:id` | `ResultsScreen` | Deep-link only |
 
 ---
 
 ## Commands
 
 ```bash
-# 앱 실행
+# Run app
 flutter run
 
-# 코드 생성 (Freezed, Riverpod)
+# Code generation (Freezed, Riverpod)
 dart run build_runner build --delete-conflicting-outputs
 
-# 코드 생성 (watch 모드)
+# Watch mode
 dart run build_runner watch --delete-conflicting-outputs
 
-# 테스트
+# Analyze
+flutter analyze
+
+# Test
 flutter test
 
-# 빌드
-flutter build apk          # Android
-flutter build ios           # iOS
-flutter build web           # Web
+# Build
+flutter build apk    # Android
+flutter build ios     # iOS
+flutter build web     # Web
 ```
+
+---
+
+## API Connection
+
+- **Base URL**: `https://s3-workers.clickaround8.workers.dev`
+- **Auth**: Anonymous JWT via POST `/auth/anon`, stored in SecureStorage
+- **Envelope**: Workers return `{ success, data, error, meta }` → interceptor unwraps to `data`
+- **Upload**: R2 presigned PUT (separate Dio instance, auto-closed after upload)
+- **Polling**: 3s interval with race-condition guard + max retry (10 failures → error)
 
 ---
 
@@ -176,9 +191,9 @@ flutter build web           # Web
 
 | Item | Convention | Example |
 |------|-----------|---------|
-| File | snake_case | `segmentation_screen.dart` |
-| Class | PascalCase | `SegmentationScreen` |
-| Variable | camelCase | `imageUrl` |
-| Provider | camelCase + Provider suffix | `segmentationProvider` |
-| Freezed model | PascalCase | `SegmentationResult` |
-| Route | lowercase kebab | `/segment`, `/results/:id` |
+| File | snake_case | `workspace_screen.dart` |
+| Class | PascalCase | `WorkspaceScreen` |
+| Variable | camelCase | `selectedPresetId` |
+| Provider | camelCase + Provider | `workspaceProvider` |
+| Freezed model | PascalCase | `WorkspaceState` |
+| Theme colors | WsColors.camelCase | `WsColors.accent1` |
