@@ -86,3 +86,6 @@ htmlcov/
 nul
 *.tmp
 *.bak
+
+# Auto Claude data directory
+.auto-claude/
