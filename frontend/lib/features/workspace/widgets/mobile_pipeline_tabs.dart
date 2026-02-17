@@ -400,12 +400,51 @@ class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
   /// Index of the currently selected tab (0–3).
   int _selectedTab = 0;
 
+  /// Currently selected domain in the Palette panel.
+  String? _selectedDomain;
+
+  /// Active concept labels in the Palette panel.
+  final _selectedConcepts = <String>{};
+
+  /// Instance count selection in the Palette panel (1–3).
+  int _instanceCount = 1;
+
+  /// Active protect-element labels in the Protect panel.
+  final _selectedProtectItems = <String>{};
+
   /// Tab definitions for the four pipeline sections.
   static const _tabs = <_TabItem>[
     _TabItem(label: 'Palette', icon: Icons.palette_rounded),
     _TabItem(label: 'Instances', icon: Icons.auto_awesome_motion_rounded),
     _TabItem(label: 'Protect', icon: Icons.shield_rounded),
     _TabItem(label: 'Rules', icon: Icons.rule_rounded),
+  ];
+
+  /// Available domain options shown in the Palette panel.
+  static const _domains = <String>[
+    'Portrait',
+    'Landscape',
+    'Product',
+    'Fashion',
+    'Architecture',
+  ];
+
+  /// Available concept options shown in the Palette panel.
+  static const _concepts = <String>[
+    'Hair',
+    'Skin',
+    'Eyes',
+    'Background',
+    'Clothing',
+  ];
+
+  /// Available protect-element options shown in the Protect panel.
+  static const _protectItems = <String>[
+    'Face',
+    'Eyes',
+    'Skin Tone',
+    'Background',
+    'Text',
   ];
 
   @override
@@ -423,19 +462,56 @@ class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
       mainAxisSize: MainAxisSize.min,
       children: [
         // Panel area: height capped at 60% of screen to leave room for content above.
-        ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.of(context).size.height * 0.6,
+        Container(
+          decoration: const BoxDecoration(
+            color: WsColors.glassWhite,
+            border: Border(
+              top: BorderSide(color: WsColors.glassBorder, width: 0.5),
+            ),
           ),
-          child: IndexedStack(
-            index: _selectedTab,
-            children: const [
-              // TODO(subtask-2-3): Replace stubs with panel content widgets.
-              SizedBox.shrink(), // index 0 — Palette panel
-              SizedBox.shrink(), // index 1 — Instances panel
-              SizedBox.shrink(), // index 2 — Protect panel
-              SizedBox.shrink(), // index 3 — Rules panel
-            ],
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.6,
+            ),
+            child: IndexedStack(
+              index: _selectedTab,
+              children: [
+                // index 0 — Palette panel: domain + concept selection.
+                _PalettePanel(
+                  domains: _domains,
+                  selectedDomain: _selectedDomain,
+                  onDomainSelected: (d) => setState(() => _selectedDomain = d),
+                  concepts: _concepts,
+                  selectedConcepts: _selectedConcepts,
+                  onConceptToggled: (c) => setState(() {
+                    if (_selectedConcepts.contains(c)) {
+                      _selectedConcepts.remove(c);
+                    } else {
+                      _selectedConcepts.add(c);
+                    }
+                  }),
+                  instanceCount: _instanceCount,
+                  onInstanceSelected: (n) =>
+                      setState(() => _instanceCount = n),
+                ),
+                // index 1 — Instances panel: coming soon placeholder.
+                const _ComingSoonPanel(),
+                // index 2 — Protect panel: protect-element selection.
+                _ProtectPanelWrapper(
+                  protectItems: _protectItems,
+                  selectedItems: _selectedProtectItems,
+                  onItemToggled: (item) => setState(() {
+                    if (_selectedProtectItems.contains(item)) {
+                      _selectedProtectItems.remove(item);
+                    } else {
+                      _selectedProtectItems.add(item);
+                    }
+                  }),
+                ),
+                // index 3 — Rules panel: active rules + save rule button.
+                const _RulesPanelWrapper(),
+              ],
+            ),
           ),
         ),
         // Tab strip: 56 px glassmorphism bar.
@@ -561,5 +637,159 @@ class _TabStrip extends StatelessWidget {
       return ProBadge(showBadge: showRulesBadge, child: cell);
     }
     return cell;
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _PalettePanel
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Palette tab panel (index 0) combining [DomainSection] and [ConceptsSection].
+///
+/// The parent [_MobilePipelineTabsState] owns the domain / concept /
+/// instance-count selections and passes them in; mutations fire setState on
+/// the parent via the provided callbacks.
+class _PalettePanel extends StatelessWidget {
+  const _PalettePanel({
+    required this.domains,
+    required this.selectedDomain,
+    required this.onDomainSelected,
+    required this.concepts,
+    required this.selectedConcepts,
+    required this.onConceptToggled,
+    required this.instanceCount,
+    required this.onInstanceSelected,
+  });
+
+  final List<String> domains;
+  final String? selectedDomain;
+  final ValueChanged<String> onDomainSelected;
+  final List<String> concepts;
+  final Set<String> selectedConcepts;
+  final ValueChanged<String> onConceptToggled;
+  final int instanceCount;
+  final ValueChanged<int> onInstanceSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: WsTheme.spacingSm),
+        DomainSection(
+          domains: domains,
+          selectedDomain: selectedDomain,
+          onDomainSelected: onDomainSelected,
+        ),
+        ConceptsSection(
+          concepts: concepts,
+          selectedConcepts: selectedConcepts,
+          onConceptToggled: onConceptToggled,
+          instanceCount: instanceCount,
+          onInstanceSelected: onInstanceSelected,
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _ComingSoonPanel
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// "Coming Soon" placeholder shown at tab index 1 (Instances).
+class _ComingSoonPanel extends StatelessWidget {
+  const _ComingSoonPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: WsTheme.spacingLg,
+        vertical: WsTheme.spacingXl,
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.auto_awesome_motion_rounded,
+              size: 32,
+              color: WsColors.textMuted,
+            ),
+            SizedBox(height: WsTheme.spacingSm),
+            Text(
+              'Coming Soon',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: WsColors.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _ProtectPanelWrapper
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Protect tab panel (index 2) wrapping [ProtectSection].
+///
+/// The parent [_MobilePipelineTabsState] owns the selected protect-item set
+/// and fires setState on mutations via [onItemToggled].
+class _ProtectPanelWrapper extends StatelessWidget {
+  const _ProtectPanelWrapper({
+    required this.protectItems,
+    required this.selectedItems,
+    required this.onItemToggled,
+  });
+
+  final List<String> protectItems;
+  final Set<String> selectedItems;
+  final ValueChanged<String> onItemToggled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: WsTheme.spacingSm),
+        ProtectSection(
+          protectItems: protectItems,
+          selectedItems: selectedItems,
+          onItemToggled: onItemToggled,
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _RulesPanelWrapper
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Rules tab panel (index 3) wrapping [RulesSection].
+///
+/// [RulesSection] reads workspace state internally via Riverpod; no data
+/// needs to be passed from the parent.
+class _RulesPanelWrapper extends StatelessWidget {
+  const _RulesPanelWrapper();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: WsTheme.spacingSm),
+        RulesSection(),
+      ],
+    );
   }
 }
