@@ -32,7 +32,7 @@ app.post('/', async (c) => {
   }
 
   if (!item_count || item_count < 1) {
-    return c.json(error('INVALID_ITEM_COUNT', 'item_count must be at least 1'), 400);
+    return c.json(error(ERR.INVALID_ITEM_COUNT, 'item_count must be at least 1'), 400);
   }
 
   const jobId = crypto.randomUUID();
