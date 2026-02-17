@@ -6,6 +6,7 @@ import '../features/auth/pages/screens/login_screen.dart';
 import '../features/history/history_screen.dart';
 import '../features/home/pages/screens/home_screen.dart';
 import '../features/profile/pages/screens/profile_screen.dart';
+import '../features/results/results_screen.dart';
 
 part 'app_router.g.dart';
 
@@ -29,6 +30,12 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/history',
         builder: (context, state) => const HistoryScreen(),
+      ),
+      GoRoute(
+        path: '/results/:id',
+        builder: (context, state) => ResultsScreen(
+          jobId: state.pathParameters['id']!,
+        ),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

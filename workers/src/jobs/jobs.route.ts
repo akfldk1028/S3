@@ -29,7 +29,21 @@ app.get('/', authMiddleware, async (c) => {
      LIMIT 50`,
   ).bind(user.userId).all();
 
-  return c.json(ok(results));
+  // Transform flat DB rows into nested Job objects matching the Flutter model
+  const jobs = results.map((row: any) => ({
+    job_id: row.job_id,
+    status: row.status,
+    preset: row.preset,
+    created_at: row.created_at,
+    progress: {
+      done: row.progress_done ?? 0,
+      failed: row.progress_failed ?? 0,
+      total: row.progress_total ?? 0,
+    },
+    outputs_ready: [], // TODO: query from outputs table when available
+  }));
+
+  return c.json(ok(jobs));
 });
 
 // POST /jobs
