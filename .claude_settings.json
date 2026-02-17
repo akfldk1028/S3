@@ -1,0 +1,34 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm\\.auto-claude\\specs\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm\\.auto-claude\\specs\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm\\.auto-claude\\specs\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
+      "Read(C:\\DK\\S3\\.auto-claude/**)",
+      "Write(C:\\DK\\S3\\.auto-claude/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)"
+    ]
+  }
+}
