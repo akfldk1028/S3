@@ -33,7 +33,7 @@ final class LoginMutationProvider
   LoginMutation create() => LoginMutation();
 }
 
-String _$loginMutationHash() => r'6814694c4dd9b4f483248ad279b57ffdeb992b14';
+String _$loginMutationHash() => r'ec0b0706cbfede5fc9b61a80287a4b15a86193fc';
 
 abstract class _$LoginMutation extends $AsyncNotifier<LoginResponse?> {
   FutureOr<LoginResponse?> build();
