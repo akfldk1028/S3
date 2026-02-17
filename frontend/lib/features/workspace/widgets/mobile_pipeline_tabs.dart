@@ -358,6 +358,21 @@ class _ComparisonTable extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// _TabItem
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Defines a single tab entry in [MobilePipelineTabs].
+class _TabItem {
+  const _TabItem({
+    required this.label,
+    required this.icon,
+  });
+
+  final String label;
+  final IconData icon;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MobilePipelineTabs
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -365,10 +380,10 @@ class _ComparisonTable extends StatelessWidget {
 ///
 /// Replaces the FAB + [MobileBottomSheet] pattern with a SNOW-style
 /// persistent tab strip showing:
-/// - **Palette**: [DomainSection] + [ConceptsSection]
-/// - **Instances**: Coming Soon placeholder
-/// - **Protect**: [ProtectSection]
-/// - **Rules**: [RulesSection] + [ProBadge] on Save Rule
+/// - **Palette** (index 0): [DomainSection] + [ConceptsSection]
+/// - **Instances** (index 1): Coming Soon placeholder
+/// - **Protect** (index 2): [ProtectSection]
+/// - **Rules** (index 3): [RulesSection] + [ProBadge] on Save Rule
 ///
 /// Only visible on mobile viewports (width < 768) when photos are selected
 /// and the workspace phase is not [WorkspacePhase.done].
@@ -382,9 +397,127 @@ class MobilePipelineTabs extends ConsumerStatefulWidget {
 }
 
 class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
+  /// Index of the currently selected tab (0–3).
+  int _selectedTab = 0;
+
+  /// Tab definitions for the four pipeline sections.
+  static const _tabs = <_TabItem>[
+    _TabItem(label: 'Palette', icon: Icons.palette_rounded),
+    _TabItem(label: 'Instances', icon: Icons.auto_awesome_motion_rounded),
+    _TabItem(label: 'Protect', icon: Icons.shield_rounded),
+    _TabItem(label: 'Rules', icon: Icons.rule_rounded),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    // TODO(subtask-2-1): Implement tab strip + IndexedStack panel layout
-    return const SizedBox.shrink();
+    final ws = ref.watch(workspaceProvider);
+    final hasPhotos = ws.selectedImages.isNotEmpty;
+    final isDesktop = MediaQuery.of(context).size.width >= 768;
+
+    // Hidden on desktop, when no photos are selected, or after processing completes.
+    if (isDesktop || !hasPhotos || ws.phase == WorkspacePhase.done) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Panel area: height capped at 60% of screen to leave room for content above.
+        ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.6,
+          ),
+          child: IndexedStack(
+            index: _selectedTab,
+            children: const [
+              // TODO(subtask-2-3): Replace stubs with panel content widgets.
+              SizedBox.shrink(), // index 0 — Palette panel
+              SizedBox.shrink(), // index 1 — Instances panel
+              SizedBox.shrink(), // index 2 — Protect panel
+              SizedBox.shrink(), // index 3 — Rules panel
+            ],
+          ),
+        ),
+        // Tab strip: 56 px glassmorphism bar (implemented in subtask-2-2).
+        _TabStrip(
+          tabs: _tabs,
+          selectedIndex: _selectedTab,
+          onTap: (i) => setState(() => _selectedTab = i),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _TabStrip (stub — fleshed out in subtask-2-2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 56 px glassmorphism bottom tab bar with 4 equally-spaced pipeline tabs.
+///
+/// The selected tab renders its icon and label with a gradient; unselected
+/// tabs use [WsColors.textMuted]. The Rules tab (index 3) shows a [ProBadge]
+/// overlay when the free plan's rule slot limit is reached.
+///
+/// Full visual implementation is completed in subtask-2-2.
+class _TabStrip extends StatelessWidget {
+  const _TabStrip({
+    required this.tabs,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  final List<_TabItem> tabs;
+  final int selectedIndex;
+  final ValueChanged<int> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO(subtask-2-2): Implement 56 px glassmorphism tab strip with
+    // BackdropFilter blur, gradient-selected icons/labels, and SafeArea.
+    return Container(
+      height: 56,
+      decoration: const BoxDecoration(
+        color: WsColors.surface,
+        border: Border(
+          top: BorderSide(color: WsColors.glassBorder, width: 0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          for (int i = 0; i < tabs.length; i++)
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onTap(i),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      tabs[i].icon,
+                      size: 18,
+                      color: i == selectedIndex
+                          ? WsColors.accent1
+                          : WsColors.textMuted,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      tabs[i].label,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: i == selectedIndex
+                            ? WsColors.accent1
+                            : WsColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 }
