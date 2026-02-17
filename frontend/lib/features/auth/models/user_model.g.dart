@@ -11,6 +11,7 @@ _User _$UserFromJson(Map<String, dynamic> json) => _User(
   email: json['email'] as String,
   name: json['name'] as String?,
   profileImage: json['profileImage'] as String?,
+  credits: (json['credits'] as num?)?.toInt() ?? 0,
 );
 
 Map<String, dynamic> _$UserToJson(_User instance) => <String, dynamic>{
@@ -18,6 +19,7 @@ Map<String, dynamic> _$UserToJson(_User instance) => <String, dynamic>{
   'email': instance.email,
   'name': instance.name,
   'profileImage': instance.profileImage,
+  'credits': instance.credits,
 };
 
 _LoginRequest _$LoginRequestFromJson(Map<String, dynamic> json) =>
