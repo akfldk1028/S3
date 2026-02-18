@@ -14,19 +14,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$WorkspaceState {
 
-/// Current phase of the processing pipeline
- WorkspacePhase get phase;/// Raw bytes of photos selected by the user; preserved across retries
- List<Uint8List> get selectedImages;/// Upload progress [0.0, 1.0]; only meaningful during [WorkspacePhase.uploading]
- double get uploadProgress;/// Server-assigned job ID, set after POST /jobs succeeds
- String? get activeJobId;/// Latest job status polled from GET /jobs/:id
- Job? get activeJob;/// Human-readable error message shown in the error banner
- String? get errorMessage;/// Number of consecutive network failures during polling (for UI feedback)
- int get networkRetryCount;/// User-supplied text prompts passed to SAM3 during executeJob.
-///
-/// Added via [WorkspaceNotifier.addPrompt]; removed via
-/// [WorkspaceNotifier.removePrompt]. Passed as `prompts` in the
-/// POST /jobs/:id/execute request body when non-empty.
- List<String> get customPrompts;
+ List<SelectedImage> get selectedImages; WorkspacePhase get phase; bool get showLargeBatchWarning; String? get errorMessage; double get uploadProgress; JobResult? get activeJob;
 /// Create a copy of WorkspaceState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -37,16 +25,16 @@ $WorkspaceStateCopyWith<WorkspaceState> get copyWith => _$WorkspaceStateCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is WorkspaceState&&(identical(other.phase, phase) || other.phase == phase)&&const DeepCollectionEquality().equals(other.selectedImages, selectedImages)&&(identical(other.uploadProgress, uploadProgress) || other.uploadProgress == uploadProgress)&&(identical(other.activeJobId, activeJobId) || other.activeJobId == activeJobId)&&(identical(other.activeJob, activeJob) || other.activeJob == activeJob)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.networkRetryCount, networkRetryCount) || other.networkRetryCount == networkRetryCount)&&const DeepCollectionEquality().equals(other.customPrompts, customPrompts));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is WorkspaceState&&const DeepCollectionEquality().equals(other.selectedImages, selectedImages)&&(identical(other.phase, phase) || other.phase == phase)&&(identical(other.showLargeBatchWarning, showLargeBatchWarning) || other.showLargeBatchWarning == showLargeBatchWarning)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.uploadProgress, uploadProgress) || other.uploadProgress == uploadProgress)&&(identical(other.activeJob, activeJob) || other.activeJob == activeJob));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,phase,const DeepCollectionEquality().hash(selectedImages),uploadProgress,activeJobId,activeJob,errorMessage,networkRetryCount,const DeepCollectionEquality().hash(customPrompts));
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(selectedImages),phase,showLargeBatchWarning,errorMessage,uploadProgress,activeJob);
 
 @override
 String toString() {
-  return 'WorkspaceState(phase: $phase, selectedImages: $selectedImages, uploadProgress: $uploadProgress, activeJobId: $activeJobId, activeJob: $activeJob, errorMessage: $errorMessage, networkRetryCount: $networkRetryCount, customPrompts: $customPrompts)';
+  return 'WorkspaceState(selectedImages: $selectedImages, phase: $phase, showLargeBatchWarning: $showLargeBatchWarning, errorMessage: $errorMessage, uploadProgress: $uploadProgress, activeJob: $activeJob)';
 }
 
 
@@ -57,7 +45,7 @@ abstract mixin class $WorkspaceStateCopyWith<$Res>  {
   factory $WorkspaceStateCopyWith(WorkspaceState value, $Res Function(WorkspaceState) _then) = _$WorkspaceStateCopyWithImpl;
 @useResult
 $Res call({
- WorkspacePhase phase, List<Uint8List> selectedImages, double uploadProgress, String? activeJobId, Job? activeJob, String? errorMessage, int networkRetryCount, List<String> customPrompts
+ List<SelectedImage> selectedImages, WorkspacePhase phase, bool showLargeBatchWarning, String? errorMessage, double uploadProgress, JobResult? activeJob
 });
 
 
@@ -74,17 +62,15 @@ class _$WorkspaceStateCopyWithImpl<$Res>
 
 /// Create a copy of WorkspaceState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? phase = null,Object? selectedImages = null,Object? uploadProgress = null,Object? activeJobId = freezed,Object? activeJob = freezed,Object? errorMessage = freezed,Object? networkRetryCount = null,Object? customPrompts = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? selectedImages = null,Object? phase = null,Object? showLargeBatchWarning = null,Object? errorMessage = freezed,Object? uploadProgress = null,Object? activeJob = freezed,}) {
   return _then(_self.copyWith(
-phase: null == phase ? _self.phase : phase // ignore: cast_nullable_to_non_nullable
-as WorkspacePhase,selectedImages: null == selectedImages ? _self.selectedImages : selectedImages // ignore: cast_nullable_to_non_nullable
-as List<Uint8List>,uploadProgress: null == uploadProgress ? _self.uploadProgress : uploadProgress // ignore: cast_nullable_to_non_nullable
-as double,activeJobId: freezed == activeJobId ? _self.activeJobId : activeJobId // ignore: cast_nullable_to_non_nullable
-as String?,activeJob: freezed == activeJob ? _self.activeJob : activeJob // ignore: cast_nullable_to_non_nullable
-as Job?,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
-as String?,networkRetryCount: null == networkRetryCount ? _self.networkRetryCount : networkRetryCount // ignore: cast_nullable_to_non_nullable
-as int,customPrompts: null == customPrompts ? _self.customPrompts : customPrompts // ignore: cast_nullable_to_non_nullable
-as List<String>,
+selectedImages: null == selectedImages ? _self.selectedImages : selectedImages // ignore: cast_nullable_to_non_nullable
+as List<SelectedImage>,phase: null == phase ? _self.phase : phase // ignore: cast_nullable_to_non_nullable
+as WorkspacePhase,showLargeBatchWarning: null == showLargeBatchWarning ? _self.showLargeBatchWarning : showLargeBatchWarning // ignore: cast_nullable_to_non_nullable
+as bool,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
+as String?,uploadProgress: null == uploadProgress ? _self.uploadProgress : uploadProgress // ignore: cast_nullable_to_non_nullable
+as double,activeJob: freezed == activeJob ? _self.activeJob : activeJob // ignore: cast_nullable_to_non_nullable
+as JobResult?,
   ));
 }
 
@@ -169,10 +155,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( WorkspacePhase phase,  List<Uint8List> selectedImages,  double uploadProgress,  String? activeJobId,  Job? activeJob,  String? errorMessage,  int networkRetryCount,  List<String> customPrompts)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( List<SelectedImage> selectedImages,  WorkspacePhase phase,  bool showLargeBatchWarning,  String? errorMessage,  double uploadProgress,  JobResult? activeJob)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _WorkspaceState() when $default != null:
-return $default(_that.phase,_that.selectedImages,_that.uploadProgress,_that.activeJobId,_that.activeJob,_that.errorMessage,_that.networkRetryCount,_that.customPrompts);case _:
+return $default(_that.selectedImages,_that.phase,_that.showLargeBatchWarning,_that.errorMessage,_that.uploadProgress,_that.activeJob);case _:
   return orElse();
 
 }
@@ -190,10 +176,10 @@ return $default(_that.phase,_that.selectedImages,_that.uploadProgress,_that.acti
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( WorkspacePhase phase,  List<Uint8List> selectedImages,  double uploadProgress,  String? activeJobId,  Job? activeJob,  String? errorMessage,  int networkRetryCount,  List<String> customPrompts)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( List<SelectedImage> selectedImages,  WorkspacePhase phase,  bool showLargeBatchWarning,  String? errorMessage,  double uploadProgress,  JobResult? activeJob)  $default,) {final _that = this;
 switch (_that) {
 case _WorkspaceState():
-return $default(_that.phase,_that.selectedImages,_that.uploadProgress,_that.activeJobId,_that.activeJob,_that.errorMessage,_that.networkRetryCount,_that.customPrompts);case _:
+return $default(_that.selectedImages,_that.phase,_that.showLargeBatchWarning,_that.errorMessage,_that.uploadProgress,_that.activeJob);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -210,10 +196,10 @@ return $default(_that.phase,_that.selectedImages,_that.uploadProgress,_that.acti
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( WorkspacePhase phase,  List<Uint8List> selectedImages,  double uploadProgress,  String? activeJobId,  Job? activeJob,  String? errorMessage,  int networkRetryCount,  List<String> customPrompts)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( List<SelectedImage> selectedImages,  WorkspacePhase phase,  bool showLargeBatchWarning,  String? errorMessage,  double uploadProgress,  JobResult? activeJob)?  $default,) {final _that = this;
 switch (_that) {
 case _WorkspaceState() when $default != null:
-return $default(_that.phase,_that.selectedImages,_that.uploadProgress,_that.activeJobId,_that.activeJob,_that.errorMessage,_that.networkRetryCount,_that.customPrompts);case _:
+return $default(_that.selectedImages,_that.phase,_that.showLargeBatchWarning,_that.errorMessage,_that.uploadProgress,_that.activeJob);case _:
   return null;
 
 }
@@ -225,47 +211,21 @@ return $default(_that.phase,_that.selectedImages,_that.uploadProgress,_that.acti
 
 
 class _WorkspaceState implements WorkspaceState {
-  const _WorkspaceState({this.phase = WorkspacePhase.idle, final  List<Uint8List> selectedImages = const [], this.uploadProgress = 0.0, this.activeJobId, this.activeJob, this.errorMessage, this.networkRetryCount = 0, final  List<String> customPrompts = const []}): _selectedImages = selectedImages,_customPrompts = customPrompts;
+  const _WorkspaceState({final  List<SelectedImage> selectedImages = const [], this.phase = WorkspacePhase.idle, this.showLargeBatchWarning = false, this.errorMessage, this.uploadProgress = 0.0, this.activeJob}): _selectedImages = selectedImages;
   
 
-/// Current phase of the processing pipeline
-@override@JsonKey() final  WorkspacePhase phase;
-/// Raw bytes of photos selected by the user; preserved across retries
- final  List<Uint8List> _selectedImages;
-/// Raw bytes of photos selected by the user; preserved across retries
-@override@JsonKey() List<Uint8List> get selectedImages {
+ final  List<SelectedImage> _selectedImages;
+@override@JsonKey() List<SelectedImage> get selectedImages {
   if (_selectedImages is EqualUnmodifiableListView) return _selectedImages;
   // ignore: implicit_dynamic_type
   return EqualUnmodifiableListView(_selectedImages);
 }
 
-/// Upload progress [0.0, 1.0]; only meaningful during [WorkspacePhase.uploading]
-@override@JsonKey() final  double uploadProgress;
-/// Server-assigned job ID, set after POST /jobs succeeds
-@override final  String? activeJobId;
-/// Latest job status polled from GET /jobs/:id
-@override final  Job? activeJob;
-/// Human-readable error message shown in the error banner
+@override@JsonKey() final  WorkspacePhase phase;
+@override@JsonKey() final  bool showLargeBatchWarning;
 @override final  String? errorMessage;
-/// Number of consecutive network failures during polling (for UI feedback)
-@override@JsonKey() final  int networkRetryCount;
-/// User-supplied text prompts passed to SAM3 during executeJob.
-///
-/// Added via [WorkspaceNotifier.addPrompt]; removed via
-/// [WorkspaceNotifier.removePrompt]. Passed as `prompts` in the
-/// POST /jobs/:id/execute request body when non-empty.
- final  List<String> _customPrompts;
-/// User-supplied text prompts passed to SAM3 during executeJob.
-///
-/// Added via [WorkspaceNotifier.addPrompt]; removed via
-/// [WorkspaceNotifier.removePrompt]. Passed as `prompts` in the
-/// POST /jobs/:id/execute request body when non-empty.
-@override@JsonKey() List<String> get customPrompts {
-  if (_customPrompts is EqualUnmodifiableListView) return _customPrompts;
-  // ignore: implicit_dynamic_type
-  return EqualUnmodifiableListView(_customPrompts);
-}
-
+@override@JsonKey() final  double uploadProgress;
+@override final  JobResult? activeJob;
 
 /// Create a copy of WorkspaceState
 /// with the given fields replaced by the non-null parameter values.
@@ -277,16 +237,16 @@ _$WorkspaceStateCopyWith<_WorkspaceState> get copyWith => __$WorkspaceStateCopyW
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _WorkspaceState&&(identical(other.phase, phase) || other.phase == phase)&&const DeepCollectionEquality().equals(other._selectedImages, _selectedImages)&&(identical(other.uploadProgress, uploadProgress) || other.uploadProgress == uploadProgress)&&(identical(other.activeJobId, activeJobId) || other.activeJobId == activeJobId)&&(identical(other.activeJob, activeJob) || other.activeJob == activeJob)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.networkRetryCount, networkRetryCount) || other.networkRetryCount == networkRetryCount)&&const DeepCollectionEquality().equals(other._customPrompts, _customPrompts));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _WorkspaceState&&const DeepCollectionEquality().equals(other._selectedImages, _selectedImages)&&(identical(other.phase, phase) || other.phase == phase)&&(identical(other.showLargeBatchWarning, showLargeBatchWarning) || other.showLargeBatchWarning == showLargeBatchWarning)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.uploadProgress, uploadProgress) || other.uploadProgress == uploadProgress)&&(identical(other.activeJob, activeJob) || other.activeJob == activeJob));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,phase,const DeepCollectionEquality().hash(_selectedImages),uploadProgress,activeJobId,activeJob,errorMessage,networkRetryCount,const DeepCollectionEquality().hash(_customPrompts));
+int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_selectedImages),phase,showLargeBatchWarning,errorMessage,uploadProgress,activeJob);
 
 @override
 String toString() {
-  return 'WorkspaceState(phase: $phase, selectedImages: $selectedImages, uploadProgress: $uploadProgress, activeJobId: $activeJobId, activeJob: $activeJob, errorMessage: $errorMessage, networkRetryCount: $networkRetryCount, customPrompts: $customPrompts)';
+  return 'WorkspaceState(selectedImages: $selectedImages, phase: $phase, showLargeBatchWarning: $showLargeBatchWarning, errorMessage: $errorMessage, uploadProgress: $uploadProgress, activeJob: $activeJob)';
 }
 
 
@@ -297,7 +257,7 @@ abstract mixin class _$WorkspaceStateCopyWith<$Res> implements $WorkspaceStateCo
   factory _$WorkspaceStateCopyWith(_WorkspaceState value, $Res Function(_WorkspaceState) _then) = __$WorkspaceStateCopyWithImpl;
 @override @useResult
 $Res call({
- WorkspacePhase phase, List<Uint8List> selectedImages, double uploadProgress, String? activeJobId, Job? activeJob, String? errorMessage, int networkRetryCount, List<String> customPrompts
+ List<SelectedImage> selectedImages, WorkspacePhase phase, bool showLargeBatchWarning, String? errorMessage, double uploadProgress, JobResult? activeJob
 });
 
 
@@ -314,17 +274,15 @@ class __$WorkspaceStateCopyWithImpl<$Res>
 
 /// Create a copy of WorkspaceState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? phase = null,Object? selectedImages = null,Object? uploadProgress = null,Object? activeJobId = freezed,Object? activeJob = freezed,Object? errorMessage = freezed,Object? networkRetryCount = null,Object? customPrompts = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? selectedImages = null,Object? phase = null,Object? showLargeBatchWarning = null,Object? errorMessage = freezed,Object? uploadProgress = null,Object? activeJob = freezed,}) {
   return _then(_WorkspaceState(
-phase: null == phase ? _self.phase : phase // ignore: cast_nullable_to_non_nullable
-as WorkspacePhase,selectedImages: null == selectedImages ? _self._selectedImages : selectedImages // ignore: cast_nullable_to_non_nullable
-as List<Uint8List>,uploadProgress: null == uploadProgress ? _self.uploadProgress : uploadProgress // ignore: cast_nullable_to_non_nullable
-as double,activeJobId: freezed == activeJobId ? _self.activeJobId : activeJobId // ignore: cast_nullable_to_non_nullable
-as String?,activeJob: freezed == activeJob ? _self.activeJob : activeJob // ignore: cast_nullable_to_non_nullable
-as Job?,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
-as String?,networkRetryCount: null == networkRetryCount ? _self.networkRetryCount : networkRetryCount // ignore: cast_nullable_to_non_nullable
-as int,customPrompts: null == customPrompts ? _self._customPrompts : customPrompts // ignore: cast_nullable_to_non_nullable
-as List<String>,
+selectedImages: null == selectedImages ? _self._selectedImages : selectedImages // ignore: cast_nullable_to_non_nullable
+as List<SelectedImage>,phase: null == phase ? _self.phase : phase // ignore: cast_nullable_to_non_nullable
+as WorkspacePhase,showLargeBatchWarning: null == showLargeBatchWarning ? _self.showLargeBatchWarning : showLargeBatchWarning // ignore: cast_nullable_to_non_nullable
+as bool,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
+as String?,uploadProgress: null == uploadProgress ? _self.uploadProgress : uploadProgress // ignore: cast_nullable_to_non_nullable
+as double,activeJob: freezed == activeJob ? _self.activeJob : activeJob // ignore: cast_nullable_to_non_nullable
+as JobResult?,
   ));
 }
 

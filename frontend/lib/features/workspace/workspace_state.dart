@@ -1,133 +1,137 @@
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 
-import '../../core/models/job.dart';
+import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:image_picker/image_picker.dart';
 
-/// The phases of the workspace processing pipeline.
+part 'workspace_state.freezed.dart';
+
+// ─────────────────────────────────────────────
+// SelectedImage — plain Dart class (NOT Freezed)
+// ─────────────────────────────────────────────
+
+/// 선택된 이미지 — XFile 참조 + 200px 썸네일만 보유
 ///
-/// State machine: idle → photosSelected → uploading → processing → done | error
+/// - [thumbnail]: 그리드 표시용 200px 압축 이미지 (즉시 생성)
+/// - [readBytesForUpload]: 업로드 시점에만 전체 bytes 로드 (지연 로딩)
+///
+/// full Uint8List bytes는 이 클래스에 절대 저장하지 않는다.
+/// 원본은 업로드 루프 내에서만 [readBytesForUpload]로 on-demand 로드한다.
+class SelectedImage {
+  final XFile file;
+  final Uint8List thumbnail; // 200px 썸네일만 즉시 보유
+  final String name;
+
+  const SelectedImage({
+    required this.file,
+    required this.thumbnail,
+    required this.name,
+  });
+
+  /// 업로드 시점에만 전체 bytes 로드 (on-demand)
+  ///
+  /// 이 메서드를 upload loop 외부에서 호출하지 말 것.
+  /// 반환된 Uint8List는 압축 후 즉시 scope를 벗어나야 한다 (GC 허용).
+  Future<Uint8List> readBytesForUpload() => file.readAsBytes();
+}
+
+// ─────────────────────────────────────────────
+// WorkspacePhase — 작업 단계 상태 머신
+// ─────────────────────────────────────────────
+
+/// 워크스페이스 작업 단계
 enum WorkspacePhase {
-  /// No photos selected; initial state
+  /// 초기 상태 — 이미지 미선택
   idle,
 
-  /// At least one photo has been selected; ready to process
+  /// 이미지 선택 완료 — 업로드 전
   photosSelected,
 
-  /// Photos are being uploaded to presigned S3 URLs
+  /// S3/R2 업로드 진행 중
   uploading,
 
-  /// Upload complete; job is queued/running on the GPU worker
+  /// GPU 처리 대기/진행 중
   processing,
 
-  /// Job completed successfully
-  done,
+  /// 작업 완료 — 결과 표시 가능
+  completed,
 
-  /// An error occurred (credit check failure, network error, or job failure)
+  /// 오류 발생
   error,
 }
 
-/// Immutable state for the workspace feature.
-///
-/// All mutations go through [WorkspaceNotifier.state] via [copyWith].
-@immutable
-class WorkspaceState {
-  const WorkspaceState({
-    this.phase = WorkspacePhase.idle,
-    this.selectedImages = const [],
-    this.uploadProgress = 0.0,
-    this.activeJobId,
-    this.activeJob,
-    this.errorMessage,
-    this.networkRetryCount = 0,
+// ─────────────────────────────────────────────
+// JobResultItem — 개별 결과 이미지 항목
+// ─────────────────────────────────────────────
+
+/// 작업 결과의 개별 이미지 항목
+class JobResultItem {
+  final int idx;
+  final String previewUrl;
+  final String resultUrl;
+
+  const JobResultItem({
+    required this.idx,
+    required this.previewUrl,
+    required this.resultUrl,
   });
 
-  /// Current phase of the processing pipeline
-  final WorkspacePhase phase;
-
-  /// Raw bytes of photos selected by the user; preserved across retries
-  final List<Uint8List> selectedImages;
-
-  /// Upload progress [0.0, 1.0]; only meaningful during [WorkspacePhase.uploading]
-  final double uploadProgress;
-
-  /// Server-assigned job ID, set after POST /jobs succeeds
-  final String? activeJobId;
-
-  /// Latest job status polled from GET /jobs/:id
-  final Job? activeJob;
-
-  /// Human-readable error message shown in the error banner
-  final String? errorMessage;
-
-  /// Number of consecutive network failures during polling (for UI feedback)
-  final int networkRetryCount;
-
-  /// Returns a copy of this state with the specified fields replaced.
-  ///
-  /// For nullable fields ([activeJobId], [activeJob], [errorMessage]), pass
-  /// `null` to explicitly clear them. The default sentinel value means
-  /// "keep the current value".
-  WorkspaceState copyWith({
-    WorkspacePhase? phase,
-    List<Uint8List>? selectedImages,
-    double? uploadProgress,
-    Object? activeJobId = _unset,
-    Object? activeJob = _unset,
-    Object? errorMessage = _unset,
-    int? networkRetryCount,
-  }) {
-    return WorkspaceState(
-      phase: phase ?? this.phase,
-      selectedImages: selectedImages ?? this.selectedImages,
-      uploadProgress: uploadProgress ?? this.uploadProgress,
-      activeJobId:
-          identical(activeJobId, _unset) ? this.activeJobId : activeJobId as String?,
-      activeJob:
-          identical(activeJob, _unset) ? this.activeJob : activeJob as Job?,
-      errorMessage:
-          identical(errorMessage, _unset) ? this.errorMessage : errorMessage as String?,
-      networkRetryCount: networkRetryCount ?? this.networkRetryCount,
+  factory JobResultItem.fromJson(Map<String, dynamic> json) {
+    return JobResultItem(
+      idx: json['idx'] as int,
+      previewUrl: json['previewUrl'] as String,
+      resultUrl: json['resultUrl'] as String,
     );
   }
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is WorkspaceState &&
-          runtimeType == other.runtimeType &&
-          phase == other.phase &&
-          listEquals(selectedImages, other.selectedImages) &&
-          uploadProgress == other.uploadProgress &&
-          activeJobId == other.activeJobId &&
-          activeJob == other.activeJob &&
-          errorMessage == other.errorMessage &&
-          networkRetryCount == other.networkRetryCount;
-
-  @override
-  int get hashCode => Object.hash(
-        phase,
-        Object.hashAll(selectedImages),
-        uploadProgress,
-        activeJobId,
-        activeJob,
-        errorMessage,
-        networkRetryCount,
-      );
-
-  @override
-  String toString() => 'WorkspaceState('
-      'phase: $phase, '
-      'photos: ${selectedImages.length}, '
-      'uploadProgress: ${uploadProgress.toStringAsFixed(2)}, '
-      'activeJobId: $activeJobId, '
-      'activeJob: $activeJob, '
-      'errorMessage: $errorMessage, '
-      'networkRetryCount: $networkRetryCount'
-      ')';
 }
 
-// Private sentinel to distinguish "not provided" from explicit null in copyWith
-const _unset = _Unset();
+// ─────────────────────────────────────────────
+// JobResult — 완료된 작업 결과
+// ─────────────────────────────────────────────
 
-class _Unset {
-  const _Unset();
+/// 완료된 작업 결과 (ID + 결과 이미지 목록)
+class JobResult {
+  final String id;
+  final List<JobResultItem> items;
+  final String? presetName;
+
+  const JobResult({
+    required this.id,
+    required this.items,
+    this.presetName,
+  });
+
+  factory JobResult.fromJson(Map<String, dynamic> json) {
+    final rawItems = json['items'] as List<dynamic>? ?? [];
+    return JobResult(
+      id: json['id'] as String,
+      items: rawItems
+          .map((e) => JobResultItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      presetName: json['presetName'] as String?,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────
+// WorkspaceState — Riverpod Freezed 상태
+// ─────────────────────────────────────────────
+
+/// 워크스페이스 Riverpod 상태 (불변 Freezed 클래스)
+///
+/// - [selectedImages]: 선택된 이미지 목록 (thumbnail만 보유, full bytes 없음)
+/// - [phase]: 현재 작업 단계
+/// - [showLargeBatchWarning]: 50개 이상 선택 시 경고 표시 여부
+/// - [errorMessage]: 오류 메시지 (없으면 null)
+/// - [uploadProgress]: 업로드 진행률 (0.0 ~ 1.0)
+/// - [activeJob]: 완료된 작업 결과 (처리 전/중에는 null)
+@freezed
+abstract class WorkspaceState with _$WorkspaceState {
+  const factory WorkspaceState({
+    @Default([]) List<SelectedImage> selectedImages,
+    @Default(WorkspacePhase.idle) WorkspacePhase phase,
+    @Default(false) bool showLargeBatchWarning,
+    String? errorMessage,
+    @Default(0.0) double uploadProgress,
+    JobResult? activeJob,
+  }) = _WorkspaceState;
 }

@@ -8,24 +8,12 @@ part of 'workspace_provider.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
-/// Riverpod notifier that manages the [WorkspaceState] for the workspace feature.
-///
-/// Access via `ref.read(workspaceProvider.notifier)`.
-/// Watch state via `ref.watch(workspaceProvider)`.
 
 @ProviderFor(Workspace)
 final workspaceProvider = WorkspaceProvider._();
 
-/// Riverpod notifier that manages the [WorkspaceState] for the workspace feature.
-///
-/// Access via `ref.read(workspaceProvider.notifier)`.
-/// Watch state via `ref.watch(workspaceProvider)`.
 final class WorkspaceProvider
     extends $NotifierProvider<Workspace, WorkspaceState> {
-  /// Riverpod notifier that manages the [WorkspaceState] for the workspace feature.
-  ///
-  /// Access via `ref.read(workspaceProvider.notifier)`.
-  /// Watch state via `ref.watch(workspaceProvider)`.
   WorkspaceProvider._()
     : super(
         from: null,
@@ -53,12 +41,7 @@ final class WorkspaceProvider
   }
 }
 
-String _$workspaceHash() => r'1624bdf1c295be6fdb02dabbb961df268face1ce';
-
-/// Riverpod notifier that manages the [WorkspaceState] for the workspace feature.
-///
-/// Access via `ref.read(workspaceProvider.notifier)`.
-/// Watch state via `ref.watch(workspaceProvider)`.
+String _$workspaceHash() => r'101fa53b1ec63999bb35e85f0446f8396feaed21';
 
 abstract class _$Workspace extends $Notifier<WorkspaceState> {
   WorkspaceState build();

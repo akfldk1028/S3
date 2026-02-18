@@ -1,14 +1,25 @@
-// Basic smoke test for the S3 Frontend app.
+// This is a basic Flutter widget test.
 //
-// This file intentionally contains a minimal placeholder test because the
-// full app requires a ProviderScope + Hive initialisation + GoRouter setup
-// that is covered by feature-level widget tests in test/features/.
+// To perform an interaction with a widget in your test, use the WidgetTester
+// utility in the flutter_test package. For example, you can send tap and scroll
+// gestures. You can also use WidgetTester to find child widgets in the widget
+// tree, read text, and verify that the values of widget properties are correct.
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:s3_frontend/app.dart';
+
 void main() {
-  test('placeholder smoke test', () {
-    // Verifies that the test infrastructure is wired up correctly.
-    expect(true, isTrue);
+  testWidgets('App smoke test', (WidgetTester tester) async {
+    // Build our app and trigger a frame.
+    await tester.pumpWidget(
+      const ProviderScope(
+        child: App(),
+      ),
+    );
+
+    // Verify that our App widget is rendered.
+    expect(find.byType(App), findsOneWidget);
   });
 }

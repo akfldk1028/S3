@@ -1,242 +1,67 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../theme.dart';
-import '../workspace_provider.dart';
 import '../workspace_state.dart';
 
-/// Displays the grid of selected photos.
+/// 선택된 이미지를 그리드 형태로 표시하는 위젯
 ///
-/// On an empty workspace, renders a full-screen photo-first empty state
-/// (SNOW-style: tap anywhere to add photos).
-/// Once photos are selected, shows a scrollable grid with add-more tile.
-class PhotoGrid extends ConsumerWidget {
-  const PhotoGrid({super.key});
+/// 각 타일은 [SelectedImage.thumbnail] (200px 압축 이미지)을 표시한다.
+/// full bytes는 절대 로드하지 않는다.
+class PhotoGrid extends StatelessWidget {
+  const PhotoGrid({
+    super.key,
+    required this.images,
+    this.crossAxisCount = 3,
+  });
+
+  final List<SelectedImage> images;
+  final int crossAxisCount;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final ws = ref.watch(workspaceProvider);
-    final images = ws.selectedImages;
-
+  Widget build(BuildContext context) {
     if (images.isEmpty) {
-      return _EmptyState(
-        onAdd: () {
-          // Image picker integration handled in a future subtask.
-          // For now this is a no-op stub.
-        },
-      );
+      return const SizedBox.shrink();
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth >= 600 ? 4 : 3;
-
-        return GridView.builder(
-          padding: const EdgeInsets.all(6),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 3,
-            mainAxisSpacing: 3,
-          ),
-          itemCount: images.length + 1,
-          itemBuilder: (context, index) {
-            if (index == images.length) {
-              return _AddMoreTile(
-                onTap: () {
-                  // Image picker integration handled in a future subtask.
-                },
-              );
-            }
-            return _PhotoTile(
-              imageBytes: images[index],
-              index: index,
-              onRemove: () =>
-                  ref.read(workspaceProvider.notifier).removePhoto(index),
-              uploading: ws.phase == WorkspacePhase.uploading,
-              uploadProgress: ws.phase == WorkspacePhase.uploading
-                  ? ws.uploadProgress
-                  : null,
-            );
-          },
-        );
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: crossAxisCount,
+        crossAxisSpacing: 4,
+        mainAxisSpacing: 4,
+      ),
+      itemCount: images.length,
+      itemBuilder: (context, index) {
+        return _PhotoTile(image: images[index]);
       },
     );
   }
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Private widgets
-// ──────────────────────────────────────────────────────────────────────────────
-
-class _EmptyState extends StatelessWidget {
-  final VoidCallback onAdd;
-
-  const _EmptyState({required this.onAdd});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onAdd,
-      behavior: HitTestBehavior.opaque,
-      child: Container(
-        color: WsColors.bg,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ShaderMask(
-                shaderCallback: (bounds) =>
-                    WsColors.gradientPrimary.createShader(bounds),
-                child: const Text(
-                  'S3',
-                  style: TextStyle(
-                    fontSize: 48,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                    letterSpacing: -2,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Icon(Icons.photo_library_rounded,
-                  size: 48, color: WsColors.textMuted),
-              const SizedBox(height: 16),
-              const Text(
-                'Tap to add photos',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: WsColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Select from gallery to start editing',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: WsColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
+/// 개별 이미지 타일 — thumbnail(200px)만 표시
+///
+/// [SelectedImage.thumbnail]은 non-nullable이므로 null 검사 불필요.
 class _PhotoTile extends StatelessWidget {
-  final Uint8List imageBytes;
-  final int index;
-  final VoidCallback onRemove;
-  final bool uploading;
-  final double? uploadProgress;
+  const _PhotoTile({required this.image});
 
-  const _PhotoTile({
-    required this.imageBytes,
-    required this.index,
-    required this.onRemove,
-    required this.uploading,
-    this.uploadProgress,
-  });
+  final SelectedImage image;
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
       borderRadius: BorderRadius.circular(4),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          Image.memory(
-            imageBytes,
-            fit: BoxFit.cover,
-            gaplessPlayback: true,
-          ),
-          if (uploading)
-            Container(
-              color: WsColors.bg.withValues(alpha: 0.6),
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: WsColors.accent1,
-                    value: uploadProgress,
-                  ),
-                ),
-              ),
+      child: Image.memory(
+        image.thumbnail,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return const ColoredBox(
+            color: Color(0xFFE0E0E0),
+            child: Center(
+              child: Icon(Icons.broken_image, color: Color(0xFF9E9E9E)),
             ),
-          if (!uploading)
-            Positioned(
-              top: 4,
-              right: 4,
-              child: GestureDetector(
-                onTap: onRemove,
-                child: Container(
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.close_rounded,
-                      size: 12, color: Colors.white70),
-                ),
-              ),
-            ),
-          Positioned(
-            bottom: 4,
-            left: 4,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                '${index + 1}',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 }
-
-class _AddMoreTile extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _AddMoreTile({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(color: WsColors.glassBorder, width: 1),
-          color: WsColors.glassWhite,
-        ),
-        child: Center(
-          child: ShaderMask(
-            shaderCallback: (bounds) =>
-                WsColors.gradientPrimary.createShader(bounds),
-            child: const Icon(Icons.add_rounded,
-                size: 28, color: Colors.white),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
