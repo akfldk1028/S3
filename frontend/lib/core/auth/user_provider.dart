@@ -1,50 +1,24 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import '../../constants/api_endpoints.dart';
-import '../models/user.dart';
+import '../../features/auth/models/user_model.dart';
+import '../../features/auth/queries/get_me_query.dart';
 
-/// Fetches and caches the authenticated user from GET /me.
+/// Provides the current authenticated user including their credits balance.
 ///
 /// Usage:
 /// ```dart
-/// final userAsync = ref.watch(userProvider);
-/// userAsync.when(
-///   loading: () => ...,
-///   error: (e, st) => ...,
-///   data: (user) => ...,
-/// );
+/// final credits = ref.read(userProvider).value?.credits ?? 0;
 /// ```
 ///
-/// To refresh: `ref.invalidate(userProvider)`
-final userProvider = AsyncNotifierProvider<UserNotifier, User>(
-  UserNotifier.new,
-);
-
-class UserNotifier extends AsyncNotifier<User> {
-  static const _storage = FlutterSecureStorage();
-
+/// Returns `AsyncValue<User>` — use `.value` to access the User
+/// synchronously without triggering an async load.
+class _UserNotifier extends AsyncNotifier<User> {
   @override
-  Future<User> build() async {
-    final token = await _storage.read(key: 'accessToken');
-    final dio = Dio(
-      BaseOptions(
-        baseUrl: ApiEndpoints.baseUrl,
-        connectTimeout: const Duration(seconds: 10),
-        receiveTimeout: const Duration(seconds: 10),
-        headers: token != null
-            ? {'Authorization': 'Bearer $token'}
-            : null,
-      ),
-    );
-    final response = await dio.get(ApiEndpoints.me);
-    return User.fromJson(response.data as Map<String, dynamic>);
-  }
-
-  /// Force-refresh the user data from the server.
-  Future<void> refresh() async {
-    ref.invalidateSelf();
-    await future;
+  Future<User> build() {
+    return ref.watch(getMeQueryProvider.future);
   }
 }
+
+final userProvider = AsyncNotifierProvider<_UserNotifier, User>(
+  _UserNotifier.new,
+);

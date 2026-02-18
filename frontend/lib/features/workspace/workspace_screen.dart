@@ -15,6 +15,13 @@ import 'widgets/results_overlay.dart';
 import 'widgets/side_panel.dart';
 import 'widgets/top_bar.dart';
 
+/// Main workspace screen for the S3 photo-editing pipeline.
+///
+/// Handles:
+/// - Anonymous auth gate (auto-login on mount)
+/// - Responsive layout: desktop (≥ 600 px) shows [SidePanel] inline;
+///   mobile (< 600 px) hides [SidePanel] and exposes it via FAB → [MobileBottomSheet]
+/// - SNOW-style photo-first UX: full-screen empty state until photos are added
 class WorkspaceScreen extends ConsumerStatefulWidget {
   const WorkspaceScreen({super.key});
 
@@ -42,7 +49,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
       try {
         await ref.read(authProvider.notifier).login();
       } catch (_) {
-        // Auth failed — will show error state
+        // Auth failed — error state is propagated via authProvider
       }
     }
   }
@@ -69,7 +76,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
               ),
               const SizedBox(height: 16),
               const Text(
-                'Setting up...',
+                'Setting up…',
                 style: TextStyle(
                   fontSize: 13,
                   color: WsColors.textSecondary,
@@ -136,8 +143,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
                         horizontal: 24, vertical: 12),
                     decoration: BoxDecoration(
                       gradient: WsColors.gradientPrimary,
-                      borderRadius:
-                          BorderRadius.circular(WsTheme.radiusXl),
+                      borderRadius: BorderRadius.circular(WsTheme.radiusXl),
                     ),
                     child: const Text(
                       'Retry',
@@ -178,7 +184,13 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
 
   Widget _buildWorkspace(BuildContext context) {
     final ws = ref.watch(workspaceProvider);
-    final isDesktop = MediaQuery.of(context).size.width >= 768;
+
+    // ── Breakpoint ───────────────────────────────────────────────────────────
+    // 600 px is the standard mobile/tablet split.
+    // On 375 px mobile: isDesktop == false → SidePanel is NOT shown inline.
+    // On ≥ 600 px desktop/tablet: isDesktop == true → SidePanel rendered beside
+    // PhotoGrid in a Row.
+    final isDesktop = MediaQuery.of(context).size.width >= 600;
 
     final hasPhotos = ws.selectedImages.isNotEmpty;
     final showControls = hasPhotos && ws.phase != WorkspacePhase.done;
@@ -189,7 +201,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
         bottom: false,
         child: Column(
           children: [
-            // SNOW-like: minimal top bar when no photos, full bar after
+            // Minimal top bar — only shown once photos have been selected
             if (hasPhotos) const TopBar(),
             Expanded(
               child: _buildBody(ws, isDesktop),
@@ -198,31 +210,49 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
           ],
         ),
       ),
+      // ── FAB (mobile only) ─────────────────────────────────────────────────
+      // The FAB is only shown on mobile (!isDesktop) and only when the user has
+      // photos. It opens [MobileBottomSheet] so the user can access settings
+      // that are normally in [SidePanel] on desktop.
+      //
+      // Padding(bottom: 80) ensures the FAB does not overlap the last photo
+      // thumbnail in [PhotoGrid].
       floatingActionButton: !isDesktop && showControls
-          ? Container(
-              decoration: BoxDecoration(
-                gradient: WsColors.gradientPrimary,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: WsColors.accent1.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: FloatingActionButton.small(
-                onPressed: () => MobileBottomSheet.show(context),
-                backgroundColor: Colors.transparent,
-                elevation: 0,
-                child: const Icon(Icons.tune_rounded,
-                    color: Colors.white, size: 20),
+          ? Padding(
+              padding: const EdgeInsets.only(bottom: 80.0),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: WsColors.gradientPrimary,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: WsColors.accent1.withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: FloatingActionButton.small(
+                  onPressed: () => MobileBottomSheet.show(context),
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  child: const Icon(Icons.tune_rounded,
+                      color: Colors.white, size: 20),
+                ),
               ),
             )
           : null,
     );
   }
 
+  /// Builds the main body, gating [SidePanel] behind the desktop breakpoint.
+  ///
+  /// **Mobile (< 600 px)**: [SidePanel] is OMITTED entirely — not hidden with
+  /// Visibility, not wrapped in Offstage. This prevents the 280 px panel from
+  /// pushing [PhotoGrid] off-screen on 375 px viewports.
+  ///
+  /// **Desktop (≥ 600 px)**: [SidePanel] is shown to the left of [PhotoGrid]
+  /// in a [Row].
   Widget _buildBody(WorkspaceState ws, bool isDesktop) {
     if (ws.phase == WorkspacePhase.done) {
       return const ResultsOverlay();
@@ -230,12 +260,14 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
 
     final hasPhotos = ws.selectedImages.isNotEmpty;
 
-    // SNOW-like: full-screen photo picker when no photos yet
+    // SNOW-like: full-screen photo picker when no photos yet.
     if (!hasPhotos) {
       return const PhotoGrid();
     }
 
     if (isDesktop) {
+      // ── Desktop layout ─────────────────────────────────────────────────
+      // SidePanel (280 px fixed) + PhotoGrid (flexible) side by side.
       return Row(
         children: [
           const SidePanel(),
@@ -254,6 +286,9 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
       );
     }
 
+    // ── Mobile layout ───────────────────────────────────────────────────────
+    // SidePanel is intentionally NOT included — the 280 px panel would push
+    // PhotoGrid completely off-screen on 375 px viewports.
     return Stack(
       children: [
         const PhotoGrid(),
@@ -265,6 +300,8 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
   }
 }
 
+/// Translucent error banner shown at the top of the body when [errorMessage]
+/// is set in [WorkspaceState].
 class _ErrorBanner extends StatelessWidget {
   final String message;
 
@@ -280,12 +317,12 @@ class _ErrorBanner extends StatelessWidget {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: WsColors.error.withValues(alpha: 0.15),
-              border: const Border(
-                bottom:
-                    BorderSide(color: WsColors.glassBorder, width: 0.5),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: const BoxDecoration(
+              color: Color(0x26FF4D6A), // WsColors.error at ~15% opacity
+              border: Border(
+                bottom: BorderSide(color: WsColors.glassBorder, width: 0.5),
               ),
             ),
             child: Row(

@@ -1,46 +1,45 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Authentication state provider.
-///
-/// State: the current JWT access token (`String?`).
-/// - `AsyncData(token)` — authenticated
-/// - `AsyncData(null)` — unauthenticated
-/// - `AsyncLoading` — checking stored token
-/// - `AsyncError` — storage read failed
-///
-/// Usage:
-/// ```dart
-/// // Logout
-/// await ref.read(authProvider.notifier).logout();
-/// context.go('/auth');
-/// ```
-final authProvider = AsyncNotifierProvider<AuthNotifier, String?>(
-  AuthNotifier.new,
-);
+const _kTokenKey = 'jwt_token';
+const _storage = FlutterSecureStorage();
 
-class AuthNotifier extends AsyncNotifier<String?> {
-  static const _storage = FlutterSecureStorage();
-
+/// Manages anonymous JWT authentication state.
+///
+/// State: [AsyncValue<String?>] where String is the JWT token.
+/// - `null` / empty string → not authenticated
+/// - non-empty string → authenticated
+class _AuthNotifier extends AsyncNotifier<String?> {
   @override
   Future<String?> build() async {
-    return _storage.read(key: 'accessToken');
+    return await _storage.read(key: _kTokenKey);
   }
 
-  /// Persist tokens after successful authentication.
-  Future<void> setTokens({
-    required String accessToken,
-    required String refreshToken,
-  }) async {
-    await _storage.write(key: 'accessToken', value: accessToken);
-    await _storage.write(key: 'refreshToken', value: refreshToken);
-    state = AsyncData(accessToken);
-  }
-
-  /// Clear tokens and transition to unauthenticated state.
-  Future<void> logout() async {
-    await _storage.delete(key: 'accessToken');
-    await _storage.delete(key: 'refreshToken');
-    state = const AsyncData(null);
+  /// Performs an anonymous login (or re-reads stored JWT).
+  ///
+  /// Subclasses / future implementations should call the POST /auth/anon
+  /// endpoint here. For now this is a stub that reads from secure storage.
+  Future<void> login() async {
+    state = const AsyncValue.loading();
+    try {
+      final token = await _storage.read(key: _kTokenKey);
+      state = AsyncValue.data(token);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
   }
 }
+
+/// Provider for JWT-based auth state.
+///
+/// ```dart
+/// final authState = ref.watch(authProvider);
+/// authState.when(
+///   loading: () => ...,
+///   error: (e, _) => ...,
+///   data: (token) => token != null ? WorkspaceScreen() : LoginScreen(),
+/// );
+/// ```
+final authProvider = AsyncNotifierProvider<_AuthNotifier, String?>(
+  _AuthNotifier.new,
+);

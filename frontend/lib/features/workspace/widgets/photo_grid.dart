@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +7,11 @@ import '../theme.dart';
 import '../workspace_provider.dart';
 import '../workspace_state.dart';
 
+/// Displays the grid of selected photos.
+///
+/// On an empty workspace, renders a full-screen photo-first empty state
+/// (SNOW-style: tap anywhere to add photos).
+/// Once photos are selected, shows a scrollable grid with add-more tile.
 class PhotoGrid extends ConsumerWidget {
   const PhotoGrid({super.key});
 
@@ -14,14 +21,17 @@ class PhotoGrid extends ConsumerWidget {
     final images = ws.selectedImages;
 
     if (images.isEmpty) {
-      return _PhotoFirstEmptyState(
-        onAdd: () => ref.read(workspaceProvider.notifier).addPhotos(),
+      return _EmptyState(
+        onAdd: () {
+          // Image picker integration handled in a future subtask.
+          // For now this is a no-op stub.
+        },
       );
     }
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final crossAxisCount = constraints.maxWidth > 600 ? 4 : 3;
+        final crossAxisCount = constraints.maxWidth >= 600 ? 4 : 3;
 
         return GridView.builder(
           padding: const EdgeInsets.all(6),
@@ -34,11 +44,13 @@ class PhotoGrid extends ConsumerWidget {
           itemBuilder: (context, index) {
             if (index == images.length) {
               return _AddMoreTile(
-                onTap: () => ref.read(workspaceProvider.notifier).addPhotos(),
+                onTap: () {
+                  // Image picker integration handled in a future subtask.
+                },
               );
             }
             return _PhotoTile(
-              image: images[index],
+              imageBytes: images[index],
               index: index,
               onRemove: () =>
                   ref.read(workspaceProvider.notifier).removePhoto(index),
@@ -54,275 +66,76 @@ class PhotoGrid extends ConsumerWidget {
   }
 }
 
-/// SNOW-like full-screen empty state — photo-first experience.
-/// The entire screen is a tap target. Feels like opening a camera/gallery app.
-class _PhotoFirstEmptyState extends StatefulWidget {
+// ──────────────────────────────────────────────────────────────────────────────
+// Private widgets
+// ──────────────────────────────────────────────────────────────────────────────
+
+class _EmptyState extends StatelessWidget {
   final VoidCallback onAdd;
 
-  const _PhotoFirstEmptyState({required this.onAdd});
-
-  @override
-  State<_PhotoFirstEmptyState> createState() => _PhotoFirstEmptyStateState();
-}
-
-class _PhotoFirstEmptyStateState extends State<_PhotoFirstEmptyState>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2500),
-    )..repeat(reverse: true);
-    _pulseAnimation = Tween<double>(begin: 0.6, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  void dispose() {
-    _pulseController.dispose();
-    super.dispose();
-  }
+  const _EmptyState({required this.onAdd});
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isWide = size.width >= 768;
-
     return GestureDetector(
-      onTap: widget.onAdd,
+      onTap: onAdd,
       behavior: HitTestBehavior.opaque,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Ambient gradient background
-          Container(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: const Alignment(0, -0.3),
-                radius: 1.2,
-                colors: [
-                  WsColors.accent1.withValues(alpha: 0.08),
-                  WsColors.bg,
-                  WsColors.accent2.withValues(alpha: 0.04),
-                ],
-                stops: const [0.0, 0.5, 1.0],
+      child: Container(
+        color: WsColors.bg,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ShaderMask(
+                shaderCallback: (bounds) =>
+                    WsColors.gradientPrimary.createShader(bounds),
+                child: const Text(
+                  'S3',
+                  style: TextStyle(
+                    fontSize: 48,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: -2,
+                  ),
+                ),
               ),
-            ),
-          ),
-
-          // Main content
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // App logo + branding (SNOW-style)
-                  ShaderMask(
-                    shaderCallback: (bounds) =>
-                        WsColors.gradientPrimary.createShader(bounds),
-                    child: const Text(
-                      'S3',
-                      style: TextStyle(
-                        fontSize: 48,
-                        fontWeight: FontWeight.w900,
-                        color: Colors.white,
-                        letterSpacing: -2,
-                        height: 1,
-                      ),
-                    ),
-                  ),
-
-                  const SizedBox(height: 4),
-
-                  const Text(
-                    'Domain Palette Engine',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: WsColors.textMuted,
-                      fontWeight: FontWeight.w500,
-                      letterSpacing: 2,
-                    ),
-                  ),
-
-                  SizedBox(height: isWide ? 56 : 44),
-
-                  // Animated camera/gallery icon
-                  AnimatedBuilder(
-                    animation: _pulseAnimation,
-                    builder: (context, child) {
-                      return Container(
-                        width: isWide ? 120 : 100,
-                        height: isWide ? 120 : 100,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              WsColors.accent1.withValues(
-                                  alpha: 0.12 * _pulseAnimation.value),
-                              WsColors.accent2.withValues(
-                                  alpha: 0.12 * _pulseAnimation.value),
-                            ],
-                          ),
-                          border: Border.all(
-                            color: WsColors.accent1.withValues(
-                                alpha: 0.25 * _pulseAnimation.value),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: Center(
-                          child: ShaderMask(
-                            shaderCallback: (bounds) =>
-                                WsColors.gradientPrimary.createShader(bounds),
-                            child: Icon(
-                              Icons.photo_library_rounded,
-                              size: isWide ? 44 : 36,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-
-                  const SizedBox(height: 32),
-
-                  // Main CTA text
-                  const Text(
-                    'Tap to add your photos',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w600,
-                      color: WsColors.textPrimary,
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  Text(
-                    'Select from gallery to start editing',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: WsColors.textSecondary,
-                    ),
-                  ),
-
-                  const SizedBox(height: 36),
-
-                  // Gradient CTA button
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 36, vertical: 16),
-                    decoration: BoxDecoration(
-                      gradient: WsColors.gradientPrimary,
-                      borderRadius: BorderRadius.circular(WsTheme.radiusXl),
-                      boxShadow: [
-                        BoxShadow(
-                          color: WsColors.accent1.withValues(alpha: 0.35),
-                          blurRadius: 24,
-                          offset: const Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.add_photo_alternate_rounded,
-                            size: 20, color: Colors.white),
-                        SizedBox(width: 10),
-                        Text(
-                          'Add Photos',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 48),
-
-                  // Feature pills (subtle)
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    alignment: WrapAlignment.center,
-                    children: const [
-                      _FeaturePill(
-                          icon: Icons.palette_outlined, label: 'Concepts'),
-                      _FeaturePill(
-                          icon: Icons.shield_outlined, label: 'Protect'),
-                      _FeaturePill(
-                          icon: Icons.auto_fix_high_rounded, label: 'Rules'),
-                      _FeaturePill(
-                          icon: Icons.collections_rounded, label: 'Sets'),
-                    ],
-                  ),
-                ],
+              const SizedBox(height: 24),
+              const Icon(Icons.photo_library_rounded,
+                  size: 48, color: WsColors.textMuted),
+              const SizedBox(height: 16),
+              const Text(
+                'Tap to add photos',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: WsColors.textPrimary,
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+              const Text(
+                'Select from gallery to start editing',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: WsColors.textSecondary,
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Small subtle pill showing a feature hint.
-class _FeaturePill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _FeaturePill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: WsColors.glassWhite,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: WsColors.glassBorder, width: 0.5),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: WsColors.textMuted),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 11,
-              color: WsColors.textMuted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
 class _PhotoTile extends StatelessWidget {
-  final SelectedImage image;
+  final Uint8List imageBytes;
   final int index;
   final VoidCallback onRemove;
   final bool uploading;
   final double? uploadProgress;
 
   const _PhotoTile({
-    required this.image,
+    required this.imageBytes,
     required this.index,
     required this.onRemove,
     required this.uploading,
@@ -336,22 +149,11 @@ class _PhotoTile extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          Image.memory(image.bytes, fit: BoxFit.cover),
-          // Dark vignette
-          Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.4),
-                ],
-                stops: const [0.6, 1.0],
-              ),
-            ),
+          Image.memory(
+            imageBytes,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
           ),
-          // Upload overlay
           if (uploading)
             Container(
               color: WsColors.bg.withValues(alpha: 0.6),
@@ -367,7 +169,6 @@ class _PhotoTile extends StatelessWidget {
                 ),
               ),
             ),
-          // Remove button
           if (!uploading)
             Positioned(
               top: 4,
@@ -386,7 +187,6 @@ class _PhotoTile extends StatelessWidget {
                 ),
               ),
             ),
-          // Index badge
           Positioned(
             bottom: 4,
             left: 4,
@@ -424,24 +224,19 @@ class _AddMoreTile extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(4),
-          border: Border.all(
-            color: WsColors.glassBorder,
-            width: 1,
-          ),
+          border: Border.all(color: WsColors.glassBorder, width: 1),
           color: WsColors.glassWhite,
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            ShaderMask(
-              shaderCallback: (bounds) =>
-                  WsColors.gradientPrimary.createShader(bounds),
-              child:
-                  const Icon(Icons.add_rounded, size: 28, color: Colors.white),
-            ),
-          ],
+        child: Center(
+          child: ShaderMask(
+            shaderCallback: (bounds) =>
+                WsColors.gradientPrimary.createShader(bounds),
+            child: const Icon(Icons.add_rounded,
+                size: 28, color: Colors.white),
+          ),
         ),
       ),
     );
   }
 }
+

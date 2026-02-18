@@ -1,57 +1,82 @@
 import 'package:flutter/material.dart';
 
-/// Central color palette and theme constants for the S3 workspace.
-///
-/// All UI components should reference these values rather than using
-/// hardcoded [Color] literals so the entire dark theme can be updated
-/// from a single location.
-abstract final class WsColors {
-  // ---------------------------------------------------------------------------
-  // Primary accent colors (gradient endpoints)
-  // ---------------------------------------------------------------------------
+/// SNOW / B612-inspired dark colour palette for the workspace screens.
+abstract class WsColors {
+  /// Deep dark navy — main background.
+  static const bg = Color(0xFF0F0F17);
 
-  /// Indigo-blue accent — start of the primary gradient. `0xFF667EEA`.
-  static const Color accent1 = Color(0xFF667EEA);
+  /// Slightly lighter dark — surface / card background.
+  static const surface = Color(0xFF1A1A2E);
 
-  /// Pink accent — end of the primary gradient. `0xFFFF6B9D`.
-  static const Color accent2 = Color(0xFFFF6B9D);
+  /// Accent 1 — purple-blue.
+  static const accent1 = Color(0xFF6C63FF);
 
-  // ---------------------------------------------------------------------------
-  // Background / surface palette
-  // ---------------------------------------------------------------------------
+  /// Accent 2 — pink / rose.
+  static const accent2 = Color(0xFFFF6B9D);
 
-  /// Page / scaffold background (near-black). `0xFF0F0F17`.
-  static const Color bg = Color(0xFF0F0F17);
+  /// Error / destructive colour.
+  static const error = Color(0xFFFF4D6A);
 
-  /// Card / list-item surface. `0xFF1A1A2E`.
-  static const Color surface = Color(0xFF1A1A2E);
+  /// Glass overlay white — 10 % opacity.
+  static const glassWhite = Color(0x1AFFFFFF);
 
-  /// Shimmer highlight colour (lighter surface). `0xFF252540`.
-  static const Color surfaceLight = Color(0xFF252540);
+  /// Glass border — 20 % opacity white.
+  static const glassBorder = Color(0x33FFFFFF);
 
-  // ---------------------------------------------------------------------------
-  // Status colors
-  // ---------------------------------------------------------------------------
+  /// Primary text colour.
+  static const text = Color(0xFFFFFFFF);
 
-  /// Error / destructive action. `0xFFEF4444`.
-  static const Color error = Color(0xFFEF4444);
+  /// High-emphasis text (87% white).
+  static const textPrimary = Color(0xDEFFFFFF);
 
-  // ---------------------------------------------------------------------------
-  // Gradients
-  // ---------------------------------------------------------------------------
+  /// Secondary / subdued text colour.
+  static const textSecondary = Color(0xFF9CA3AF);
 
-  /// Primary diagonal gradient used for the splash screen and hero areas.
-  ///
-  /// Flows top-left → bottom-right from [accent1] to [accent2].
-  static const LinearGradient gradientPrimary = LinearGradient(
+  /// Muted placeholder/hint text (50% white).
+  static const textMuted = Color(0x80FFFFFF);
+
+  /// Primary gradient: accent1 (top-left) → accent2 (bottom-right).
+  static const gradientPrimary = LinearGradient(
+    colors: [accent1, accent2],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [accent1, accent2],
   );
 }
 
-/// Shared theme constants (radii, elevations, etc.).
-abstract final class WsTheme {
-  /// Standard card corner radius used throughout the app. `12.0`.
+/// Design tokens for the workspace UI.
+abstract class WsTheme {
+  /// Default corner radius for cards and containers.
   static const double radius = 12.0;
+
+  /// Small corner radius (grid thumbnails, chips).
+  static const double radiusSm = 8.0;
+
+  /// Large corner radius (sheets, bottom panels).
+  static const double radiusLg = 20.0;
+
+  /// Extra-large corner radius (pill buttons, bottom sheets).
+  static const double radiusXl = 28.0;
+
+  /// Standard card decoration.
+  static BoxDecoration get cardDecoration => BoxDecoration(
+        color: WsColors.glassWhite,
+        borderRadius: BorderRadius.circular(radius),
+        border: Border.all(color: WsColors.glassBorder, width: 0.5),
+      );
+
+  /// Glassmorphism container decoration.
+  /// MUST be used inside a [Stack] over a blurrable (non-opaque) background,
+  /// combined with [BackdropFilter].
+  static final glassDecoration = BoxDecoration(
+    color: WsColors.glassWhite,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: WsColors.glassBorder, width: 0.5),
+  );
+
+  /// Glassmorphism decoration with smaller radius (for compact elements).
+  static final glassDecorationSm = BoxDecoration(
+    color: WsColors.glassWhite,
+    borderRadius: BorderRadius.circular(radiusSm),
+    border: Border.all(color: WsColors.glassBorder, width: 0.5),
+  );
 }

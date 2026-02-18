@@ -1,20 +1,57 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
-import 'job_progress.dart';
-import 'job_item.dart';
+/// Represents a processing job returned by the Workers API.
+class Job {
+  final String id;
 
-part 'job.freezed.dart';
-part 'job.g.dart';
+  /// Job status values: 'pending', 'processing', 'completed', 'failed', 'cancelled'
+  final String status;
 
-@freezed
-abstract class Job with _$Job {
-  const factory Job({
-    @JsonKey(name: 'job_id') required String jobId,
-    required String status,
-    required String preset,
-    required JobProgress progress,
-    @JsonKey(name: 'outputs_ready') required List<JobItem> outputsReady,
-    @JsonKey(name: 'created_at') @Default('') String createdAt,
-  }) = _Job;
+  final String? errorMessage;
+  final int? progress;
 
-  factory Job.fromJson(Map<String, dynamic> json) => _$JobFromJson(json);
+  const Job({
+    required this.id,
+    required this.status,
+    this.errorMessage,
+    this.progress,
+  });
+
+  factory Job.fromJson(Map<String, dynamic> json) {
+    return Job(
+      id: json['id'] as String,
+      status: json['status'] as String,
+      errorMessage: json['errorMessage'] as String?,
+      progress: (json['progress'] as num?)?.toInt(),
+    );
+  }
+
+  Job copyWith({
+    String? id,
+    String? status,
+    String? errorMessage,
+    int? progress,
+  }) {
+    return Job(
+      id: id ?? this.id,
+      status: status ?? this.status,
+      errorMessage: errorMessage ?? this.errorMessage,
+      progress: progress ?? this.progress,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Job &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          status == other.status &&
+          errorMessage == other.errorMessage &&
+          progress == other.progress;
+
+  @override
+  int get hashCode => Object.hash(id, status, errorMessage, progress);
+
+  @override
+  String toString() =>
+      'Job(id: $id, status: $status, errorMessage: $errorMessage, progress: $progress)';
 }

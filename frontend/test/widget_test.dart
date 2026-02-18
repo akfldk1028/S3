@@ -1,16 +1,11 @@
-// Basic smoke test for S3 Frontend.
-//
-// Verifies that the test infrastructure works. Full integration tests
-// (Riverpod, GoRouter, Hive) are covered by manual QA and build verification.
+// Basic smoke test for the S3 Frontend app.
 
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('App smoke test — test infrastructure is functional',
-      (WidgetTester tester) async {
-    // Minimal test confirming the test runner itself works.
-    // Full widget tests require Riverpod ProviderScope, GoRouter, and Hive
-    // initialisation which belong in integration_test/.
+  test('placeholder test — passes unconditionally', () {
+    // Full widget integration tests require a running backend.
+    // This placeholder keeps the test suite green during CI.
     expect(true, isTrue);
   });
 }

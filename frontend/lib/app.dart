@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shadcn_ui/shadcn_ui.dart';
 
-import 'core/widgets/offline_indicator.dart';
 import 'routing/app_router.dart';
 
 class App extends ConsumerWidget {
@@ -12,19 +11,17 @@ class App extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(appRouterProvider);
 
-    return OfflineIndicator(
-      child: ShadApp.router(
-        title: 'S3 Frontend',
-        theme: ShadThemeData(
-          brightness: Brightness.light,
-          colorScheme: const ShadSlateColorScheme.light(),
-        ),
-        darkTheme: ShadThemeData(
-          brightness: Brightness.dark,
-          colorScheme: const ShadSlateColorScheme.dark(),
-        ),
-        routerConfig: router,
+    return ShadApp.router(
+      title: 'S3 Frontend',
+      theme: ShadThemeData(
+        brightness: Brightness.light,
+        colorScheme: const ShadSlateColorScheme.light(),
       ),
+      darkTheme: ShadThemeData(
+        brightness: Brightness.dark,
+        colorScheme: const ShadSlateColorScheme.dark(),
+      ),
+      routerConfig: router,
     );
   }
 }
