@@ -14,7 +14,19 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$WorkspaceState {
 
- WorkspacePhase get phase; String? get selectedPresetId; List<SelectedImage> get selectedImages; String? get activeJobId; double get uploadProgress; Job? get activeJob; String? get selectedRuleId; String? get errorMessage;
+/// Current phase of the processing pipeline
+ WorkspacePhase get phase;/// Raw bytes of photos selected by the user; preserved across retries
+ List<Uint8List> get selectedImages;/// Upload progress [0.0, 1.0]; only meaningful during [WorkspacePhase.uploading]
+ double get uploadProgress;/// Server-assigned job ID, set after POST /jobs succeeds
+ String? get activeJobId;/// Latest job status polled from GET /jobs/:id
+ Job? get activeJob;/// Human-readable error message shown in the error banner
+ String? get errorMessage;/// Number of consecutive network failures during polling (for UI feedback)
+ int get networkRetryCount;/// User-supplied text prompts passed to SAM3 during executeJob.
+///
+/// Added via [WorkspaceNotifier.addPrompt]; removed via
+/// [WorkspaceNotifier.removePrompt]. Passed as `prompts` in the
+/// POST /jobs/:id/execute request body when non-empty.
+ List<String> get customPrompts;
 /// Create a copy of WorkspaceState
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -25,16 +37,16 @@ $WorkspaceStateCopyWith<WorkspaceState> get copyWith => _$WorkspaceStateCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is WorkspaceState&&(identical(other.phase, phase) || other.phase == phase)&&(identical(other.selectedPresetId, selectedPresetId) || other.selectedPresetId == selectedPresetId)&&const DeepCollectionEquality().equals(other.selectedImages, selectedImages)&&(identical(other.activeJobId, activeJobId) || other.activeJobId == activeJobId)&&(identical(other.uploadProgress, uploadProgress) || other.uploadProgress == uploadProgress)&&(identical(other.activeJob, activeJob) || other.activeJob == activeJob)&&(identical(other.selectedRuleId, selectedRuleId) || other.selectedRuleId == selectedRuleId)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is WorkspaceState&&(identical(other.phase, phase) || other.phase == phase)&&const DeepCollectionEquality().equals(other.selectedImages, selectedImages)&&(identical(other.uploadProgress, uploadProgress) || other.uploadProgress == uploadProgress)&&(identical(other.activeJobId, activeJobId) || other.activeJobId == activeJobId)&&(identical(other.activeJob, activeJob) || other.activeJob == activeJob)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.networkRetryCount, networkRetryCount) || other.networkRetryCount == networkRetryCount)&&const DeepCollectionEquality().equals(other.customPrompts, customPrompts));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,phase,selectedPresetId,const DeepCollectionEquality().hash(selectedImages),activeJobId,uploadProgress,activeJob,selectedRuleId,errorMessage);
+int get hashCode => Object.hash(runtimeType,phase,const DeepCollectionEquality().hash(selectedImages),uploadProgress,activeJobId,activeJob,errorMessage,networkRetryCount,const DeepCollectionEquality().hash(customPrompts));
 
 @override
 String toString() {
-  return 'WorkspaceState(phase: $phase, selectedPresetId: $selectedPresetId, selectedImages: $selectedImages, activeJobId: $activeJobId, uploadProgress: $uploadProgress, activeJob: $activeJob, selectedRuleId: $selectedRuleId, errorMessage: $errorMessage)';
+  return 'WorkspaceState(phase: $phase, selectedImages: $selectedImages, uploadProgress: $uploadProgress, activeJobId: $activeJobId, activeJob: $activeJob, errorMessage: $errorMessage, networkRetryCount: $networkRetryCount, customPrompts: $customPrompts)';
 }
 
 
@@ -45,11 +57,11 @@ abstract mixin class $WorkspaceStateCopyWith<$Res>  {
   factory $WorkspaceStateCopyWith(WorkspaceState value, $Res Function(WorkspaceState) _then) = _$WorkspaceStateCopyWithImpl;
 @useResult
 $Res call({
- WorkspacePhase phase, String? selectedPresetId, List<SelectedImage> selectedImages, String? activeJobId, double uploadProgress, Job? activeJob, String? selectedRuleId, String? errorMessage
+ WorkspacePhase phase, List<Uint8List> selectedImages, double uploadProgress, String? activeJobId, Job? activeJob, String? errorMessage, int networkRetryCount, List<String> customPrompts
 });
 
 
-$JobCopyWith<$Res>? get activeJob;
+
 
 }
 /// @nodoc
@@ -62,32 +74,20 @@ class _$WorkspaceStateCopyWithImpl<$Res>
 
 /// Create a copy of WorkspaceState
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? phase = null,Object? selectedPresetId = freezed,Object? selectedImages = null,Object? activeJobId = freezed,Object? uploadProgress = null,Object? activeJob = freezed,Object? selectedRuleId = freezed,Object? errorMessage = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? phase = null,Object? selectedImages = null,Object? uploadProgress = null,Object? activeJobId = freezed,Object? activeJob = freezed,Object? errorMessage = freezed,Object? networkRetryCount = null,Object? customPrompts = null,}) {
   return _then(_self.copyWith(
 phase: null == phase ? _self.phase : phase // ignore: cast_nullable_to_non_nullable
-as WorkspacePhase,selectedPresetId: freezed == selectedPresetId ? _self.selectedPresetId : selectedPresetId // ignore: cast_nullable_to_non_nullable
-as String?,selectedImages: null == selectedImages ? _self.selectedImages : selectedImages // ignore: cast_nullable_to_non_nullable
-as List<SelectedImage>,activeJobId: freezed == activeJobId ? _self.activeJobId : activeJobId // ignore: cast_nullable_to_non_nullable
-as String?,uploadProgress: null == uploadProgress ? _self.uploadProgress : uploadProgress // ignore: cast_nullable_to_non_nullable
-as double,activeJob: freezed == activeJob ? _self.activeJob : activeJob // ignore: cast_nullable_to_non_nullable
-as Job?,selectedRuleId: freezed == selectedRuleId ? _self.selectedRuleId : selectedRuleId // ignore: cast_nullable_to_non_nullable
-as String?,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
-as String?,
+as WorkspacePhase,selectedImages: null == selectedImages ? _self.selectedImages : selectedImages // ignore: cast_nullable_to_non_nullable
+as List<Uint8List>,uploadProgress: null == uploadProgress ? _self.uploadProgress : uploadProgress // ignore: cast_nullable_to_non_nullable
+as double,activeJobId: freezed == activeJobId ? _self.activeJobId : activeJobId // ignore: cast_nullable_to_non_nullable
+as String?,activeJob: freezed == activeJob ? _self.activeJob : activeJob // ignore: cast_nullable_to_non_nullable
+as Job?,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
+as String?,networkRetryCount: null == networkRetryCount ? _self.networkRetryCount : networkRetryCount // ignore: cast_nullable_to_non_nullable
+as int,customPrompts: null == customPrompts ? _self.customPrompts : customPrompts // ignore: cast_nullable_to_non_nullable
+as List<String>,
   ));
 }
-/// Create a copy of WorkspaceState
-/// with the given fields replaced by the non-null parameter values.
-@override
-@pragma('vm:prefer-inline')
-$JobCopyWith<$Res>? get activeJob {
-    if (_self.activeJob == null) {
-    return null;
-  }
 
-  return $JobCopyWith<$Res>(_self.activeJob!, (value) {
-    return _then(_self.copyWith(activeJob: value));
-  });
-}
 }
 
 
@@ -169,10 +169,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( WorkspacePhase phase,  String? selectedPresetId,  List<SelectedImage> selectedImages,  String? activeJobId,  double uploadProgress,  Job? activeJob,  String? selectedRuleId,  String? errorMessage)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( WorkspacePhase phase,  List<Uint8List> selectedImages,  double uploadProgress,  String? activeJobId,  Job? activeJob,  String? errorMessage,  int networkRetryCount,  List<String> customPrompts)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _WorkspaceState() when $default != null:
-return $default(_that.phase,_that.selectedPresetId,_that.selectedImages,_that.activeJobId,_that.uploadProgress,_that.activeJob,_that.selectedRuleId,_that.errorMessage);case _:
+return $default(_that.phase,_that.selectedImages,_that.uploadProgress,_that.activeJobId,_that.activeJob,_that.errorMessage,_that.networkRetryCount,_that.customPrompts);case _:
   return orElse();
 
 }
@@ -190,10 +190,10 @@ return $default(_that.phase,_that.selectedPresetId,_that.selectedImages,_that.ac
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( WorkspacePhase phase,  String? selectedPresetId,  List<SelectedImage> selectedImages,  String? activeJobId,  double uploadProgress,  Job? activeJob,  String? selectedRuleId,  String? errorMessage)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( WorkspacePhase phase,  List<Uint8List> selectedImages,  double uploadProgress,  String? activeJobId,  Job? activeJob,  String? errorMessage,  int networkRetryCount,  List<String> customPrompts)  $default,) {final _that = this;
 switch (_that) {
 case _WorkspaceState():
-return $default(_that.phase,_that.selectedPresetId,_that.selectedImages,_that.activeJobId,_that.uploadProgress,_that.activeJob,_that.selectedRuleId,_that.errorMessage);case _:
+return $default(_that.phase,_that.selectedImages,_that.uploadProgress,_that.activeJobId,_that.activeJob,_that.errorMessage,_that.networkRetryCount,_that.customPrompts);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -210,10 +210,10 @@ return $default(_that.phase,_that.selectedPresetId,_that.selectedImages,_that.ac
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( WorkspacePhase phase,  String? selectedPresetId,  List<SelectedImage> selectedImages,  String? activeJobId,  double uploadProgress,  Job? activeJob,  String? selectedRuleId,  String? errorMessage)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( WorkspacePhase phase,  List<Uint8List> selectedImages,  double uploadProgress,  String? activeJobId,  Job? activeJob,  String? errorMessage,  int networkRetryCount,  List<String> customPrompts)?  $default,) {final _that = this;
 switch (_that) {
 case _WorkspaceState() when $default != null:
-return $default(_that.phase,_that.selectedPresetId,_that.selectedImages,_that.activeJobId,_that.uploadProgress,_that.activeJob,_that.selectedRuleId,_that.errorMessage);case _:
+return $default(_that.phase,_that.selectedImages,_that.uploadProgress,_that.activeJobId,_that.activeJob,_that.errorMessage,_that.networkRetryCount,_that.customPrompts);case _:
   return null;
 
 }
@@ -225,23 +225,47 @@ return $default(_that.phase,_that.selectedPresetId,_that.selectedImages,_that.ac
 
 
 class _WorkspaceState implements WorkspaceState {
-  const _WorkspaceState({this.phase = WorkspacePhase.idle, this.selectedPresetId, final  List<SelectedImage> selectedImages = const [], this.activeJobId, this.uploadProgress = 0.0, this.activeJob, this.selectedRuleId, this.errorMessage}): _selectedImages = selectedImages;
+  const _WorkspaceState({this.phase = WorkspacePhase.idle, final  List<Uint8List> selectedImages = const [], this.uploadProgress = 0.0, this.activeJobId, this.activeJob, this.errorMessage, this.networkRetryCount = 0, final  List<String> customPrompts = const []}): _selectedImages = selectedImages,_customPrompts = customPrompts;
   
 
+/// Current phase of the processing pipeline
 @override@JsonKey() final  WorkspacePhase phase;
-@override final  String? selectedPresetId;
- final  List<SelectedImage> _selectedImages;
-@override@JsonKey() List<SelectedImage> get selectedImages {
+/// Raw bytes of photos selected by the user; preserved across retries
+ final  List<Uint8List> _selectedImages;
+/// Raw bytes of photos selected by the user; preserved across retries
+@override@JsonKey() List<Uint8List> get selectedImages {
   if (_selectedImages is EqualUnmodifiableListView) return _selectedImages;
   // ignore: implicit_dynamic_type
   return EqualUnmodifiableListView(_selectedImages);
 }
 
-@override final  String? activeJobId;
+/// Upload progress [0.0, 1.0]; only meaningful during [WorkspacePhase.uploading]
 @override@JsonKey() final  double uploadProgress;
+/// Server-assigned job ID, set after POST /jobs succeeds
+@override final  String? activeJobId;
+/// Latest job status polled from GET /jobs/:id
 @override final  Job? activeJob;
-@override final  String? selectedRuleId;
+/// Human-readable error message shown in the error banner
 @override final  String? errorMessage;
+/// Number of consecutive network failures during polling (for UI feedback)
+@override@JsonKey() final  int networkRetryCount;
+/// User-supplied text prompts passed to SAM3 during executeJob.
+///
+/// Added via [WorkspaceNotifier.addPrompt]; removed via
+/// [WorkspaceNotifier.removePrompt]. Passed as `prompts` in the
+/// POST /jobs/:id/execute request body when non-empty.
+ final  List<String> _customPrompts;
+/// User-supplied text prompts passed to SAM3 during executeJob.
+///
+/// Added via [WorkspaceNotifier.addPrompt]; removed via
+/// [WorkspaceNotifier.removePrompt]. Passed as `prompts` in the
+/// POST /jobs/:id/execute request body when non-empty.
+@override@JsonKey() List<String> get customPrompts {
+  if (_customPrompts is EqualUnmodifiableListView) return _customPrompts;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_customPrompts);
+}
+
 
 /// Create a copy of WorkspaceState
 /// with the given fields replaced by the non-null parameter values.
@@ -253,16 +277,16 @@ _$WorkspaceStateCopyWith<_WorkspaceState> get copyWith => __$WorkspaceStateCopyW
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _WorkspaceState&&(identical(other.phase, phase) || other.phase == phase)&&(identical(other.selectedPresetId, selectedPresetId) || other.selectedPresetId == selectedPresetId)&&const DeepCollectionEquality().equals(other._selectedImages, _selectedImages)&&(identical(other.activeJobId, activeJobId) || other.activeJobId == activeJobId)&&(identical(other.uploadProgress, uploadProgress) || other.uploadProgress == uploadProgress)&&(identical(other.activeJob, activeJob) || other.activeJob == activeJob)&&(identical(other.selectedRuleId, selectedRuleId) || other.selectedRuleId == selectedRuleId)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _WorkspaceState&&(identical(other.phase, phase) || other.phase == phase)&&const DeepCollectionEquality().equals(other._selectedImages, _selectedImages)&&(identical(other.uploadProgress, uploadProgress) || other.uploadProgress == uploadProgress)&&(identical(other.activeJobId, activeJobId) || other.activeJobId == activeJobId)&&(identical(other.activeJob, activeJob) || other.activeJob == activeJob)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&(identical(other.networkRetryCount, networkRetryCount) || other.networkRetryCount == networkRetryCount)&&const DeepCollectionEquality().equals(other._customPrompts, _customPrompts));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,phase,selectedPresetId,const DeepCollectionEquality().hash(_selectedImages),activeJobId,uploadProgress,activeJob,selectedRuleId,errorMessage);
+int get hashCode => Object.hash(runtimeType,phase,const DeepCollectionEquality().hash(_selectedImages),uploadProgress,activeJobId,activeJob,errorMessage,networkRetryCount,const DeepCollectionEquality().hash(_customPrompts));
 
 @override
 String toString() {
-  return 'WorkspaceState(phase: $phase, selectedPresetId: $selectedPresetId, selectedImages: $selectedImages, activeJobId: $activeJobId, uploadProgress: $uploadProgress, activeJob: $activeJob, selectedRuleId: $selectedRuleId, errorMessage: $errorMessage)';
+  return 'WorkspaceState(phase: $phase, selectedImages: $selectedImages, uploadProgress: $uploadProgress, activeJobId: $activeJobId, activeJob: $activeJob, errorMessage: $errorMessage, networkRetryCount: $networkRetryCount, customPrompts: $customPrompts)';
 }
 
 
@@ -273,11 +297,11 @@ abstract mixin class _$WorkspaceStateCopyWith<$Res> implements $WorkspaceStateCo
   factory _$WorkspaceStateCopyWith(_WorkspaceState value, $Res Function(_WorkspaceState) _then) = __$WorkspaceStateCopyWithImpl;
 @override @useResult
 $Res call({
- WorkspacePhase phase, String? selectedPresetId, List<SelectedImage> selectedImages, String? activeJobId, double uploadProgress, Job? activeJob, String? selectedRuleId, String? errorMessage
+ WorkspacePhase phase, List<Uint8List> selectedImages, double uploadProgress, String? activeJobId, Job? activeJob, String? errorMessage, int networkRetryCount, List<String> customPrompts
 });
 
 
-@override $JobCopyWith<$Res>? get activeJob;
+
 
 }
 /// @nodoc
@@ -290,33 +314,21 @@ class __$WorkspaceStateCopyWithImpl<$Res>
 
 /// Create a copy of WorkspaceState
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? phase = null,Object? selectedPresetId = freezed,Object? selectedImages = null,Object? activeJobId = freezed,Object? uploadProgress = null,Object? activeJob = freezed,Object? selectedRuleId = freezed,Object? errorMessage = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? phase = null,Object? selectedImages = null,Object? uploadProgress = null,Object? activeJobId = freezed,Object? activeJob = freezed,Object? errorMessage = freezed,Object? networkRetryCount = null,Object? customPrompts = null,}) {
   return _then(_WorkspaceState(
 phase: null == phase ? _self.phase : phase // ignore: cast_nullable_to_non_nullable
-as WorkspacePhase,selectedPresetId: freezed == selectedPresetId ? _self.selectedPresetId : selectedPresetId // ignore: cast_nullable_to_non_nullable
-as String?,selectedImages: null == selectedImages ? _self._selectedImages : selectedImages // ignore: cast_nullable_to_non_nullable
-as List<SelectedImage>,activeJobId: freezed == activeJobId ? _self.activeJobId : activeJobId // ignore: cast_nullable_to_non_nullable
-as String?,uploadProgress: null == uploadProgress ? _self.uploadProgress : uploadProgress // ignore: cast_nullable_to_non_nullable
-as double,activeJob: freezed == activeJob ? _self.activeJob : activeJob // ignore: cast_nullable_to_non_nullable
-as Job?,selectedRuleId: freezed == selectedRuleId ? _self.selectedRuleId : selectedRuleId // ignore: cast_nullable_to_non_nullable
-as String?,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
-as String?,
+as WorkspacePhase,selectedImages: null == selectedImages ? _self._selectedImages : selectedImages // ignore: cast_nullable_to_non_nullable
+as List<Uint8List>,uploadProgress: null == uploadProgress ? _self.uploadProgress : uploadProgress // ignore: cast_nullable_to_non_nullable
+as double,activeJobId: freezed == activeJobId ? _self.activeJobId : activeJobId // ignore: cast_nullable_to_non_nullable
+as String?,activeJob: freezed == activeJob ? _self.activeJob : activeJob // ignore: cast_nullable_to_non_nullable
+as Job?,errorMessage: freezed == errorMessage ? _self.errorMessage : errorMessage // ignore: cast_nullable_to_non_nullable
+as String?,networkRetryCount: null == networkRetryCount ? _self.networkRetryCount : networkRetryCount // ignore: cast_nullable_to_non_nullable
+as int,customPrompts: null == customPrompts ? _self._customPrompts : customPrompts // ignore: cast_nullable_to_non_nullable
+as List<String>,
   ));
 }
 
-/// Create a copy of WorkspaceState
-/// with the given fields replaced by the non-null parameter values.
-@override
-@pragma('vm:prefer-inline')
-$JobCopyWith<$Res>? get activeJob {
-    if (_self.activeJob == null) {
-    return null;
-  }
 
-  return $JobCopyWith<$Res>(_self.activeJob!, (value) {
-    return _then(_self.copyWith(activeJob: value));
-  });
-}
 }
 
 // dart format on

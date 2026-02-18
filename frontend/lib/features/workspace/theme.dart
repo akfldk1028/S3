@@ -1,57 +1,59 @@
 import 'package:flutter/material.dart';
 
-/// SNOW/B612-inspired dark theme for the photo workspace.
+/// Workspace-specific colour tokens and glass-morphism helpers.
+///
+/// These constants define the visual language for the SidePanel and all
+/// workspace widgets (concept chips, prompt chips, input fields, etc.).
+///
+/// All values are designed for use on dark/semi-transparent backgrounds.
 class WsColors {
   WsColors._();
 
-  // Backgrounds
-  static const bg = Color(0xFF0F0F17);
-  static const surface = Color(0xFF1A1A2E);
-  static const surfaceLight = Color(0xFF252540);
-  static const card = Color(0xFF1E1E32);
+  // ── Glass surface ──────────────────────────────────────────────────────────
 
-  // Accents — gradient pair
-  static const accent1 = Color(0xFF667EEA); // Purple-blue
-  static const accent2 = Color(0xFFFF6B9D); // Pink
+  /// Semi-transparent white used as the fill for un-selected glass chips
+  /// and input field backgrounds.
+  static const Color glassWhite = Color(0x1AFFFFFF); // 10% white
 
-  // Text
-  static const textPrimary = Color(0xFFF0F0F5);
-  static const textSecondary = Color(0xFF8888A0);
-  static const textMuted = Color(0xFF55556A);
+  /// Subtle white border drawn around glass surfaces.
+  static const Color glassBorder = Color(0x33FFFFFF); // 20% white
 
-  // Functional
-  static const success = Color(0xFF4ADE80);
-  static const error = Color(0xFFFF6B6B);
-  static const warning = Color(0xFFFFD93D);
+  // ── Text ──────────────────────────────────────────────────────────────────
 
-  // Glass
-  static const glassWhite = Color(0x1AFFFFFF); // 10%
-  static const glassBorder = Color(0x33FFFFFF); // 20%
+  /// Muted white used for placeholder / hint text inside glass inputs.
+  static const Color textMuted = Color(0x80FFFFFF); // 50% white
 
-  static const gradientPrimary = LinearGradient(
-    colors: [accent1, accent2],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-  );
-}
+  /// Primary body text colour (near-white for dark surfaces).
+  static const Color textPrimary = Color(0xDEFFFFFF); // 87% white
 
-class WsTheme {
-  WsTheme._();
+  // ── Gradients ─────────────────────────────────────────────────────────────
 
-  static const radius = 12.0;
-  static const radiusSm = 8.0;
-  static const radiusLg = 16.0;
-  static const radiusXl = 24.0;
-
-  static final cardDecoration = BoxDecoration(
-    color: WsColors.card,
-    borderRadius: BorderRadius.circular(radius),
-    border: Border.all(color: WsColors.glassBorder, width: 0.5),
+  /// Primary indigo-to-violet gradient applied to selected chips and active
+  /// UI elements.  Matches the overall product accent palette.
+  static const LinearGradient gradientPrimary = LinearGradient(
+    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
   );
 
-  static final glassDecoration = BoxDecoration(
-    color: WsColors.glassWhite,
-    borderRadius: BorderRadius.circular(radius),
-    border: Border.all(color: WsColors.glassBorder, width: 0.5),
-  );
+  // ── Utility helpers ───────────────────────────────────────────────────────
+
+  /// Standard glass chip decoration for *un-selected* concept chips.
+  static BoxDecoration get glassChipDecoration => BoxDecoration(
+        color: glassWhite,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: glassBorder, width: 0.5),
+      );
+
+  /// Standard chip decoration for *selected* concept chips (gradient fill).
+  static BoxDecoration get selectedChipDecoration => BoxDecoration(
+        gradient: gradientPrimary,
+        borderRadius: BorderRadius.circular(16),
+      );
+
+  /// Standard chip decoration for *prompt* chips (always gradient + removable).
+  static BoxDecoration get promptChipDecoration => BoxDecoration(
+        gradient: gradientPrimary,
+        borderRadius: BorderRadius.circular(16),
+      );
 }

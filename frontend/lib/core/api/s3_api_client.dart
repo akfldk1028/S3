@@ -1,126 +1,99 @@
 import 'package:dio/dio.dart';
-import 'api_client.dart';
-import '../models/user.dart';
-import '../models/preset.dart';
-import '../models/rule.dart';
-import '../models/job.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-/// Real API client using Dio with JWT authentication.
+import '../../constants/api_endpoints.dart';
+import '../../core/models/job.dart';
+import 'api_client.dart';
+
+/// Real Dio-based HTTP client for the S3 Workers REST API.
 ///
-/// Implements all 13 frontend endpoints from workflow.md §6
-/// (excludes internal #13 /jobs/{id}/callback endpoint).
+/// Automatically attaches the JWT access token (stored in [FlutterSecureStorage])
+/// to every request via an [InterceptorsWrapper].
 ///
-/// Features:
-/// - Automatic JWT Bearer token injection via interceptor
-/// - 401 unauthorized error handling
-/// - Request/response envelope unwrapping
+/// File uploads to presigned S3 URLs use a separate Dio instance without the
+/// auth interceptor, because S3 presigned URLs are self-authenticating.
 class S3ApiClient implements ApiClient {
   final Dio _dio;
-  final String _baseUrl;
 
-  S3ApiClient({required String baseUrl, required String jwt})
-      : _baseUrl = baseUrl,
-        _dio = Dio(BaseOptions(baseURL: baseUrl)) {
-    // Add JWT interceptor to all requests
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) {
-        options.headers['Authorization'] = 'Bearer $jwt';
-        return handler.next(options);
-      },
-      onError: (error, handler) {
-        if (error.response?.statusCode == 401) {
-          // Handle token expiration (MVP: just log, v2: refresh token)
-          print('Unauthorized: Token expired');
+  /// A plain Dio instance used exclusively for presigned S3 uploads.
+  /// Authorization headers must NOT be sent to S3.
+  final Dio _s3Dio;
+
+  S3ApiClient({
+    required FlutterSecureStorage secureStorage,
+  })  : _dio = _buildDio(secureStorage),
+        _s3Dio = Dio();
+
+  static Dio _buildDio(FlutterSecureStorage secureStorage) {
+    final dio = Dio(BaseOptions(
+      baseUrl: ApiEndpoints.baseUrl,
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 60),
+      headers: {'Content-Type': 'application/json'},
+    ));
+
+    dio.interceptors.add(InterceptorsWrapper(
+      onRequest: (options, handler) async {
+        final token = await secureStorage.read(key: 'accessToken');
+        if (token != null) {
+          options.headers['Authorization'] = 'Bearer $token';
         }
-        return handler.next(error);
+        handler.next(options);
       },
     ));
+
+    return dio;
   }
 
+  /// POST /jobs — creates a new processing job and returns the job ID
+  /// and presigned upload URLs.
   @override
-  Future<Map<String, dynamic>> createAnonUser() async {
-    final response = await _dio.post('/auth/anon');
-    return response.data;
-  }
-
-  @override
-  Future<User> getMe() async {
-    final response = await _dio.get('/me');
-    return User.fromJson(response.data);
-  }
-
-  @override
-  Future<List<Preset>> getPresets() async {
-    final response = await _dio.get('/presets');
-    final List<dynamic> data = response.data;
-    return data.map((json) => Preset.fromJson(json)).toList();
-  }
-
-  @override
-  Future<Preset> getPresetById(String id) async {
-    final response = await _dio.get('/presets/$id');
-    return Preset.fromJson(response.data);
-  }
-
-  @override
-  Future<String> createRule({
-    required String name,
+  Future<({String jobId, List<String> uploadUrls})> createJob({
+    required int imageCount,
     required String presetId,
-    required Map<String, ConceptAction> concepts,
-    List<String>? protect,
   }) async {
-    final response = await _dio.post('/rules', data: {
-      'name': name,
+    final response = await _dio.post(ApiEndpoints.jobs, data: {
+      'image_count': imageCount,
       'preset_id': presetId,
-      'concepts': concepts.map((key, value) => MapEntry(key, value.toJson())),
-      if (protect != null) 'protect': protect,
     });
-    return response.data['id'];
+    final data = response.data as Map<String, dynamic>;
+    return (
+      jobId: data['job_id'] as String,
+      uploadUrls: List<String>.from(data['upload_urls'] as List),
+    );
   }
 
+  /// Uploads a single image byte buffer to the given presigned S3 URL.
+  ///
+  /// Uses a plain Dio instance — S3 presigned URLs must not receive an
+  /// Authorization header (it would invalidate the presigned signature).
   @override
-  Future<List<Rule>> getRules() async {
-    final response = await _dio.get('/rules');
-    final List<dynamic> data = response.data;
-    return data.map((json) => Rule.fromJson(json)).toList();
+  Future<void> uploadFile(String url, List<int> bytes) async {
+    await _s3Dio.put(
+      url,
+      data: Stream.fromIterable(bytes.map((b) => [b])),
+      options: Options(
+        headers: {
+          'Content-Type': 'image/jpeg',
+          'Content-Length': bytes.length,
+        },
+        followRedirects: false,
+        validateStatus: (status) => status != null && status < 400,
+      ),
+    );
   }
 
-  @override
-  Future<void> updateRule(
-    String id, {
-    required String name,
-    required Map<String, ConceptAction> concepts,
-    List<String>? protect,
-  }) async {
-    await _dio.put('/rules/$id', data: {
-      'name': name,
-      'concepts': concepts.map((key, value) => MapEntry(key, value.toJson())),
-      if (protect != null) 'protect': protect,
-    });
-  }
-
-  @override
-  Future<void> deleteRule(String id) async {
-    await _dio.delete('/rules/$id');
-  }
-
-  @override
-  Future<Map<String, dynamic>> createJob({
-    required String preset,
-    required int itemCount,
-  }) async {
-    final response = await _dio.post('/jobs', data: {
-      'preset': preset,
-      'item_count': itemCount,
-    });
-    return response.data;
-  }
-
+  /// POST /jobs/{id}/confirm-upload — signals that all images are uploaded.
   @override
   Future<void> confirmUpload(String jobId) async {
-    await _dio.post('/jobs/$jobId/confirm-upload');
+    await _dio.post(ApiEndpoints.confirmUpload(jobId));
   }
 
+  /// POST /jobs/{id}/execute — triggers processing with the given concept actions.
+  ///
+  /// The [prompts] list is conditionally included in the request body only when
+  /// it is non-null and non-empty, so the `prompts` key is omitted entirely for
+  /// jobs that have no custom SAM3 prompts.
   @override
   Future<void> executeJob(
     String jobId, {
@@ -128,23 +101,29 @@ class S3ApiClient implements ApiClient {
     List<String>? protect,
     String? ruleId,
     String? outputTemplate,
+    List<String>? prompts,
   }) async {
-    await _dio.post('/jobs/$jobId/execute', data: {
-      'concepts': concepts.map((key, value) => MapEntry(key, value.toJson())),
+    await _dio.post(ApiEndpoints.execute(jobId), data: {
+      'concepts': concepts.map(
+        (key, value) => MapEntry(key, value.toJson()),
+      ),
       if (protect != null) 'protect': protect,
       if (ruleId != null) 'rule_id': ruleId,
       if (outputTemplate != null) 'output_template': outputTemplate,
+      if (prompts != null && prompts.isNotEmpty) 'prompts': prompts,
     });
   }
 
+  /// GET /jobs/{id} — polls the current status and progress of a job.
   @override
-  Future<Job> getJob(String jobId) async {
-    final response = await _dio.get('/jobs/$jobId');
-    return Job.fromJson(response.data);
+  Future<Job> pollJob(String jobId) async {
+    final response = await _dio.get(ApiEndpoints.jobById(jobId));
+    return Job.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// POST /jobs/{id}/cancel — cancels a running job and refunds credits.
   @override
   Future<void> cancelJob(String jobId) async {
-    await _dio.post('/jobs/$jobId/cancel');
+    await _dio.post(ApiEndpoints.cancel(jobId));
   }
 }
