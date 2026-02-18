@@ -29,10 +29,6 @@ import userRoute from './user/user.route';
 
 const app = new Hono<{ Bindings: Env; Variables: { user: AuthUser } }>();
 
-<<<<<<< HEAD
-// Global middleware
-app.use('*', cors());
-=======
 // ─── CORS Allowlist ──────────────────────────────────────
 // 명시적 origin 허용 목록 — 와일드카드(*) 사용 금지
 // credentials: true (JWT Authorization 헤더) 사용 시 * 불가 (브라우저 보안 요구사항)
@@ -50,7 +46,6 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
->>>>>>> auto-claude/025-workers-cors-일관성-cors
 app.use('*', logger());
 app.use('*', authMiddleware);
 
