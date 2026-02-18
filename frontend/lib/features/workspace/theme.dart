@@ -1,71 +1,47 @@
 import 'package:flutter/material.dart';
 
-/// Workspace colour tokens and theme helpers.
-///
-/// All workspace widgets should reference [WsColors] for consistent theming.
-/// Do NOT use hard-coded colour literals elsewhere in the workspace feature.
+/// Dark-mode workspace color palette.
 class WsColors {
   WsColors._();
 
-  // ── Primary accent palette ────────────────────────────────────────────────
-  static const Color accent1 = Color(0xFF667EEA); // purple-blue
-  static const Color accent2 = Color(0xFFFF6B9D); // pink
+  // Backgrounds
+  static const Color bg = Color(0xFF0F0F17);
+  static const Color surface = Color(0xFF1A1A2E);
+  static const Color surfaceLight = Color(0xFF252540);
+  static const Color card = Color(0xFF1E1E32);
 
-  // ── Glass / overlay surfaces ──────────────────────────────────────────────
-  static const Color glassWhite = Color(0x1AFFFFFF); // 10% white
-  static const Color glassBorder = Color(0x33FFFFFF); // 20% white
-  static const Color glassHover = Color(0x26FFFFFF); // 15% white
+  // Accents
+  static const Color accent1 = Color(0xFF667EEA);
+  static const Color accent2 = Color(0xFFFF6B9D);
 
-  // ── Text ──────────────────────────────────────────────────────────────────
-  static const Color textPrimary = Colors.white;
-  static const Color textSecondary = Color(0xB3FFFFFF); // 70% white
-  static const Color textTertiary = Color(0x80FFFFFF); // 50% white
-
-  // ── Background ────────────────────────────────────────────────────────────
-  static const Color bgDark = Color(0xFF0F0F1A);
-  static const Color bgCard = Color(0x1AFFFFFF);
-
-  // ── Status ────────────────────────────────────────────────────────────────
-  static const Color statusRunning = Color(0xFF667EEA);
-  static const Color statusSuccess = Color(0xFF4ADE80);
-  static const Color statusError = Color(0xFFFF6B6B);
-
-  // ── Gradients ─────────────────────────────────────────────────────────────
+  // Gradient
   static const LinearGradient gradientPrimary = LinearGradient(
-    colors: [accent1, accent2],
-    begin: Alignment.centerLeft,
-    end: Alignment.centerRight,
-  );
-
-  static const LinearGradient gradientDiagonal = LinearGradient(
     colors: [accent1, accent2],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
+
+  // Text
+  static const Color textPrimary = Color(0xFFF0F0F5);
+  static const Color textSecondary = Color(0xFF8888A0);
+  static const Color textMuted = Color(0xFF55556A);
+
+  // Glass effects
+  static const Color glassWhite = Color(0x1AFFFFFF);
+  static const Color glassBorder = Color(0x33FFFFFF);
+
+  // Functional
+  static const Color success = Color(0xFF4ADE80);
+  static const Color error = Color(0xFFFF6B6B);
+  static const Color warning = Color(0xFFFFD93D);
 }
 
-/// Layout and dimension tokens for the workspace feature.
+/// Workspace theme constants.
 class WsTheme {
   WsTheme._();
 
-  static const double borderRadius = 12.0;
-  static const double borderRadiusSm = 8.0;
-  static const double borderRadiusLg = 16.0;
-  static const double borderRadiusPill = 24.0;
-
-  static const double spacing = 12.0;
-  static const double spacingSm = 8.0;
-  static const double spacingLg = 16.0;
-  static const double spacingXl = 24.0;
-
-  static const double iconSize = 18.0;
-  static const double iconSizeSm = 14.0;
-  static const double iconSizeLg = 22.0;
-
-  static const Duration animFast = Duration(milliseconds: 150);
-  static const Duration animNormal = Duration(milliseconds: 250);
-  static const Duration animSlow = Duration(milliseconds: 400);
-
-  static const double actionBarHeight = 72.0;
-  static const double actionBarPadding = 16.0;
+  static const double radius = 12.0;
+  static const double radiusSm = 8.0;
+  static const double radiusLg = 16.0;
+  static const double radiusXl = 24.0;
 }

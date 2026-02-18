@@ -1,124 +1,104 @@
-import 'dart:async';
-import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/models/job.dart';
+import '../../../core/models/job_item.dart';
+import '../../../shared/widgets/before_after_slider.dart';
 import '../theme.dart';
-import '../../../shared/widgets/tap_scale.dart';
+import '../workspace_provider.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Status enum
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Current state of the workspace job driving [ProgressOverlay].
-enum OverlayStatus {
-  /// Upload or server-side queuing is in progress — no explicit percentage yet.
-  waiting,
-
-  /// Processing is actively running — use [ProgressOverlay.progressValue].
-  running,
-
-  /// Processing finished successfully.
-  done,
-
-  /// Processing failed with an error.
-  error,
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Public API
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Full-screen modal overlay displayed while a workspace job is in progress.
+/// Overlay displayed while a job is actively processing.
 ///
-/// Renders one of two sub-views:
-/// - **Waiting** ([OverlayStatus.waiting]) — indeterminate ring at progress 0,
-///   "Please wait…" label, and an optional Cancel button.
-/// - **Running** ([OverlayStatus.running]) — determinate [_SweepRingPainter]
-///   ring driven by [progressValue], a percentage label, and a status pill.
-///
-/// Both ring variants use [_SweepRingPainter] instead of the stock
-/// [CircularProgressIndicator] for a gradient accent1→accent2 sweep.
-class ProgressOverlay extends StatelessWidget {
-  const ProgressOverlay({
-    super.key,
-    required this.status,
-    this.progressValue = 0.0,
-    this.onCancel,
-  });
-
-  /// Current job phase controlling which sub-view is shown.
-  final OverlayStatus status;
-
-  /// Fractional progress in range [0.0, 1.0].
-  ///
-  /// Only meaningful when [status] is [OverlayStatus.running].
-  final double progressValue;
-
-  /// Called when the user taps the Cancel button (waiting state).
-  ///
-  /// If null the Cancel button is hidden.
-  final VoidCallback? onCancel;
+/// Shows a progress bar, job info, a cancel button, and a horizontal
+/// thumbnail strip of any items that have already finished processing.
+class ProgressOverlay extends ConsumerWidget {
+  const ProgressOverlay({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: WsColors.bgDark.withValues(alpha: 0.88),
-      child: Center(
-        child: status == OverlayStatus.waiting
-            ? _buildWaiting()
-            : _ProgressCard(progressValue: progressValue),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final job = ref.watch(workspaceProvider).activeJob;
+
+    if (job == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Scaffold(
+      backgroundColor: WsColors.bg,
+      body: SafeArea(
+        child: _buildProgress(context, ref, job),
       ),
     );
   }
 
-  // ── Waiting sub-view (L45 – L79) ────────────────────────────────────────
+  /// Builds the main progress content area.
+  Widget _buildProgress(BuildContext context, WidgetRef ref, Job job) {
+    final progress = job.progress;
+    final fraction =
+        progress.total > 0 ? progress.done / progress.total : 0.0;
 
-  /// Waiting / upload phase — indeterminate ring (progress=0) + Cancel button.
-  Widget _buildWaiting() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // ── Sweep ring — indeterminate (progress = 0.0) ──────────────────
-        SizedBox(
-          width: 64,
-          height: 64,
-          child: CustomPaint(
-            painter: _SweepRingPainter(0.0),
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Job header ──────────────────────────────────────────────
+          Text(
+            job.preset,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: WsColors.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+            ),
           ),
-        ),
-
-        const SizedBox(height: WsTheme.spacingXl),
-
-        // "Please wait…" label.
-        const Text(
-          'Please wait…',
-          style: TextStyle(
-            color: WsColors.textSecondary,
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
+          const SizedBox(height: 8),
+          Text(
+            '${progress.done} / ${progress.total}',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: WsColors.textPrimary,
+              fontSize: 28,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
+          const SizedBox(height: 20),
 
-        const SizedBox(height: WsTheme.spacingLg),
+          // ── Progress bar ─────────────────────────────────────────────
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: fraction,
+              backgroundColor: WsColors.surfaceLight,
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(WsColors.accent1),
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${(fraction * 100).toStringAsFixed(0)}%',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: WsColors.textMuted,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 32),
 
-        // Optional Cancel button.
-        if (onCancel != null)
-          TapScale(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              onCancel!();
-            },
+          // ── Cancel button ────────────────────────────────────────────
+          GestureDetector(
+            onTap: () =>
+                ref.read(workspaceProvider.notifier).cancelJob(),
             child: Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: WsTheme.spacingXl,
-                vertical: WsTheme.spacingLg,
-              ),
+              height: 44,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: WsColors.glassWhite,
-                borderRadius: BorderRadius.circular(WsTheme.borderRadiusPill),
-                border: Border.all(color: WsColors.glassBorder, width: 1.0),
+                color: WsColors.surfaceLight,
+                borderRadius: BorderRadius.circular(WsTheme.radius),
               ),
               child: const Text(
                 'Cancel',
@@ -130,180 +110,151 @@ class ProgressOverlay extends StatelessWidget {
               ),
             ),
           ),
-      ],
+
+          // ── Partial-results thumbnail strip ─────────────────────────
+          if (job.outputsReady.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildThumbnailStrip(context, ref, job.outputsReady),
+          ],
+        ],
+      ),
     );
   }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// _ProgressCard
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// Running phase — determinate [_SweepRingPainter] ring with percentage label
-/// and an [AnimatedSwitcher] carousel that cycles through processing status
-/// messages every 3 seconds.
-class _ProgressCard extends StatefulWidget {
-  const _ProgressCard({required this.progressValue});
-
-  /// Fractional progress in range [0.0, 1.0].
-  final double progressValue;
-
-  @override
-  State<_ProgressCard> createState() => _ProgressCardState();
-}
-
-class _ProgressCardState extends State<_ProgressCard> {
-  static const List<String> _messages = [
-    'Detecting walls...',
-    'Generating masks...',
-    'Applying rules...',
-    'Finalizing...',
-  ];
-
-  int _msgIndex = 0;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
-      if (mounted) {
-        setState(() {
-          _msgIndex = (_msgIndex + 1) % _messages.length;
-        });
-      }
-    });
+  /// Builds a horizontal 64 px thumbnail strip for [items] that are ready.
+  Widget _buildThumbnailStrip(
+    BuildContext context,
+    WidgetRef ref,
+    List<JobItem> items,
+  ) {
+    return SizedBox(
+      height: 64,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        separatorBuilder: (ctx, i) => const SizedBox(width: 4),
+        itemCount: items.length,
+        itemBuilder: (ctx, i) {
+          final item = items[i];
+          return GestureDetector(
+            onTap: () => _showItemPreview(ctx, ref, item),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: Image.network(
+                item.previewUrl,
+                width: 64,
+                height: 64,
+                fit: BoxFit.cover,
+                errorBuilder: (ctx, err, st) => Container(
+                  width: 64,
+                  height: 64,
+                  color: WsColors.surfaceLight,
+                  child: const Icon(
+                    Icons.broken_image_rounded,
+                    color: WsColors.textMuted,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
+  /// Opens a fullscreen Before/After comparison dialog for [item].
+  ///
+  /// Reads original image bytes from [workspaceProvider].selectedImages
+  /// using [item.idx] (1-based) → selectedImages[idx - 1].bytes.
+  /// Falls back to a single-image view if bytes are unavailable.
+  void _showItemPreview(
+    BuildContext context,
+    WidgetRef ref,
+    JobItem item,
+  ) {
+    final selectedImages = ref.read(workspaceProvider).selectedImages;
 
-  @override
-  Widget build(BuildContext context) {
-    final pct = (widget.progressValue * 100).round();
+    final Uint8List? beforeBytes;
+    if (item.idx >= 1 && item.idx <= selectedImages.length) {
+      beforeBytes = selectedImages[item.idx - 1].bytes;
+    } else {
+      beforeBytes = null;
+    }
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        // ── Sweep ring with percentage label centred inside ──────────────
-        SizedBox(
-          width: 96,
-          height: 96,
-          child: Stack(
-            alignment: Alignment.center,
+    showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: EdgeInsets.zero,
+        child: SafeArea(
+          child: Column(
             children: [
-              // Gradient arc driven by progressValue.
-              CustomPaint(
-                size: const Size(96, 96),
-                painter: _SweepRingPainter(widget.progressValue),
+              // ── Dialog header ───────────────────────────────────────
+              Container(
+                height: 56,
+                color: WsColors.surface,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    const SizedBox(width: 8),
+                    Text(
+                      'Preview #${item.idx}',
+                      style: const TextStyle(
+                        color: WsColors.textPrimary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.close,
+                        size: 18,
+                        color: WsColors.textSecondary,
+                      ),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                      tooltip: 'Close',
+                    ),
+                  ],
+                ),
               ),
 
-              // Percentage text inside the ring.
-              Text(
-                '$pct%',
-                style: const TextStyle(
-                  color: WsColors.textPrimary,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                ),
+              // ── Slider or fallback image ────────────────────────────
+              Expanded(
+                child: beforeBytes != null
+                    ? BeforeAfterSlider(
+                        beforeBytes: beforeBytes,
+                        afterUrl: item.previewUrl,
+                      )
+                    : Image.network(
+                        item.previewUrl,
+                        fit: BoxFit.contain,
+                        loadingBuilder: (_, child, progress) {
+                          if (progress == null) return child;
+                          return Container(
+                            color: WsColors.surfaceLight,
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: WsColors.accent1,
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (ctx, err, st) => Container(
+                          color: WsColors.surfaceLight,
+                          child: const Icon(
+                            Icons.broken_image_rounded,
+                            color: WsColors.textMuted,
+                            size: 48,
+                          ),
+                        ),
+                      ),
               ),
             ],
           ),
         ),
-
-        const SizedBox(height: WsTheme.spacingXl),
-
-        // ── Animated message carousel ────────────────────────────────────
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: Text(
-            _messages[_msgIndex],
-            key: ValueKey(_msgIndex),
-            style: const TextStyle(
-              color: WsColors.textSecondary,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-
-        const SizedBox(height: WsTheme.spacingLg),
-
-        // Sub-label under the message carousel.
-        const Text(
-          'Processing your workspace…',
-          style: TextStyle(
-            color: WsColors.textTertiary,
-            fontSize: 13,
-          ),
-        ),
-      ],
+      ),
     );
   }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// _SweepRingPainter
-// ─────────────────────────────────────────────────────────────────────────────
-
-/// [CustomPainter] that draws a two-layer progress ring:
-///
-/// 1. **Track** — full circle in [WsColors.glassWhite], strokeWidth = 4.
-/// 2. **Arc**   — sweep arc from –π/2 using a [SweepGradient] from
-///    [WsColors.accent1] to [WsColors.accent2], strokeWidth = 4.
-///
-/// [progress] is clamped to [0.0, 1.0].
-class _SweepRingPainter extends CustomPainter {
-  const _SweepRingPainter(this.progress);
-
-  /// Fractional fill level of the arc — 0.0 means no arc, 1.0 means full circle.
-  final double progress;
-
-  static const double _strokeWidth = 4.0;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.shortestSide - _strokeWidth) / 2;
-    final rect = Rect.fromCircle(center: center, radius: radius);
-
-    // ── Track (full circle) ────────────────────────────────────────────────
-    final trackPaint = Paint()
-      ..color = WsColors.glassWhite
-      ..strokeWidth = _strokeWidth
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawCircle(center, radius, trackPaint);
-
-    // ── Sweep arc ──────────────────────────────────────────────────────────
-    final clampedProgress = progress.clamp(0.0, 1.0);
-    if (clampedProgress == 0.0) return; // nothing to draw
-
-    final sweepAngle = 2 * math.pi * clampedProgress;
-
-    final sweepPaint = Paint()
-      ..shader = const SweepGradient(
-        colors: [WsColors.accent1, WsColors.accent2],
-        startAngle: -math.pi / 2,
-        endAngle: -math.pi / 2 + 2 * math.pi,
-      ).createShader(rect)
-      ..strokeWidth = _strokeWidth
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      rect,
-      -math.pi / 2,      // start at 12 o'clock
-      sweepAngle,
-      false,
-      sweepPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_SweepRingPainter old) => old.progress != progress;
 }

@@ -1,16 +1,12 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+/// Progress counters for a running job.
+class JobProgress {
+  final int done;
+  final int failed;
+  final int total;
 
-part 'job_progress.freezed.dart';
-part 'job_progress.g.dart';
-
-@freezed
-abstract class JobProgress with _$JobProgress {
-  const factory JobProgress({
-    required int done,
-    required int failed,
-    required int total,
-  }) = _JobProgress;
-
-  factory JobProgress.fromJson(Map<String, dynamic> json) =>
-      _$JobProgressFromJson(json);
+  const JobProgress({
+    required this.done,
+    required this.failed,
+    required this.total,
+  });
 }

@@ -13,9 +13,6 @@ dependencies:
 
   # UI
   shadcn_ui: ^0.45.1
-  before_after: ^3.2.0
-  gal: ^2.3.2
-  share_plus: ^10.0.0
 
   # State Management
   flutter_riverpod: ^3.1.0
@@ -29,60 +26,27 @@ dependencies:
 
   # Local Storage
   hive_flutter: ^1.1.0
-  shared_preferences: ^2.5.4
 
   # Secure Storage
   flutter_secure_storage: ^10.0.0
 
-  # Image Picker
-  image_picker: ^1.1.2
+  # Share / Export
+  share_plus: ^10.0.0
 
   # Model
   freezed_annotation: ^3.1.0
   json_annotation: ^4.9.0
 
-  # UI Polish
-  shimmer: ^3.0.0
-  connectivity_plus: ^7.0.0
-
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
-  mocktail: ^0.3.0
 
   # Code Generation
-  build_runner: ^2.4.13
+  build_runner:
   freezed: ^3.2.3
-  json_serializable: ^6.8.0
+  json_serializable:
   riverpod_generator: ^4.0.0+1
-
-  # Icon Generation
-  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
-
-  assets:
-    - assets/icon/
-
-# To regenerate app icons after updating assets/icon/app_icon.png, run:
-#   dart run flutter_launcher_icons
-flutter_launcher_icons:
-  image_path: "assets/icon/app_icon.png"
-  android: true
-  adaptive_icon_background: "#667EEA"
-  adaptive_icon_foreground: "assets/icon/app_icon.png"
-  ios: true
-  web:
-    generate: true
-    image_path: "assets/icon/app_icon.png"
-    background_color: "#0F0F17"
-    theme_color: "#667EEA"
-  windows:
-    generate: true
-    image_path: "assets/icon/app_icon.png"
-    icon_size: 48
-  macos:
-    generate: true
-    image_path: "assets/icon/app_icon.png"
