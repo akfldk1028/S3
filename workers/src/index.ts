@@ -5,7 +5,7 @@
  *
  * - Hono<{ Bindings: Env; Variables: { user: AuthUser } }>
  * - Global middleware: cors, logger, auth
- * - Route mounts: auth, presets, rules, jobs, user
+ * - Route mounts: auth, presets, rules, jobs, me
  * - Health check: GET /health
  * - 404 + error handler
  * - Queue consumer (dead-letter / retry)
@@ -59,7 +59,7 @@ app.route('/auth', authRoute);
 app.route('/presets', presetsRoute);
 app.route('/rules', rulesRoute);
 app.route('/jobs', jobsRoute);
-app.route('/user', userRoute);
+app.route('/me', userRoute);
 
 // 404 handler
 app.notFound((c) => {

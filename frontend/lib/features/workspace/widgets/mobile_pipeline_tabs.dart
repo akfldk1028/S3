@@ -472,7 +472,7 @@ class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
     // Free-plan users who have reached their rule slot limit see the badge.
     final userAsync = ref.watch(userProvider);
     final showRulesBadge = userAsync.maybeWhen(
-      data: (user) => user.plan != 'pro' && user.ruleSlotsUsed >= user.ruleSlotsMax,
+      data: (user) => user.plan != 'pro' && user.ruleSlots >= 2,
       orElse: () => false,
     );
 

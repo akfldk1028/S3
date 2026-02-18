@@ -15,10 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$User {
 
- String get id; String get email; String? get name; String? get profileImage; int get credits;/// 'free' or 'pro'
- String get plan;/// Number of rule slots currently used
- int get ruleSlotsUsed;/// Maximum rule slots for this plan (2 for free, 20 for pro)
- int get ruleSlotsMax;
+@JsonKey(name: 'user_id') String get id; String get plan; int get credits;@JsonKey(name: 'rule_slots') int get ruleSlots;@JsonKey(name: 'concurrent_jobs') int get concurrentJobs;
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -31,16 +28,16 @@ $UserCopyWith<User> get copyWith => _$UserCopyWithImpl<User>(this as User, _$ide
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is User&&(identical(other.id, id) || other.id == id)&&(identical(other.email, email) || other.email == email)&&(identical(other.name, name) || other.name == name)&&(identical(other.profileImage, profileImage) || other.profileImage == profileImage)&&(identical(other.credits, credits) || other.credits == credits)&&(identical(other.plan, plan) || other.plan == plan)&&(identical(other.ruleSlotsUsed, ruleSlotsUsed) || other.ruleSlotsUsed == ruleSlotsUsed)&&(identical(other.ruleSlotsMax, ruleSlotsMax) || other.ruleSlotsMax == ruleSlotsMax));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is User&&(identical(other.id, id) || other.id == id)&&(identical(other.plan, plan) || other.plan == plan)&&(identical(other.credits, credits) || other.credits == credits)&&(identical(other.ruleSlots, ruleSlots) || other.ruleSlots == ruleSlots)&&(identical(other.concurrentJobs, concurrentJobs) || other.concurrentJobs == concurrentJobs));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,email,name,profileImage,credits,plan,ruleSlotsUsed,ruleSlotsMax);
+int get hashCode => Object.hash(runtimeType,id,plan,credits,ruleSlots,concurrentJobs);
 
 @override
 String toString() {
-  return 'User(id: $id, email: $email, name: $name, profileImage: $profileImage, credits: $credits, plan: $plan, ruleSlotsUsed: $ruleSlotsUsed, ruleSlotsMax: $ruleSlotsMax)';
+  return 'User(id: $id, plan: $plan, credits: $credits, ruleSlots: $ruleSlots, concurrentJobs: $concurrentJobs)';
 }
 
 
@@ -51,7 +48,7 @@ abstract mixin class $UserCopyWith<$Res>  {
   factory $UserCopyWith(User value, $Res Function(User) _then) = _$UserCopyWithImpl;
 @useResult
 $Res call({
- String id, String email, String? name, String? profileImage, int credits, String plan, int ruleSlotsUsed, int ruleSlotsMax
+@JsonKey(name: 'user_id') String id, String plan, int credits,@JsonKey(name: 'rule_slots') int ruleSlots,@JsonKey(name: 'concurrent_jobs') int concurrentJobs
 });
 
 
@@ -68,16 +65,13 @@ class _$UserCopyWithImpl<$Res>
 
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? email = null,Object? name = freezed,Object? profileImage = freezed,Object? credits = null,Object? plan = null,Object? ruleSlotsUsed = null,Object? ruleSlotsMax = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? plan = null,Object? credits = null,Object? ruleSlots = null,Object? concurrentJobs = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
-as String,email: null == email ? _self.email : email // ignore: cast_nullable_to_non_nullable
-as String,name: freezed == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String?,profileImage: freezed == profileImage ? _self.profileImage : profileImage // ignore: cast_nullable_to_non_nullable
-as String?,credits: null == credits ? _self.credits : credits // ignore: cast_nullable_to_non_nullable
-as int,plan: null == plan ? _self.plan : plan // ignore: cast_nullable_to_non_nullable
-as String,ruleSlotsUsed: null == ruleSlotsUsed ? _self.ruleSlotsUsed : ruleSlotsUsed // ignore: cast_nullable_to_non_nullable
-as int,ruleSlotsMax: null == ruleSlotsMax ? _self.ruleSlotsMax : ruleSlotsMax // ignore: cast_nullable_to_non_nullable
+as String,plan: null == plan ? _self.plan : plan // ignore: cast_nullable_to_non_nullable
+as String,credits: null == credits ? _self.credits : credits // ignore: cast_nullable_to_non_nullable
+as int,ruleSlots: null == ruleSlots ? _self.ruleSlots : ruleSlots // ignore: cast_nullable_to_non_nullable
+as int,concurrentJobs: null == concurrentJobs ? _self.concurrentJobs : concurrentJobs // ignore: cast_nullable_to_non_nullable
 as int,
   ));
 }
@@ -163,10 +157,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String email,  String? name,  String? profileImage,  int credits,  String plan,  int ruleSlotsUsed,  int ruleSlotsMax)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String id,  String plan,  int credits, @JsonKey(name: 'rule_slots')  int ruleSlots, @JsonKey(name: 'concurrent_jobs')  int concurrentJobs)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _User() when $default != null:
-return $default(_that.id,_that.email,_that.name,_that.profileImage,_that.credits,_that.plan,_that.ruleSlotsUsed,_that.ruleSlotsMax);case _:
+return $default(_that.id,_that.plan,_that.credits,_that.ruleSlots,_that.concurrentJobs);case _:
   return orElse();
 
 }
@@ -184,10 +178,10 @@ return $default(_that.id,_that.email,_that.name,_that.profileImage,_that.credits
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String email,  String? name,  String? profileImage,  int credits,  String plan,  int ruleSlotsUsed,  int ruleSlotsMax)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String id,  String plan,  int credits, @JsonKey(name: 'rule_slots')  int ruleSlots, @JsonKey(name: 'concurrent_jobs')  int concurrentJobs)  $default,) {final _that = this;
 switch (_that) {
 case _User():
-return $default(_that.id,_that.email,_that.name,_that.profileImage,_that.credits,_that.plan,_that.ruleSlotsUsed,_that.ruleSlotsMax);case _:
+return $default(_that.id,_that.plan,_that.credits,_that.ruleSlots,_that.concurrentJobs);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -204,10 +198,10 @@ return $default(_that.id,_that.email,_that.name,_that.profileImage,_that.credits
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String email,  String? name,  String? profileImage,  int credits,  String plan,  int ruleSlotsUsed,  int ruleSlotsMax)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'user_id')  String id,  String plan,  int credits, @JsonKey(name: 'rule_slots')  int ruleSlots, @JsonKey(name: 'concurrent_jobs')  int concurrentJobs)?  $default,) {final _that = this;
 switch (_that) {
 case _User() when $default != null:
-return $default(_that.id,_that.email,_that.name,_that.profileImage,_that.credits,_that.plan,_that.ruleSlotsUsed,_that.ruleSlotsMax);case _:
+return $default(_that.id,_that.plan,_that.credits,_that.ruleSlots,_that.concurrentJobs);case _:
   return null;
 
 }
@@ -219,20 +213,14 @@ return $default(_that.id,_that.email,_that.name,_that.profileImage,_that.credits
 @JsonSerializable()
 
 class _User implements User {
-  const _User({required this.id, required this.email, this.name, this.profileImage, this.credits = 0, this.plan = 'free', this.ruleSlotsUsed = 0, this.ruleSlotsMax = 2});
+  const _User({@JsonKey(name: 'user_id') required this.id, this.plan = 'free', this.credits = 0, @JsonKey(name: 'rule_slots') this.ruleSlots = 0, @JsonKey(name: 'concurrent_jobs') this.concurrentJobs = 0});
   factory _User.fromJson(Map<String, dynamic> json) => _$UserFromJson(json);
 
-@override final  String id;
-@override final  String email;
-@override final  String? name;
-@override final  String? profileImage;
-@override@JsonKey() final  int credits;
-/// 'free' or 'pro'
+@override@JsonKey(name: 'user_id') final  String id;
 @override@JsonKey() final  String plan;
-/// Number of rule slots currently used
-@override@JsonKey() final  int ruleSlotsUsed;
-/// Maximum rule slots for this plan (2 for free, 20 for pro)
-@override@JsonKey() final  int ruleSlotsMax;
+@override@JsonKey() final  int credits;
+@override@JsonKey(name: 'rule_slots') final  int ruleSlots;
+@override@JsonKey(name: 'concurrent_jobs') final  int concurrentJobs;
 
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.
@@ -247,16 +235,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _User&&(identical(other.id, id) || other.id == id)&&(identical(other.email, email) || other.email == email)&&(identical(other.name, name) || other.name == name)&&(identical(other.profileImage, profileImage) || other.profileImage == profileImage)&&(identical(other.credits, credits) || other.credits == credits)&&(identical(other.plan, plan) || other.plan == plan)&&(identical(other.ruleSlotsUsed, ruleSlotsUsed) || other.ruleSlotsUsed == ruleSlotsUsed)&&(identical(other.ruleSlotsMax, ruleSlotsMax) || other.ruleSlotsMax == ruleSlotsMax));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _User&&(identical(other.id, id) || other.id == id)&&(identical(other.plan, plan) || other.plan == plan)&&(identical(other.credits, credits) || other.credits == credits)&&(identical(other.ruleSlots, ruleSlots) || other.ruleSlots == ruleSlots)&&(identical(other.concurrentJobs, concurrentJobs) || other.concurrentJobs == concurrentJobs));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,email,name,profileImage,credits,plan,ruleSlotsUsed,ruleSlotsMax);
+int get hashCode => Object.hash(runtimeType,id,plan,credits,ruleSlots,concurrentJobs);
 
 @override
 String toString() {
-  return 'User(id: $id, email: $email, name: $name, profileImage: $profileImage, credits: $credits, plan: $plan, ruleSlotsUsed: $ruleSlotsUsed, ruleSlotsMax: $ruleSlotsMax)';
+  return 'User(id: $id, plan: $plan, credits: $credits, ruleSlots: $ruleSlots, concurrentJobs: $concurrentJobs)';
 }
 
 
@@ -267,7 +255,7 @@ abstract mixin class _$UserCopyWith<$Res> implements $UserCopyWith<$Res> {
   factory _$UserCopyWith(_User value, $Res Function(_User) _then) = __$UserCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String email, String? name, String? profileImage, int credits, String plan, int ruleSlotsUsed, int ruleSlotsMax
+@JsonKey(name: 'user_id') String id, String plan, int credits,@JsonKey(name: 'rule_slots') int ruleSlots,@JsonKey(name: 'concurrent_jobs') int concurrentJobs
 });
 
 
@@ -284,283 +272,14 @@ class __$UserCopyWithImpl<$Res>
 
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? email = null,Object? name = freezed,Object? profileImage = freezed,Object? credits = null,Object? plan = null,Object? ruleSlotsUsed = null,Object? ruleSlotsMax = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? plan = null,Object? credits = null,Object? ruleSlots = null,Object? concurrentJobs = null,}) {
   return _then(_User(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
-as String,email: null == email ? _self.email : email // ignore: cast_nullable_to_non_nullable
-as String,name: freezed == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String?,profileImage: freezed == profileImage ? _self.profileImage : profileImage // ignore: cast_nullable_to_non_nullable
-as String?,credits: null == credits ? _self.credits : credits // ignore: cast_nullable_to_non_nullable
-as int,plan: null == plan ? _self.plan : plan // ignore: cast_nullable_to_non_nullable
-as String,ruleSlotsUsed: null == ruleSlotsUsed ? _self.ruleSlotsUsed : ruleSlotsUsed // ignore: cast_nullable_to_non_nullable
-as int,ruleSlotsMax: null == ruleSlotsMax ? _self.ruleSlotsMax : ruleSlotsMax // ignore: cast_nullable_to_non_nullable
+as String,plan: null == plan ? _self.plan : plan // ignore: cast_nullable_to_non_nullable
+as String,credits: null == credits ? _self.credits : credits // ignore: cast_nullable_to_non_nullable
+as int,ruleSlots: null == ruleSlots ? _self.ruleSlots : ruleSlots // ignore: cast_nullable_to_non_nullable
+as int,concurrentJobs: null == concurrentJobs ? _self.concurrentJobs : concurrentJobs // ignore: cast_nullable_to_non_nullable
 as int,
-  ));
-}
-
-
-}
-
-
-/// @nodoc
-mixin _$LoginRequest {
-
- String get email; String get password;
-/// Create a copy of LoginRequest
-/// with the given fields replaced by the non-null parameter values.
-@JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-$LoginRequestCopyWith<LoginRequest> get copyWith => _$LoginRequestCopyWithImpl<LoginRequest>(this as LoginRequest, _$identity);
-
-  /// Serializes this LoginRequest to a JSON map.
-  Map<String, dynamic> toJson();
-
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is LoginRequest&&(identical(other.email, email) || other.email == email)&&(identical(other.password, password) || other.password == password));
-}
-
-@JsonKey(includeFromJson: false, includeToJson: false)
-@override
-int get hashCode => Object.hash(runtimeType,email,password);
-
-@override
-String toString() {
-  return 'LoginRequest(email: $email, password: $password)';
-}
-
-
-}
-
-/// @nodoc
-abstract mixin class $LoginRequestCopyWith<$Res>  {
-  factory $LoginRequestCopyWith(LoginRequest value, $Res Function(LoginRequest) _then) = _$LoginRequestCopyWithImpl;
-@useResult
-$Res call({
- String email, String password
-});
-
-
-
-
-}
-/// @nodoc
-class _$LoginRequestCopyWithImpl<$Res>
-    implements $LoginRequestCopyWith<$Res> {
-  _$LoginRequestCopyWithImpl(this._self, this._then);
-
-  final LoginRequest _self;
-  final $Res Function(LoginRequest) _then;
-
-/// Create a copy of LoginRequest
-/// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? email = null,Object? password = null,}) {
-  return _then(_self.copyWith(
-email: null == email ? _self.email : email // ignore: cast_nullable_to_non_nullable
-as String,password: null == password ? _self.password : password // ignore: cast_nullable_to_non_nullable
-as String,
-  ));
-}
-
-}
-
-
-/// Adds pattern-matching-related methods to [LoginRequest].
-extension LoginRequestPatterns on LoginRequest {
-/// A variant of `map` that fallback to returning `orElse`.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case _:
-///     return orElse();
-/// }
-/// ```
-
-@optionalTypeArgs TResult maybeMap<TResult extends Object?>(TResult Function( _LoginRequest value)?  $default,{required TResult orElse(),}){
-final _that = this;
-switch (_that) {
-case _LoginRequest() when $default != null:
-return $default(_that);case _:
-  return orElse();
-
-}
-}
-/// A `switch`-like method, using callbacks.
-///
-/// Callbacks receives the raw object, upcasted.
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case final Subclass2 value:
-///     return ...;
-/// }
-/// ```
-
-@optionalTypeArgs TResult map<TResult extends Object?>(TResult Function( _LoginRequest value)  $default,){
-final _that = this;
-switch (_that) {
-case _LoginRequest():
-return $default(_that);case _:
-  throw StateError('Unexpected subclass');
-
-}
-}
-/// A variant of `map` that fallback to returning `null`.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case final Subclass value:
-///     return ...;
-///   case _:
-///     return null;
-/// }
-/// ```
-
-@optionalTypeArgs TResult? mapOrNull<TResult extends Object?>(TResult? Function( _LoginRequest value)?  $default,){
-final _that = this;
-switch (_that) {
-case _LoginRequest() when $default != null:
-return $default(_that);case _:
-  return null;
-
-}
-}
-/// A variant of `when` that fallback to an `orElse` callback.
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case _:
-///     return orElse();
-/// }
-/// ```
-
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String email,  String password)?  $default,{required TResult orElse(),}) {final _that = this;
-switch (_that) {
-case _LoginRequest() when $default != null:
-return $default(_that.email,_that.password);case _:
-  return orElse();
-
-}
-}
-/// A `switch`-like method, using callbacks.
-///
-/// As opposed to `map`, this offers destructuring.
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case Subclass2(:final field2):
-///     return ...;
-/// }
-/// ```
-
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String email,  String password)  $default,) {final _that = this;
-switch (_that) {
-case _LoginRequest():
-return $default(_that.email,_that.password);case _:
-  throw StateError('Unexpected subclass');
-
-}
-}
-/// A variant of `when` that fallback to returning `null`
-///
-/// It is equivalent to doing:
-/// ```dart
-/// switch (sealedClass) {
-///   case Subclass(:final field):
-///     return ...;
-///   case _:
-///     return null;
-/// }
-/// ```
-
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String email,  String password)?  $default,) {final _that = this;
-switch (_that) {
-case _LoginRequest() when $default != null:
-return $default(_that.email,_that.password);case _:
-  return null;
-
-}
-}
-
-}
-
-/// @nodoc
-@JsonSerializable()
-
-class _LoginRequest implements LoginRequest {
-  const _LoginRequest({required this.email, required this.password});
-  factory _LoginRequest.fromJson(Map<String, dynamic> json) => _$LoginRequestFromJson(json);
-
-@override final  String email;
-@override final  String password;
-
-/// Create a copy of LoginRequest
-/// with the given fields replaced by the non-null parameter values.
-@override @JsonKey(includeFromJson: false, includeToJson: false)
-@pragma('vm:prefer-inline')
-_$LoginRequestCopyWith<_LoginRequest> get copyWith => __$LoginRequestCopyWithImpl<_LoginRequest>(this, _$identity);
-
-@override
-Map<String, dynamic> toJson() {
-  return _$LoginRequestToJson(this, );
-}
-
-@override
-bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _LoginRequest&&(identical(other.email, email) || other.email == email)&&(identical(other.password, password) || other.password == password));
-}
-
-@JsonKey(includeFromJson: false, includeToJson: false)
-@override
-int get hashCode => Object.hash(runtimeType,email,password);
-
-@override
-String toString() {
-  return 'LoginRequest(email: $email, password: $password)';
-}
-
-
-}
-
-/// @nodoc
-abstract mixin class _$LoginRequestCopyWith<$Res> implements $LoginRequestCopyWith<$Res> {
-  factory _$LoginRequestCopyWith(_LoginRequest value, $Res Function(_LoginRequest) _then) = __$LoginRequestCopyWithImpl;
-@override @useResult
-$Res call({
- String email, String password
-});
-
-
-
-
-}
-/// @nodoc
-class __$LoginRequestCopyWithImpl<$Res>
-    implements _$LoginRequestCopyWith<$Res> {
-  __$LoginRequestCopyWithImpl(this._self, this._then);
-
-  final _LoginRequest _self;
-  final $Res Function(_LoginRequest) _then;
-
-/// Create a copy of LoginRequest
-/// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? email = null,Object? password = null,}) {
-  return _then(_LoginRequest(
-email: null == email ? _self.email : email // ignore: cast_nullable_to_non_nullable
-as String,password: null == password ? _self.password : password // ignore: cast_nullable_to_non_nullable
-as String,
   ));
 }
 
@@ -571,7 +290,7 @@ as String,
 /// @nodoc
 mixin _$LoginResponse {
 
- String get accessToken; String get refreshToken; User get user;
+@JsonKey(name: 'user_id') String get userId; String get token; String get plan;@JsonKey(name: 'is_new') bool get isNew;
 /// Create a copy of LoginResponse
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -584,16 +303,16 @@ $LoginResponseCopyWith<LoginResponse> get copyWith => _$LoginResponseCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is LoginResponse&&(identical(other.accessToken, accessToken) || other.accessToken == accessToken)&&(identical(other.refreshToken, refreshToken) || other.refreshToken == refreshToken)&&(identical(other.user, user) || other.user == user));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is LoginResponse&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.token, token) || other.token == token)&&(identical(other.plan, plan) || other.plan == plan)&&(identical(other.isNew, isNew) || other.isNew == isNew));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,accessToken,refreshToken,user);
+int get hashCode => Object.hash(runtimeType,userId,token,plan,isNew);
 
 @override
 String toString() {
-  return 'LoginResponse(accessToken: $accessToken, refreshToken: $refreshToken, user: $user)';
+  return 'LoginResponse(userId: $userId, token: $token, plan: $plan, isNew: $isNew)';
 }
 
 
@@ -604,11 +323,11 @@ abstract mixin class $LoginResponseCopyWith<$Res>  {
   factory $LoginResponseCopyWith(LoginResponse value, $Res Function(LoginResponse) _then) = _$LoginResponseCopyWithImpl;
 @useResult
 $Res call({
- String accessToken, String refreshToken, User user
+@JsonKey(name: 'user_id') String userId, String token, String plan,@JsonKey(name: 'is_new') bool isNew
 });
 
 
-$UserCopyWith<$Res> get user;
+
 
 }
 /// @nodoc
@@ -621,24 +340,16 @@ class _$LoginResponseCopyWithImpl<$Res>
 
 /// Create a copy of LoginResponse
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? accessToken = null,Object? refreshToken = null,Object? user = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? userId = null,Object? token = null,Object? plan = null,Object? isNew = null,}) {
   return _then(_self.copyWith(
-accessToken: null == accessToken ? _self.accessToken : accessToken // ignore: cast_nullable_to_non_nullable
-as String,refreshToken: null == refreshToken ? _self.refreshToken : refreshToken // ignore: cast_nullable_to_non_nullable
-as String,user: null == user ? _self.user : user // ignore: cast_nullable_to_non_nullable
-as User,
+userId: null == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
+as String,token: null == token ? _self.token : token // ignore: cast_nullable_to_non_nullable
+as String,plan: null == plan ? _self.plan : plan // ignore: cast_nullable_to_non_nullable
+as String,isNew: null == isNew ? _self.isNew : isNew // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
-/// Create a copy of LoginResponse
-/// with the given fields replaced by the non-null parameter values.
-@override
-@pragma('vm:prefer-inline')
-$UserCopyWith<$Res> get user {
-  
-  return $UserCopyWith<$Res>(_self.user, (value) {
-    return _then(_self.copyWith(user: value));
-  });
-}
+
 }
 
 
@@ -720,10 +431,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String accessToken,  String refreshToken,  User user)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String userId,  String token,  String plan, @JsonKey(name: 'is_new')  bool isNew)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _LoginResponse() when $default != null:
-return $default(_that.accessToken,_that.refreshToken,_that.user);case _:
+return $default(_that.userId,_that.token,_that.plan,_that.isNew);case _:
   return orElse();
 
 }
@@ -741,10 +452,10 @@ return $default(_that.accessToken,_that.refreshToken,_that.user);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String accessToken,  String refreshToken,  User user)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'user_id')  String userId,  String token,  String plan, @JsonKey(name: 'is_new')  bool isNew)  $default,) {final _that = this;
 switch (_that) {
 case _LoginResponse():
-return $default(_that.accessToken,_that.refreshToken,_that.user);case _:
+return $default(_that.userId,_that.token,_that.plan,_that.isNew);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -761,10 +472,10 @@ return $default(_that.accessToken,_that.refreshToken,_that.user);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String accessToken,  String refreshToken,  User user)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'user_id')  String userId,  String token,  String plan, @JsonKey(name: 'is_new')  bool isNew)?  $default,) {final _that = this;
 switch (_that) {
 case _LoginResponse() when $default != null:
-return $default(_that.accessToken,_that.refreshToken,_that.user);case _:
+return $default(_that.userId,_that.token,_that.plan,_that.isNew);case _:
   return null;
 
 }
@@ -776,12 +487,13 @@ return $default(_that.accessToken,_that.refreshToken,_that.user);case _:
 @JsonSerializable()
 
 class _LoginResponse implements LoginResponse {
-  const _LoginResponse({required this.accessToken, required this.refreshToken, required this.user});
+  const _LoginResponse({@JsonKey(name: 'user_id') required this.userId, required this.token, this.plan = 'free', @JsonKey(name: 'is_new') this.isNew = false});
   factory _LoginResponse.fromJson(Map<String, dynamic> json) => _$LoginResponseFromJson(json);
 
-@override final  String accessToken;
-@override final  String refreshToken;
-@override final  User user;
+@override@JsonKey(name: 'user_id') final  String userId;
+@override final  String token;
+@override@JsonKey() final  String plan;
+@override@JsonKey(name: 'is_new') final  bool isNew;
 
 /// Create a copy of LoginResponse
 /// with the given fields replaced by the non-null parameter values.
@@ -796,16 +508,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _LoginResponse&&(identical(other.accessToken, accessToken) || other.accessToken == accessToken)&&(identical(other.refreshToken, refreshToken) || other.refreshToken == refreshToken)&&(identical(other.user, user) || other.user == user));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _LoginResponse&&(identical(other.userId, userId) || other.userId == userId)&&(identical(other.token, token) || other.token == token)&&(identical(other.plan, plan) || other.plan == plan)&&(identical(other.isNew, isNew) || other.isNew == isNew));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,accessToken,refreshToken,user);
+int get hashCode => Object.hash(runtimeType,userId,token,plan,isNew);
 
 @override
 String toString() {
-  return 'LoginResponse(accessToken: $accessToken, refreshToken: $refreshToken, user: $user)';
+  return 'LoginResponse(userId: $userId, token: $token, plan: $plan, isNew: $isNew)';
 }
 
 
@@ -816,11 +528,11 @@ abstract mixin class _$LoginResponseCopyWith<$Res> implements $LoginResponseCopy
   factory _$LoginResponseCopyWith(_LoginResponse value, $Res Function(_LoginResponse) _then) = __$LoginResponseCopyWithImpl;
 @override @useResult
 $Res call({
- String accessToken, String refreshToken, User user
+@JsonKey(name: 'user_id') String userId, String token, String plan,@JsonKey(name: 'is_new') bool isNew
 });
 
 
-@override $UserCopyWith<$Res> get user;
+
 
 }
 /// @nodoc
@@ -833,25 +545,17 @@ class __$LoginResponseCopyWithImpl<$Res>
 
 /// Create a copy of LoginResponse
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? accessToken = null,Object? refreshToken = null,Object? user = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? userId = null,Object? token = null,Object? plan = null,Object? isNew = null,}) {
   return _then(_LoginResponse(
-accessToken: null == accessToken ? _self.accessToken : accessToken // ignore: cast_nullable_to_non_nullable
-as String,refreshToken: null == refreshToken ? _self.refreshToken : refreshToken // ignore: cast_nullable_to_non_nullable
-as String,user: null == user ? _self.user : user // ignore: cast_nullable_to_non_nullable
-as User,
+userId: null == userId ? _self.userId : userId // ignore: cast_nullable_to_non_nullable
+as String,token: null == token ? _self.token : token // ignore: cast_nullable_to_non_nullable
+as String,plan: null == plan ? _self.plan : plan // ignore: cast_nullable_to_non_nullable
+as String,isNew: null == isNew ? _self.isNew : isNew // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 
-/// Create a copy of LoginResponse
-/// with the given fields replaced by the non-null parameter values.
-@override
-@pragma('vm:prefer-inline')
-$UserCopyWith<$Res> get user {
-  
-  return $UserCopyWith<$Res>(_self.user, (value) {
-    return _then(_self.copyWith(user: value));
-  });
-}
+
 }
 
 // dart format on

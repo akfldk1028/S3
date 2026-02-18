@@ -132,7 +132,7 @@ export class JobCoordinatorDO extends DurableObject<Env> {
     return rows.length > 0 ? (rows[0] as JobStateRow) : null;
   }
 
-  private async transitionState(newStatus: JobStatus): Promise<boolean> {
+  private transitionState(newStatus: JobStatus): boolean {
     const row = this.getJobState();
     if (!row) {
       console.log(`[JobCoordinatorDO][transitionState] REJECTED to=${newStatus} reason=no_job_state`);
@@ -196,19 +196,19 @@ export class JobCoordinatorDO extends DurableObject<Env> {
 
   // ─── confirmUpload (created → uploaded) ─────────────────────────────────────
 
-  async confirmUpload(): Promise<{ success: boolean }> {
-    const success = await this.transitionState('uploaded');
+  confirmUpload(): { success: boolean } {
+    const success = this.transitionState('uploaded');
     return { success };
   }
 
   // ─── markQueued (uploaded → queued) ─────────────────────────────────────────
 
-  async markQueued(
+  markQueued(
     conceptsJson: string,
     protectJson: string,
     ruleId?: string,
-  ): Promise<{ success: boolean }> {
-    const success = await this.transitionState('queued');
+  ): { success: boolean } {
+    const success = this.transitionState('queued');
     if (success) {
       this.ctx.storage.sql.exec(
         `UPDATE job_state SET concepts_json = ?, protect_json = ?, rule_id = ?, updated_at = ?`,
@@ -308,7 +308,7 @@ export class JobCoordinatorDO extends DurableObject<Env> {
 
     // 6. Transition queued → running on first callback arrival
     if (jobRow.status === 'queued') {
-      await this.transitionState('running');
+      this.transitionState('running');
     }
 
     // 7. Check for terminal condition
@@ -317,7 +317,7 @@ export class JobCoordinatorDO extends DurableObject<Env> {
       const { total_items, done_items, failed_items } = updatedRow;
       if (done_items + failed_items >= total_items) {
         const finalStatus: JobStatus = done_items > 0 ? 'done' : 'failed';
-        await this.transitionState(finalStatus);
+        this.transitionState(finalStatus);
         // Schedule D1 flush alarm with short delay to batch any in-flight callbacks
         await this.ctx.storage.setAlarm(Date.now() + 5_000);
       }
@@ -383,7 +383,7 @@ export class JobCoordinatorDO extends DurableObject<Env> {
       return { success: false };
     }
 
-    const success = await this.transitionState('canceled');
+    const success = this.transitionState('canceled');
     if (success) {
       // Schedule D1 flush + release
       await this.ctx.storage.setAlarm(Date.now() + 5_000);

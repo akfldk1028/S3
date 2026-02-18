@@ -5,22 +5,23 @@
 
 ---
 
-## 연결 상태 (2026-02-18)
+## 연결 상태 (2026-02-18, 버그 수정 배포 완료)
 
 ```
 ┌──────────────┐      ┌─────────────────────────────────┐      ┌──────────────────┐
-│   Flutter    │─ ✗ ──│  Cloudflare                     │─ ✗ ──│  GPU Worker      │
+│   Flutter    │─ ✓ ──│  Cloudflare                     │─ ✗ ──│  GPU Worker      │
 │   App        │      │  Workers + DO + D1 + R2         │      │  (Runpod)        │
-│  (Mock만 사용)│      │  (배포됨, Jobs stub)             │      │  (코드만 완성)    │
+│ (S3ApiClient)│      │  (배포됨, Jobs stub)             │      │  (코드만 완성)    │
 └──────────────┘      └─────────────────────────────────┘      └──────────────────┘
 ```
 
 ### 한눈에 보는 현황
 
-| 구간 | 상태 | 문제 |
+| 구간 | 상태 | 비고 |
 |------|------|------|
-| Flutter → Workers | **끊김** | `MockApiClient` 하드코딩, baseUrl이 `localhost:8787` |
-| Workers Auth/Presets/Rules | **작동** | 8개 엔드포인트 정상 (health 포함) |
+| Flutter → Workers | **연결됨** | S3ApiClient + JWT + envelope unwrap |
+| Auth (anon JWT) | **연결됨** | POST /auth/anon → token → SecureStorage |
+| Workers Auth/Presets/Rules/Me | **작동** | 9개 엔드포인트 정상 (DO init 버그 수정 완료) |
 | Workers Jobs (6개) | **미구현** | 라우트 핸들러가 빈 stub |
 | Workers → GPU Queue | **미구현** | Queue consumer가 log+ack만 |
 | GPU Worker | **미배포** | 코드 23파일 완성, Runpod 미배포 |
@@ -48,15 +49,13 @@
 
 ---
 
-## 작동하는 것 vs 안 되는 것
-
-### Workers API (`https://s3-workers.clickaround8.workers.dev`)
+## Workers API (`https://s3-workers.clickaround8.workers.dev`)
 
 | Endpoint | 상태 | 처리 주체 |
 |----------|------|----------|
 | `GET /health` | **작동** | Workers |
 | `POST /auth/anon` | **작동** | Workers → D1 |
-| `GET /me` | **작동** | UserLimiterDO |
+| `GET /me` | **작동** | UserLimiterDO → D1 |
 | `GET /presets` | **작동** | Workers (하드코딩) |
 | `GET /presets/:id` | **작동** | Workers |
 | `POST /rules` | **작동** | UserLimiterDO → D1 |
@@ -70,48 +69,56 @@
 | `POST /jobs/:id/callback` | **빈 stub** | — |
 | `POST /jobs/:id/cancel` | **빈 stub** | — |
 
-### Durable Objects (완전 구현, 호출하는 라우트가 없을 뿐)
-
-- **UserLimiterDO**: init, getUserState, reserve, commit, rollback, release, checkRuleSlot, increment/decrementRuleSlot
-- **JobCoordinatorDO**: create, confirmUpload, markQueued, onItemResult (멱등성 ring buffer), getStatus, cancel, alarm (D1 flush)
-
-### Flutter Frontend (UI 완성, 연결 끊김)
-
-- **S3ApiClient** (Dio + JWT + envelope unwrap): 완전 구현
-- **MockApiClient**: 완전 구현
-- **WorkspaceScreen** + 10+ 위젯: 완전 구현
-- **모든 Feature 화면**: domain, palette, upload, rules, results, history, settings
-
 ---
 
-## 끊어진 연결 3개소 (이것만 고치면 작동)
+## Frontend ↔ Workers 연결 상세
 
-### 1. Frontend → Workers 연결
-
-```
-파일: frontend/lib/constants/api_endpoints.dart  (Line 11)
-현재: static const baseUrl = 'http://localhost:8787';
-수정: static const baseUrl = 'https://s3-workers.clickaround8.workers.dev';
-
-파일: frontend/lib/core/api/api_client_provider.dart  (Line 20)
-현재: return MockApiClient();
-수정: return S3ApiClient();
-```
-
-### 2. Auth Flow 미완성
+### Auth Flow (작동)
 
 ```
-파일: frontend/lib/core/auth/auth_provider.dart  (Lines 22-29)
-현재: login()이 SecureStorage에서 읽기만 함 (POST /auth/anon 호출 안 함)
-수정: apiClient.createAnonUser() 호출 → JWT 저장 → state 업데이트
+1. App 실행 → /splash (2초 애니메이션)
+2. SecureStorage에 token 있으면 → /domain-select
+3. token 없으면 → /auth (AuthScreen)
+4. AuthScreen → authProvider.login() → POST /auth/anon
+5. Workers → D1 user 생성 → JWT 발급 → { user_id, token, plan, is_new }
+6. S3ApiClient envelope unwrap → LoginResponse.fromJson()
+7. token을 SecureStorage에 저장 (key: 'accessToken')
+8. authProvider state 변경 → GoRouter redirect → /domain-select
+9. 이후 모든 요청: Authorization: Bearer <JWT>
 ```
 
-### 3. Router에 Workspace 없음
+### API Client 구조
 
 ```
-파일: frontend/lib/routing/app_router.dart
-현재: /splash, /, /login, /profile  (4개뿐)
-수정: / → WorkspaceScreen, /auth → AuthScreen  (workspace를 메인으로)
+apiClientProvider (@riverpod)
+  └─ S3ApiClient (Dio)
+       ├─ baseUrl: ApiEndpoints.baseUrl (production Workers URL)
+       ├─ Interceptor 1: FlutterSecureStorage → Bearer token 주입
+       └─ Interceptor 2: { success, data } envelope unwrap
+```
+
+### Router (GoRouter + Auth Guard)
+
+```
+/splash         → SplashScreen (initial, no guard)
+/auth           → AuthScreen (auto anon login)
+/domain-select  → DomainSelectScreen
+/palette        → PaletteScreen (?presetId=)
+/upload         → UploadScreen (?presetId=&concepts=&protect=)
+/rules          → RulesScreen (?jobId=)
+/jobs/:id       → JobProgressScreen
+```
+
+Guard: 미인증 → /auth, 인증+/auth → /domain-select
+
+### Data Models (Workers 응답과 일치)
+
+```dart
+// POST /auth/anon → LoginResponse
+{ user_id, token, plan, is_new }
+
+// GET /me → User
+{ user_id, plan, credits, rule_slots, concurrent_jobs }
 ```
 
 ---
@@ -121,8 +128,8 @@
 ```
 Step  Flow                             현재
 ────  ───────────────────────────────  ──────
- 1    Flutter → POST /auth/anon        ✗ Mock (Workers는 작동함)
- 2    Flutter → GET /presets/:id       ✗ Mock (Workers는 작동함)
+ 1    Flutter → POST /auth/anon        ✓ 연결됨 (JWT 발급 → 저장)
+ 2    Flutter → GET /presets/:id       ✓ 연결됨 (프리셋 로드)
  3    Flutter → POST /jobs             ✗ Workers stub
  4    Flutter → R2 PUT (presigned)     ✗ presigned URL 미생성
  5    Flutter → POST /confirm-upload   ✗ Workers stub
@@ -141,7 +148,7 @@ Step  Flow                             현재
 
 ```
 S3/
-├── README.md                  ← 이 파일 (현황 + 연결 상태)
+├── README.md                  ← 이 파일
 ├── CLAUDE.md                  # Agent 코딩 규칙, MCP 도구, 아키텍처
 ├── workflow.md                # SSoT — API 스키마, 데이터 모델, 전체 설계
 ├── TODO.md                    # Phase A~E 실행 계획
@@ -150,83 +157,54 @@ S3/
 │   ├── src/
 │   │   ├── index.ts           # Entry: routes mount + queue consumer
 │   │   ├── auth/              # ✅ POST /auth/anon — JWT 발급
-│   │   │   ├── auth.route.ts
-│   │   │   └── auth.service.ts
 │   │   ├── presets/           # ✅ GET /presets, /presets/:id
-│   │   │   ├── presets.route.ts
-│   │   │   └── presets.data.ts  # interior(12개), seller(6개) 하드코딩
 │   │   ├── rules/             # ✅ CRUD 4개
-│   │   │   ├── rules.route.ts
-│   │   │   ├── rules.service.ts # D1 queries
-│   │   │   └── rules.validator.ts
-│   │   ├── user/              # ✅ GET /me
-│   │   │   └── user.route.ts
+│   │   ├── user/              # ✅ GET /me (mounted at /me)
 │   │   ├── jobs/              # ❌ 6개 stub
-│   │   │   ├── jobs.route.ts  #   GET /jobs만 구현, 나머지 빈 주석
-│   │   │   ├── jobs.service.ts#   generateUploadUrls → "Not implemented"
-│   │   │   └── jobs.validator.ts# Zod 스키마는 정의됨 (사용 안 됨)
-│   │   ├── do/                # ✅ 완전 구현 (호출하는 라우트가 없을 뿐)
-│   │   │   ├── UserLimiterDO.ts
-│   │   │   └── JobCoordinatorDO.ts
+│   │   ├── do/                # ✅ 완전 구현 (UserLimiter, JobCoordinator)
 │   │   ├── middleware/        # ✅ JWT 검증
-│   │   │   └── auth.middleware.ts
-│   │   └── _shared/
-│   │       ├── types.ts       # Env 바인딩, PLAN_LIMITS, 모든 타입
-│   │       ├── response.ts    # ok(), error() envelope 헬퍼
-│   │       └── r2.ts          # presigned URL 헬퍼 (존재하나 미사용)
+│   │   └── _shared/          # 타입, response helper, R2 helper
 │   ├── migrations/
-│   │   └── 0001_init_schema.sql # D1 5 tables + 4 indexes
-│   └── wrangler.toml          # D1/R2/DO/Queue 바인딩
+│   │   └── 0001_init_schema.sql
+│   └── wrangler.toml
 │
 ├── gpu-worker/                # ── GPU Worker (Python + Docker) ──
-│   ├── engine/                # ✅ 구현됨
-│   │   ├── pipeline.py        # segment → apply → postprocess → upload
-│   │   ├── segmenter.py       # SAM3 wrapper
-│   │   ├── applier.py         # Rule apply
-│   │   ├── r2_io.py           # S3/R2 업/다운로드
-│   │   └── callback.py        # Workers 콜백
+│   ├── engine/                # ✅ SAM3 pipeline (미배포)
 │   ├── adapters/              # ✅ Runpod Serverless adapter
-│   ├── presets/               # ✅ 도메인별 concept 매핑
-│   ├── Dockerfile             # ✅ 빌드 가능
-│   └── main.py                # ✅ Entry point
-│   # ⚠️ Runpod에 미배포
+│   ├── Dockerfile
+│   └── main.py
 │
 ├── frontend/                  # ── Flutter App ──
 │   └── lib/
 │       ├── constants/
-│       │   └── api_endpoints.dart    # ❌ baseUrl = localhost:8787
+│       │   └── api_endpoints.dart    # ✅ baseUrl = production Workers URL
 │       ├── core/
 │       │   ├── api/
 │       │   │   ├── api_client.dart          # ✅ 인터페이스 14개 메서드
 │       │   │   ├── s3_api_client.dart       # ✅ 실제 구현 (Dio+JWT+envelope)
-│       │   │   ├── mock_api_client.dart     # ✅ Mock 구현
-│       │   │   └── api_client_provider.dart # ❌ MockApiClient() 하드코딩
+│       │   │   ├── mock_api_client.dart     # ✅ Mock (테스트용)
+│       │   │   └── api_client_provider.dart # ✅ S3ApiClient() 사용
 │       │   ├── auth/
-│       │   │   └── auth_provider.dart       # ❌ login() stub
+│       │   │   ├── auth_provider.dart       # ✅ POST /auth/anon → JWT 저장
+│       │   │   └── user_provider.dart       # ✅ GET /me → User
 │       │   └── models/                      # ✅ Job, Preset, Rule (Freezed)
 │       ├── routing/
-│       │   └── app_router.dart    # ❌ 4개 라우트만 (workspace 없음)
+│       │   └── app_router.dart    # ✅ 8개 라우트 + auth guard
 │       └── features/
-│           ├── workspace/         # ✅ 단일페이지 UI (라우터에 미연결)
+│           ├── auth/              # ✅ AuthScreen (auto anon login)
+│           ├── splash/            # ✅ SplashScreen (auth check → redirect)
+│           ├── domain_select/     # ✅ 프리셋 선택
 │           ├── palette/           # ✅ concept 선택
-│           ├── rules/             # ✅ 룰 CRUD
 │           ├── upload/            # ✅ 업로드 화면
+│           ├── rules/             # ✅ 룰 CRUD
+│           ├── jobs/              # ✅ Job 진행률
+│           ├── workspace/         # ✅ 메인 작업 화면
 │           ├── results/           # ✅ 결과 표시
 │           ├── history/           # ✅ 히스토리
-│           └── settings/          # ✅ 설정
+│           ├── pricing/           # ✅ 플랜 비교
+│           └── settings/          # ✅ 설정 + 로그아웃
 │
-├── docs/
-│   ├── cloudflare-resources.md  # CF 리소스 ID/URL
-│   ├── project-structure.md     # 폴더 구조 상세
-│   └── wrangler-vs-do.md        # Workers vs DO 차이
-│
-├── team/                      # 팀원 역할 가이드
-│   ├── README.md
-│   ├── MEMBER-A-WORKERS-CORE.md
-│   ├── MEMBER-B-WORKERS-DO.md
-│   ├── MEMBER-C-GPU.md
-│   └── MEMBER-D-FRONTEND.md
-│
+├── docs/                      # 문서
 └── clone/Auto-Claude/         # 24/7 자동 빌드 시스템
 ```
 
@@ -238,7 +216,7 @@ S3/
 |----------|---------|------------|
 | Workers | `s3-workers` | `https://s3-workers.clickaround8.workers.dev` |
 | D1 | `s3-db` | ID: `9e2d53af-ba37-4128-9ef8-0476ace30efa` |
-| R2 | `s3-images` | Bucket 존재, 비어있음 |
+| R2 | `s3-images` | Bucket 존재 |
 | Queue | `gpu-jobs` + `gpu-jobs-dlq` | Configured, max_batch=10, retries=3 |
 | DO | UserLimiterDO, JobCoordinatorDO | Auto-created on deploy |
 | Account | Clickaround8@gmail.com | `2c1b8299e2d8cec3f82a016fa88368aa` |
@@ -248,16 +226,9 @@ S3/
 
 ## Next Steps (Priority Order)
 
-### P0 — Frontend ↔ Workers 연결 (30분)
+### P1 — Jobs 6개 엔드포인트 구현
 
-1. `api_endpoints.dart` L11: baseUrl → `https://s3-workers.clickaround8.workers.dev`
-2. `api_client_provider.dart` L20: `MockApiClient()` → `S3ApiClient()`
-3. `auth_provider.dart`: login() → POST /auth/anon 호출 구현
-4. `app_router.dart`: `/` → WorkspaceScreen 라우트 추가
-
-### P1 — Jobs 6개 엔드포인트 구현 (2~4시간)
-
-DO 클래스 이미 완성 → 라우트 핸들러만 작성하면 됨:
+DO 클래스 이미 완성 → 라우트 핸들러만 작성:
 
 ```
 POST /jobs           → validate → UserLimiterDO.reserve() → JobCoordinatorDO.create() → presigned URLs
@@ -268,13 +239,13 @@ POST /callback       → verify GPU_CALLBACK_SECRET → JobCoordinatorDO.onItemR
 POST /cancel         → JobCoordinatorDO.cancel()
 ```
 
-### P2 — GPU Worker 배포 (1~2시간)
+### P2 — GPU Worker 배포
 
 1. Docker build → registry push
 2. Runpod Serverless endpoint 생성
 3. Queue consumer에서 GPU Worker HTTP 호출
 
-### P3 — E2E 테스트
+### P3 — E2E 통합 테스트
 
 Auth → Preset → Upload → Execute → GPU → Callback → Results
 
@@ -294,7 +265,8 @@ Auth → Preset → Upload → Execute → GPU → Callback → Results
 - 모델 수정 시: `workflow.md` 섹션 5~6 (D1 스키마 + API 응답)
 
 **주의사항:**
-- Frontend는 현재 **MockApiClient만 사용** (Workers와 통신 안 함)
+- Frontend는 **S3ApiClient 사용** (production Workers와 직접 통신)
+- Auth는 **자동 anon JWT** (FlutterSecureStorage에 저장)
 - Jobs 6개 엔드포인트는 **빈 stub** (DO는 완성됨)
 - R2 presigned URL 헬퍼는 **존재하나 호출되지 않음**
 - Queue consumer는 **log+ack만** (GPU로 전달 안 함)
@@ -320,9 +292,6 @@ cd frontend && dart run build_runner build --delete-conflicting-outputs
 # Frontend (분석 + 실행)
 cd frontend && flutter analyze
 cd frontend && flutter run
-
-# GPU Worker (Docker 빌드)
-cd gpu-worker && docker build -t s3-gpu .
 ```
 
 ---

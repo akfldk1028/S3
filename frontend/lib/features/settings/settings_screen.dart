@@ -278,7 +278,10 @@ class _UserInfoCard extends StatelessWidget {
               ),
 
               // ── Row 4: Rule Slots ──────────────────────────────────────
-              _RuleSlotsRow(used: user.ruleSlotsUsed, max: user.ruleSlotsMax),
+              _RuleSlotsRow(
+                used: user.ruleSlots,
+                max: user.plan == 'pro' ? 20 : 2,
+              ),
             ],
           ),
         ),

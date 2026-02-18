@@ -8,13 +8,59 @@ part of 'app_router.dart';
 
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // ignore_for_file: type=lint, type=warning
+/// GoRouter with auth guard via redirect callback.
+///
+/// Routes:
+/// - /splash : Animated splash (initial)
+/// - /auth : Auto anonymous login
+/// - /domain-select : Domain/preset selection
+/// - /palette : Concept chips, instance selection
+/// - /upload : Image picker, R2 upload
+/// - /rules : Rule editor (CRUD)
+/// - /jobs/:id : Job progress with polling
+///
+/// Auth Guard:
+/// - /splash is always allowed (no redirect)
+/// - Unauthenticated → /auth
+/// - Authenticated on /auth → /domain-select
 
 @ProviderFor(appRouter)
 final appRouterProvider = AppRouterProvider._();
 
+/// GoRouter with auth guard via redirect callback.
+///
+/// Routes:
+/// - /splash : Animated splash (initial)
+/// - /auth : Auto anonymous login
+/// - /domain-select : Domain/preset selection
+/// - /palette : Concept chips, instance selection
+/// - /upload : Image picker, R2 upload
+/// - /rules : Rule editor (CRUD)
+/// - /jobs/:id : Job progress with polling
+///
+/// Auth Guard:
+/// - /splash is always allowed (no redirect)
+/// - Unauthenticated → /auth
+/// - Authenticated on /auth → /domain-select
+
 final class AppRouterProvider
     extends $FunctionalProvider<GoRouter, GoRouter, GoRouter>
     with $Provider<GoRouter> {
+  /// GoRouter with auth guard via redirect callback.
+  ///
+  /// Routes:
+  /// - /splash : Animated splash (initial)
+  /// - /auth : Auto anonymous login
+  /// - /domain-select : Domain/preset selection
+  /// - /palette : Concept chips, instance selection
+  /// - /upload : Image picker, R2 upload
+  /// - /rules : Rule editor (CRUD)
+  /// - /jobs/:id : Job progress with polling
+  ///
+  /// Auth Guard:
+  /// - /splash is always allowed (no redirect)
+  /// - Unauthenticated → /auth
+  /// - Authenticated on /auth → /domain-select
   AppRouterProvider._()
     : super(
         from: null,
@@ -48,4 +94,4 @@ final class AppRouterProvider
   }
 }
 
-String _$appRouterHash() => r'36bdde0d288f4f098313b4830b393eb188fd35c3';
+String _$appRouterHash() => r'0d4f63afe49c6f6b8d04594b83e2bb0e715643ca';

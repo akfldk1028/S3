@@ -8,7 +8,7 @@ class ApiEndpoints {
   /// Workers API Base URL
   /// 로컬: http://localhost:8787
   /// 프로덕션: https://s3-api.your-domain.workers.dev
-  static const baseUrl = 'http://localhost:8787';
+  static const baseUrl = 'https://s3-workers.clickaround8.workers.dev';
 
   // ── Auth (2개) ────────────────────────────────────────
   /// POST — 익명 유저 생성 + JWT 발급

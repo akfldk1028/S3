@@ -10,42 +10,30 @@ part of 'api_client_provider.dart';
 // ignore_for_file: type=lint, type=warning
 /// Riverpod provider for ApiClient instance.
 ///
-/// Phase 1: Returns MockApiClient for development without backend.
-/// Phase 2: Switch to S3ApiClient when Workers API is ready.
+/// Returns [S3ApiClient] which communicates with the Cloudflare Workers API.
+/// S3ApiClient reads JWT from FlutterSecureStorage internally (no circular dep).
 ///
-/// Usage:
-/// ```dart
-/// final apiClient = ref.watch(apiClientProvider);
-/// final user = await apiClient.getMe();
-/// ```
+/// For testing, override this provider in ProviderScope with MockApiClient.
 
 @ProviderFor(apiClient)
 final apiClientProvider = ApiClientProvider._();
 
 /// Riverpod provider for ApiClient instance.
 ///
-/// Phase 1: Returns MockApiClient for development without backend.
-/// Phase 2: Switch to S3ApiClient when Workers API is ready.
+/// Returns [S3ApiClient] which communicates with the Cloudflare Workers API.
+/// S3ApiClient reads JWT from FlutterSecureStorage internally (no circular dep).
 ///
-/// Usage:
-/// ```dart
-/// final apiClient = ref.watch(apiClientProvider);
-/// final user = await apiClient.getMe();
-/// ```
+/// For testing, override this provider in ProviderScope with MockApiClient.
 
 final class ApiClientProvider
     extends $FunctionalProvider<ApiClient, ApiClient, ApiClient>
     with $Provider<ApiClient> {
   /// Riverpod provider for ApiClient instance.
   ///
-  /// Phase 1: Returns MockApiClient for development without backend.
-  /// Phase 2: Switch to S3ApiClient when Workers API is ready.
+  /// Returns [S3ApiClient] which communicates with the Cloudflare Workers API.
+  /// S3ApiClient reads JWT from FlutterSecureStorage internally (no circular dep).
   ///
-  /// Usage:
-  /// ```dart
-  /// final apiClient = ref.watch(apiClientProvider);
-  /// final user = await apiClient.getMe();
-  /// ```
+  /// For testing, override this provider in ProviderScope with MockApiClient.
   ApiClientProvider._()
     : super(
         from: null,
@@ -79,4 +67,4 @@ final class ApiClientProvider
   }
 }
 
-String _$apiClientHash() => r'4493721bebaa3c204877cbcb679078d27534f71d';
+String _$apiClientHash() => r'1d0ceb175ab0787582a0893424d5afb7dd10e3ce';

@@ -1,7 +1,8 @@
 /**
  * User Route — GET /me
  *
- * - UserLimiterDO.getUserState() → { userId, plan, credits, activeJobs, maxConcurrency, usedRuleSlots, maxRuleSlots }
+ * Fetches user state from UserLimiterDO.
+ * Calls init() first to ensure DO is initialized (INSERT OR IGNORE — safe to repeat).
  */
 
 import { Hono } from 'hono';
@@ -19,19 +20,28 @@ app.get('/', async (c) => {
   const user = c.get('user');
 
   try {
+    // D1에서 plan 조회 (DO init에 필요)
+    const userRow = await c.env.DB
+      .prepare('SELECT plan FROM users WHERE id = ?')
+      .bind(user.userId)
+      .first<{ plan: 'free' | 'pro' }>();
+
+    const plan = userRow?.plan ?? 'free';
+
+    // DO init (INSERT OR IGNORE — 이미 초기화되었으면 무시됨)
     const limiterNs = c.env.USER_LIMITER as unknown as DurableObjectNamespace<UserLimiterDO>;
     const limiterStub = limiterNs.get(limiterNs.idFromName(user.userId));
+    await limiterStub.init(user.userId, plan);
+
     const state = await limiterStub.getUserState();
 
     return c.json(
       ok({
-        userId: state.userId,
+        user_id: state.userId,
         plan: state.plan,
         credits: state.credits,
-        activeJobs: state.activeJobs,
-        maxConcurrency: state.maxConcurrency,
-        usedRuleSlots: state.ruleSlots,
-        maxRuleSlots: state.maxRuleSlots,
+        rule_slots: state.ruleSlots,
+        concurrent_jobs: state.activeJobs,
       }),
     );
   } catch (e) {

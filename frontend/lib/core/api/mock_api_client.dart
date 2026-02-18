@@ -38,9 +38,8 @@ class MockApiClient implements ApiClient {
   Future<LoginResponse> createAnonUser() async {
     await _simulateDelay();
     return const LoginResponse(
-      accessToken: 'mock-access-token',
-      refreshToken: 'mock-refresh-token',
-      user: User(id: 'anon-user-1', email: 'anon@example.com'),
+      userId: 'anon-user-1',
+      token: 'mock-jwt-token',
     );
   }
 
@@ -50,10 +49,9 @@ class MockApiClient implements ApiClient {
     required String password,
   }) async {
     await _simulateDelay();
-    return LoginResponse(
-      accessToken: 'mock-access-token',
-      refreshToken: 'mock-refresh-token',
-      user: User(id: 'user-1', email: email),
+    return const LoginResponse(
+      userId: 'user-1',
+      token: 'mock-jwt-token',
     );
   }
 
@@ -62,7 +60,7 @@ class MockApiClient implements ApiClient {
   @override
   Future<User> getMe() async {
     await _simulateDelay();
-    return const User(id: 'user-1', email: 'test@example.com', name: 'Test User');
+    return const User(id: 'user-1', credits: 10, ruleSlots: 0);
   }
 
   // ── Presets ──────────────────────────────────────────────────────────────

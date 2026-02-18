@@ -1,5 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import '../../features/auth/models/user_model.dart';
 import '../models/job.dart';
 import '../models/preset.dart';
@@ -68,13 +66,3 @@ abstract class ApiClient {
   /// 14. POST /jobs/:id/cancel - Cancel job + refund credits
   Future<void> cancelJob(String jobId);
 }
-
-/// Riverpod provider for the [ApiClient].
-///
-/// Override this provider in tests or feature flags to swap implementations.
-final apiClientProvider = Provider<ApiClient>((ref) {
-  throw UnimplementedError(
-    'apiClientProvider must be overridden before use. '
-    'Override with S3ApiClient or MockApiClient in ProviderScope.',
-  );
-});

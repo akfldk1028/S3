@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../auth/pages/providers/auth_provider.dart';
+import '../../core/auth/auth_provider.dart';
 import 'widgets/credit_topup_dialog.dart';
 import 'widgets/plan_upgrade_flow.dart';
 import 'widgets/pricing_card.dart';
 
 /// Main pricing comparison screen showing Free vs Pro plans.
 ///
-/// Uses [authStateProvider] to determine authentication status and defaults
+/// Uses [authProvider] to determine authentication status and defaults
 /// to 'free' plan. Responsive layout via [LayoutBuilder]:
 /// - Mobile (< 600 px): cards stacked in a [Column]
 /// - Desktop (≥ 600 px): cards side-by-side in a [Row]
@@ -74,15 +74,14 @@ class PricingScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authAsync = ref.watch(authStateProvider);
+    final authAsync = ref.watch(authProvider);
 
     return authAsync.when(
       loading: () => _buildLoadingScaffold(context),
       error: (_, _) => _buildContentScaffold(context, currentPlan: ''),
-      data: (isLoggedIn) => _buildContentScaffold(
+      data: (token) => _buildContentScaffold(
         context,
-        // No plan field on User model yet — authenticated users default to free.
-        currentPlan: isLoggedIn ? 'free' : '',
+        currentPlan: token != null ? 'free' : '',
       ),
     );
   }

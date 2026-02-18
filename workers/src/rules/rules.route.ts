@@ -41,8 +41,16 @@ app.post('/', async (c) => {
   const { name, preset_id, concepts, protect } = parsed.data;
 
   try {
+    // D1에서 plan 조회 + DO init (INSERT OR IGNORE — 반복 호출 안전)
+    const userRow = await c.env.DB
+      .prepare('SELECT plan FROM users WHERE id = ?')
+      .bind(user.userId)
+      .first<{ plan: 'free' | 'pro' }>();
+    const plan = userRow?.plan ?? 'free';
+
     const limiterNs = c.env.USER_LIMITER as unknown as DurableObjectNamespace<UserLimiterDO>;
     const limiterStub = limiterNs.get(limiterNs.idFromName(user.userId));
+    await limiterStub.init(user.userId, plan);
 
     const hasSlot = await limiterStub.checkRuleSlot();
     if (!hasSlot) {
@@ -158,8 +166,16 @@ app.delete('/:id', async (c) => {
       return c.json(error(ERR.RULE_NOT_FOUND, 'Rule not found or access denied'), 404);
     }
 
+    // D1에서 plan 조회 + DO init (INSERT OR IGNORE — 반복 호출 안전)
+    const userRow = await c.env.DB
+      .prepare('SELECT plan FROM users WHERE id = ?')
+      .bind(user.userId)
+      .first<{ plan: 'free' | 'pro' }>();
+    const plan = userRow?.plan ?? 'free';
+
     const limiterNs = c.env.USER_LIMITER as unknown as DurableObjectNamespace<UserLimiterDO>;
     const limiterStub = limiterNs.get(limiterNs.idFromName(user.userId));
+    await limiterStub.init(user.userId, plan);
     await limiterStub.decrementRuleSlot();
 
     return c.json(ok({ id: ruleId, deleted: true }));

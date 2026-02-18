@@ -4,15 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../auth/pages/providers/auth_provider.dart';
+import '../../core/auth/auth_provider.dart';
 import '../workspace/theme.dart';
 
 /// Animated splash screen shown on app launch.
 ///
 /// Displays a full-screen gradient background ([WsColors.gradientPrimary])
 /// with the S3 logo/text that fades in and scales up over 800 ms.
-/// After a total of 2 seconds, navigates to the workspace ('/') if an
-/// auth token is present, or to the login screen ('/login') otherwise.
+/// After a total of 2 seconds, navigates to /domain-select if an
+/// auth token is present, or to /auth otherwise.
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -53,29 +53,24 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _navTimer = Timer(const Duration(seconds: 2), _attemptNavigation);
   }
 
-  /// Navigates to '/' or '/login' based on current auth state.
-  ///
-  /// If the auth provider is still loading when this is called (e.g. reading
-  /// from secure storage), the method sets [_navPending] and the [build]
-  /// listener will call [_attemptNavigation] again once the value arrives.
+  /// Navigates to '/domain-select' or '/auth' based on current auth state.
   void _attemptNavigation() {
     if (!mounted) return;
 
-    final authAsync = ref.read(authStateProvider);
+    final authAsync = ref.read(authProvider);
     authAsync.when(
-      data: (isAuthenticated) {
+      data: (token) {
         _navPending = false;
         if (mounted) {
-          context.go(isAuthenticated ? '/' : '/login');
+          context.go(token != null ? '/domain-select' : '/auth');
         }
       },
       loading: () {
-        // Auth state is not ready yet — wait for it via the build listener.
         _navPending = true;
       },
       error: (error, _) {
         _navPending = false;
-        if (mounted) context.go('/login');
+        if (mounted) context.go('/auth');
       },
     );
   }
@@ -91,7 +86,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
   Widget build(BuildContext context) {
     // Watch auth state so that when it transitions from loading → data/error
     // while _navPending is true, we trigger navigation immediately.
-    ref.listen<AsyncValue<bool>>(authStateProvider, (_, next) {
+    ref.listen<AsyncValue<String?>>(authProvider, (_, next) {
       if (_navPending) {
         next.whenData((_) => _attemptNavigation());
         if (next is AsyncError) _attemptNavigation();

@@ -21,7 +21,7 @@ new_sqlite_classes = ["UserLimiterDO", "JobCoordinatorDO"]
 [[d1_databases]]
 binding = "DB"
 database_name = "s3-db"
-database_id = "placeholder-replace-after-create"
+database_id = "9e2d53af-ba37-4128-9ef8-0476ace30efa"
 migrations_dir = "migrations"
 
 [[r2_buckets]]

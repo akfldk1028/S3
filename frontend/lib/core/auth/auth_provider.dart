@@ -1,29 +1,36 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-const _kTokenKey = 'jwt_token';
+import '../api/api_client_provider.dart';
+
+const _kTokenKey = 'accessToken';
 const _storage = FlutterSecureStorage();
 
 /// Manages anonymous JWT authentication state.
 ///
 /// State: [AsyncValue<String?>] where String is the JWT token.
-/// - `null` / empty string → not authenticated
+/// - `null` → not authenticated
 /// - non-empty string → authenticated
+///
+/// Storage key is `'accessToken'` — same key that [S3ApiClient]'s
+/// interceptor reads from [FlutterSecureStorage].
 class _AuthNotifier extends AsyncNotifier<String?> {
   @override
   Future<String?> build() async {
     return await _storage.read(key: _kTokenKey);
   }
 
-  /// Performs an anonymous login (or re-reads stored JWT).
+  /// Performs anonymous login via POST /auth/anon.
   ///
-  /// Subclasses / future implementations should call the POST /auth/anon
-  /// endpoint here. For now this is a stub that reads from secure storage.
+  /// Stores the JWT token in [FlutterSecureStorage] under `'accessToken'`.
+  /// The GoRouter auth guard will redirect to /domain-select on success.
   Future<void> login() async {
     state = const AsyncValue.loading();
     try {
-      final token = await _storage.read(key: _kTokenKey);
-      state = AsyncValue.data(token);
+      final apiClient = ref.read(apiClientProvider);
+      final response = await apiClient.createAnonUser();
+      await _storage.write(key: _kTokenKey, value: response.token);
+      state = AsyncValue.data(response.token);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
