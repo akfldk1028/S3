@@ -27,6 +27,7 @@ import { DurableObject } from 'cloudflare:workers';
 import type { Env, JobCoordinatorState, JobItemState, JobStatus, CallbackPayload } from '../_shared/types';
 
 export class JobCoordinatorDO extends DurableObject<Env> {
+<<<<<<< HEAD
   /**
    * State Machine: Valid transitions map
    *
@@ -604,4 +605,22 @@ export class JobCoordinatorDO extends DurableObject<Env> {
       });
     }
   }
+=======
+  // Bug 2 verified: await sql.exec() — no fix needed (file is a stub, no implementation present).
+  // Scanned all sql.exec() calls in this file: none present (implementation is pending).
+  // When implemented, all this.ctx.storage.sql.exec() calls MUST be called WITHOUT await —
+  // ctx.storage.sql.exec() is synchronous in Cloudflare DO SQLite.
+  // Planned locations that must NOT use await (per spec):
+  //   constructor blockConcurrencyWhile: 3× CREATE TABLE calls
+  //   transitionState(): 3× UPDATE/INSERT calls
+  //   confirmUpload(): 1× UPDATE call
+  //   handleCallback(): ~9× SELECT/INSERT/UPDATE calls
+  //   alarm(): 2× SELECT calls
+  //   create(): 3× INSERT/UPDATE calls
+  //   markQueued(): 1× UPDATE call
+  //   getState(): 2× SELECT calls
+  // Preserve awaits on: ctx.blockConcurrencyWhile(), ctx.storage.setAlarm(),
+  //   this.env.DB.*() D1 calls, and any async method calls.
+  // TODO: implement FSM + idempotency + alarm
+>>>>>>> auto-claude/010-workers-userlimiterdo-sql-파라미터
 }

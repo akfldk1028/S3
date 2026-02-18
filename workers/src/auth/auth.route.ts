@@ -1,8 +1,19 @@
 /**
  * Auth Route — POST /auth/anon, GET /me
  *
+<<<<<<< HEAD
  * - POST /anon: device_hash (optional) 받음 → D1 user 생성 + JWT 발급
  * - GET /me: 인증된 유저 상태 조회 (UserLimiterDO stub)
+=======
+ * TODO: Auto-Claude 구현
+ * - device_hash (optional) 받음
+ * - auth.service.ts → D1 user 생성 + JWT 발급
+ * - Response: { user_id, token }
+ *
+ * Bug 3 verified: No duplicate GET /me handler present.
+ * The canonical GET /me handler lives in user.route.ts (mounted at /me in index.ts).
+ * No ERR import exists — no unused imports.
+>>>>>>> auto-claude/010-workers-userlimiterdo-sql-파라미터
  */
 
 import { Hono } from 'hono';
