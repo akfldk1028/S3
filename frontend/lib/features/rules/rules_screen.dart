@@ -120,7 +120,7 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Center(
                 child: Text(
-                  '${user.ruleSlots.used}/${user.ruleSlots.max} rules',
+                  '${user.ruleSlotsUsed}/${user.ruleSlotsMax} rules',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -214,7 +214,7 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
                         const SizedBox(height: 24),
                         userAsync.when(
                           data: (user) => ElevatedButton.icon(
-                            onPressed: user.ruleSlots.used >= user.ruleSlots.max
+                            onPressed: user.ruleSlotsUsed >= user.ruleSlotsMax
                                 ? null
                                 : () => _showRuleDialog(),
                             icon: const Icon(Icons.add),
@@ -313,13 +313,13 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
                     userAsync.when(
                       data: (user) {
                         final quotaReached =
-                            user.ruleSlots.used >= user.ruleSlots.max;
+                            user.ruleSlotsUsed >= user.ruleSlotsMax;
                         return ElevatedButton.icon(
                           onPressed: quotaReached ? null : () => _showRuleDialog(),
                           icon: const Icon(Icons.add),
                           label: Text(
                             quotaReached
-                                ? 'Quota Reached (${user.ruleSlots.max})'
+                                ? 'Quota Reached (${user.ruleSlotsMax})'
                                 : 'Create Rule',
                           ),
                           style: ElevatedButton.styleFrom(

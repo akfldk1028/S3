@@ -187,4 +187,41 @@ class Workspace extends _$Workspace {
   void clearError() {
     state = state.copyWith(errorMessage: null);
   }
+
+  /// 실패한 작업 재시도 — 이미지를 유지하고 다시 업로드 단계로 전환
+  void retryJob() {
+    state = state.copyWith(
+      phase: WorkspacePhase.photosSelected,
+      errorMessage: null,
+      uploadProgress: 0.0,
+      activeJob: null,
+    );
+  }
+
+  /// 현재 작업 취소 — 에러 상태 없이 이미지 선택 상태로 복귀
+  void cancelJob() {
+    state = state.copyWith(
+      phase: WorkspacePhase.photosSelected,
+      errorMessage: null,
+      uploadProgress: 0.0,
+      activeJob: null,
+    );
+  }
+
+  /// 워크스페이스 초기 상태로 완전 리셋
+  void resetToIdle() {
+    state = const WorkspaceState();
+  }
+
+  /// 이미지 개별 제거
+  void removePhoto(int index) {
+    final images = [...state.selectedImages];
+    if (index >= 0 && index < images.length) {
+      images.removeAt(index);
+      state = state.copyWith(
+        selectedImages: images,
+        phase: images.isEmpty ? WorkspacePhase.idle : state.phase,
+      );
+    }
+  }
 }

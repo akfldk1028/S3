@@ -7,9 +7,9 @@ import 'status_badge.dart';
 /// A single row in the History list representing one past job.
 ///
 /// Displays:
-/// - 56×56 thumbnail (or a placeholder icon if no outputs are ready or URL fails)
-/// - Preset name (with ellipsis on overflow) + StatusBadge
-/// - Image count + formatted creation date
+/// - Placeholder icon (thumbnail not available in current Job model)
+/// - Job ID (truncated) + StatusBadge
+/// - Progress info
 /// - Chevron right indicator
 class JobHistoryItem extends StatelessWidget {
   final Job job;
@@ -19,9 +19,6 @@ class JobHistoryItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final thumbnailUrl =
-        job.outputsReady.isNotEmpty ? job.outputsReady.first.previewUrl : null;
-
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -30,19 +27,10 @@ class JobHistoryItem extends StatelessWidget {
         decoration: WsTheme.cardDecoration,
         child: Row(
           children: [
-            // Thumbnail or placeholder
+            // Thumbnail placeholder
             ClipRRect(
               borderRadius: BorderRadius.circular(WsTheme.radiusSm),
-              child: thumbnailUrl != null
-                  ? Image.network(
-                      thumbnailUrl,
-                      width: 56,
-                      height: 56,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          _buildThumbnailPlaceholder(),
-                    )
-                  : _buildThumbnailPlaceholder(),
+              child: _buildThumbnailPlaceholder(),
             ),
             const SizedBox(width: 12),
             // Job details
@@ -54,7 +42,7 @@ class JobHistoryItem extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          job.preset,
+                          'Job ${job.id.length > 8 ? job.id.substring(0, 8) : job.id}',
                           style: const TextStyle(
                             color: WsColors.textPrimary,
                             fontWeight: FontWeight.w600,
@@ -76,18 +64,10 @@ class JobHistoryItem extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        '${job.progress.total} images',
+                        job.progress != null ? '${job.progress}%' : 'N/A',
                         style: const TextStyle(
                           color: WsColors.textMuted,
                           fontSize: 12,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        _formatDate(job.createdAt),
-                        style: const TextStyle(
-                          color: WsColors.textMuted,
-                          fontSize: 11,
                         ),
                       ),
                     ],
@@ -113,15 +93,5 @@ class JobHistoryItem extends StatelessWidget {
       color: WsColors.surfaceLight,
       child: const Icon(Icons.image_outlined, color: WsColors.textMuted),
     );
-  }
-
-  String _formatDate(String isoDate) {
-    if (isoDate.isEmpty) return '—';
-    try {
-      final dt = DateTime.parse(isoDate);
-      return '${dt.month}/${dt.day} ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}';
-    } catch (_) {
-      return '—';
-    }
   }
 }

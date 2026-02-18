@@ -193,7 +193,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
     final isDesktop = MediaQuery.of(context).size.width >= 600;
 
     final hasPhotos = ws.selectedImages.isNotEmpty;
-    final showControls = hasPhotos && ws.phase != WorkspacePhase.done;
+    final showControls = hasPhotos && ws.phase != WorkspacePhase.completed;
 
     return Scaffold(
       backgroundColor: WsColors.bg,
@@ -222,7 +222,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
   /// **Desktop (≥ 600 px)**: [SidePanel] is shown to the left of [PhotoGrid]
   /// in a [Row].
   Widget _buildBody(WorkspaceState ws, bool isDesktop) {
-    if (ws.phase == WorkspacePhase.done) {
+    if (ws.phase == WorkspacePhase.completed) {
       return const ResultsOverlay();
     }
 

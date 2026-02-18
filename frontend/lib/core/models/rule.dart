@@ -4,7 +4,7 @@ part 'rule.freezed.dart';  // Freezed code generation
 part 'rule.g.dart';         // JSON serialization
 
 @freezed
-class Rule with _$Rule {
+abstract class Rule with _$Rule {
   const factory Rule({
     required String id,
     required String name,
@@ -19,7 +19,7 @@ class Rule with _$Rule {
 }
 
 @freezed
-class ConceptAction with _$ConceptAction {
+abstract class ConceptAction with _$ConceptAction {
   const factory ConceptAction({
     required String action,  // 'recolor' | 'tone' | 'texture' | 'remove'
     String? value,           // Optional value for action (e.g., 'oak_a', 'offwhite_b')

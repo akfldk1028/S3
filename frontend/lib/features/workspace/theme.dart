@@ -14,6 +14,18 @@ abstract class WsColors {
   /// Slightly lighter dark — surface / card background.
   static const surface = Color(0xFF1A1A2E);
 
+  /// Light surface variant.
+  static const surfaceLight = Color(0xFF2A2A3E);
+
+  /// Card background (alias for [surface]).
+  static const card = Color(0xFF1A1A2E);
+
+  /// Success / positive colour.
+  static const success = Color(0xFF4ADE80);
+
+  /// Warning / caution colour.
+  static const warning = Color(0xFFFFB347);
+
   /// Accent 1 — purple-blue.
   static const accent1 = Color(0xFF6C63FF);
 

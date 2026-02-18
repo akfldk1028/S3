@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../theme.dart';
 import '../workspace_provider.dart';
+import '../workspace_state.dart';
 
 /// Full-screen overlay shown while a job is processing (phase == processing).
 ///
@@ -16,7 +17,7 @@ class ProgressOverlay extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ws = ref.watch(workspaceProvider);
     final notifier = ref.read(workspaceProvider.notifier);
-    final jobFailed = ws.activeJob?.status == 'failed';
+    final jobFailed = ws.phase == WorkspacePhase.error;
 
     return Container(
       color: WsColors.bg.withValues(alpha: 0.85),

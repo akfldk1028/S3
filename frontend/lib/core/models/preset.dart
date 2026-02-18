@@ -4,7 +4,7 @@ part 'preset.freezed.dart';  // Freezed code generation
 part 'preset.g.dart';         // JSON serialization
 
 @freezed
-class Preset with _$Preset {
+abstract class Preset with _$Preset {
   const factory Preset({
     required String id,
     required String name,
@@ -19,7 +19,7 @@ class Preset with _$Preset {
 }
 
 @freezed
-class OutputTemplate with _$OutputTemplate {
+abstract class OutputTemplate with _$OutputTemplate {
   const factory OutputTemplate({
     required String id,
     required String name,

@@ -24,8 +24,8 @@ Map<String, dynamic> _$RuleToJson(_Rule instance) => <String, dynamic>{
   'name': instance.name,
   'preset_id': instance.presetId,
   'created_at': instance.createdAt,
-  'concepts': instance.concepts,
-  'protect': instance.protect,
+  'concepts': ?instance.concepts?.map((k, e) => MapEntry(k, e.toJson())),
+  'protect': ?instance.protect,
 };
 
 _ConceptAction _$ConceptActionFromJson(Map<String, dynamic> json) =>
@@ -35,4 +35,4 @@ _ConceptAction _$ConceptActionFromJson(Map<String, dynamic> json) =>
     );
 
 Map<String, dynamic> _$ConceptActionToJson(_ConceptAction instance) =>
-    <String, dynamic>{'action': instance.action, 'value': instance.value};
+    <String, dynamic>{'action': instance.action, 'value': ?instance.value};

@@ -6,8 +6,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth/auth_provider.dart';
 import '../../core/auth/user_provider.dart';
-import '../../core/models/user.dart';
 import '../../core/providers/theme_provider.dart';
+import '../../features/auth/models/user_model.dart';
 import '../workspace/theme.dart';
 
 /// Settings / Profile screen.
@@ -203,9 +203,9 @@ class _UserInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final maskedId = user.userId.length > 8
-        ? '${user.userId.substring(0, 8)}...'
-        : user.userId;
+    final maskedId = user.id.length > 8
+        ? '${user.id.substring(0, 8)}...'
+        : user.id;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(WsTheme.radius),
@@ -244,7 +244,7 @@ class _UserInfoCard extends StatelessWidget {
               // ── Row 2: Plan Badge ──────────────────────────────────────
               _InfoRow(
                 label: 'Plan',
-                child: _PlanBadge(isPro: user.isPro),
+                child: _PlanBadge(isPro: user.plan == 'pro'),
               ),
               const Divider(
                 color: WsColors.glassBorder,
@@ -258,7 +258,7 @@ class _UserInfoCard extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.bolt, color: WsColors.warning, size: 16),
+                    Icon(Icons.bolt, color: WsColors.warning, size: 16),
                     const SizedBox(width: 4),
                     Text(
                       '${user.credits}',
@@ -278,7 +278,7 @@ class _UserInfoCard extends StatelessWidget {
               ),
 
               // ── Row 4: Rule Slots ──────────────────────────────────────
-              _RuleSlotsRow(ruleSlots: user.ruleSlots),
+              _RuleSlotsRow(used: user.ruleSlotsUsed, max: user.ruleSlotsMax),
             ],
           ),
         ),
@@ -344,15 +344,14 @@ class _PlanBadge extends StatelessWidget {
 
 /// Rule slots row: label + used/max text + linear progress indicator.
 class _RuleSlotsRow extends StatelessWidget {
-  final RuleSlots ruleSlots;
+  final int used;
+  final int max;
 
-  const _RuleSlotsRow({required this.ruleSlots});
+  const _RuleSlotsRow({required this.used, required this.max});
 
   @override
   Widget build(BuildContext context) {
-    final fraction = ruleSlots.max > 0
-        ? (ruleSlots.used / ruleSlots.max).clamp(0.0, 1.0)
-        : 0.0;
+    final fraction = max > 0 ? (used / max).clamp(0.0, 1.0) : 0.0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -368,7 +367,7 @@ class _RuleSlotsRow extends StatelessWidget {
               ),
             ),
             Text(
-              '${ruleSlots.used} / ${ruleSlots.max}',
+              '$used / $max',
               style: const TextStyle(
                 color: WsColors.textPrimary,
                 fontSize: 14,
@@ -405,7 +404,7 @@ class _PlanComparisonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPro = user.plan.toLowerCase() == 'pro';
+    final isPro = user.plan == 'pro';
 
     return Container(
       width: double.infinity,
@@ -431,7 +430,7 @@ class _PlanComparisonCard extends StatelessWidget {
           if (!isPro)
             const _UpgradeButton()
           else
-            const Center(
+            Center(
               child: Text(
                 'You are on Pro',
                 style: TextStyle(
@@ -601,7 +600,8 @@ class _LogoutTile extends ConsumerWidget {
   const _LogoutTile({required this.user});
 
   Future<void> _handleLogout(BuildContext context, WidgetRef ref) async {
-    if (user.activeJobs > 0) {
+    // Always show simple logout confirmation
+    {
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -611,17 +611,15 @@ class _LogoutTile extends ConsumerWidget {
             side: const BorderSide(color: WsColors.glassBorder, width: 0.5),
           ),
           title: const Text(
-            'Active Jobs Running',
+            'Confirm Logout',
             style: TextStyle(
               color: WsColors.textPrimary,
               fontSize: 17,
               fontWeight: FontWeight.w600,
             ),
           ),
-          content: Text(
-            'You have ${user.activeJobs} active '
-            'job${user.activeJobs > 1 ? 's' : ''} running. '
-            'Logging out will not stop them. Continue?',
+          content: const Text(
+            'Are you sure you want to log out?',
             style: const TextStyle(
               color: WsColors.textSecondary,
               fontSize: 14,

@@ -4,6 +4,8 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../constants/api_endpoints.dart';
 import '../../features/auth/models/user_model.dart';
 import '../models/job.dart';
+import '../models/preset.dart';
+import '../models/rule.dart';
 import 'api_client.dart';
 
 /// Production implementation of [ApiClient] using Dio HTTP client.
@@ -82,6 +84,66 @@ class S3ApiClient implements ApiClient {
   Future<User> getMe() async {
     final response = await _dio.get(ApiEndpoints.me);
     return User.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  // ── Presets ──────────────────────────────────────────────────────────────
+
+  @override
+  Future<List<Preset>> getPresets() async {
+    final response = await _dio.get(ApiEndpoints.presets);
+    final list = response.data as List<dynamic>;
+    return list.map((e) => Preset.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  @override
+  Future<Preset> getPresetById(String presetId) async {
+    final response = await _dio.get(ApiEndpoints.presetById(presetId));
+    return Preset.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  // ── Rules ────────────────────────────────────────────────────────────────
+
+  @override
+  Future<List<Rule>> getRules() async {
+    final response = await _dio.get(ApiEndpoints.rules);
+    final list = response.data as List<dynamic>;
+    return list.map((e) => Rule.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  @override
+  Future<Rule> createRule({
+    required String name,
+    required String presetId,
+    required Map<String, ConceptAction> concepts,
+    List<String>? protect,
+  }) async {
+    final response = await _dio.post(ApiEndpoints.rules, data: {
+      'name': name,
+      'preset_id': presetId,
+      'concepts': concepts.map((k, v) => MapEntry(k, {'action': v.action, 'value': v.value})),
+      if (protect != null) 'protect': protect,
+    });
+    return Rule.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<Rule> updateRule(
+    String id, {
+    required String name,
+    required Map<String, ConceptAction> concepts,
+    List<String>? protect,
+  }) async {
+    final response = await _dio.put(ApiEndpoints.ruleById(id), data: {
+      'name': name,
+      'concepts': concepts.map((k, v) => MapEntry(k, {'action': v.action, 'value': v.value})),
+      if (protect != null) 'protect': protect,
+    });
+    return Rule.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> deleteRule(String id) async {
+    await _dio.delete(ApiEndpoints.ruleById(id));
   }
 
   // ── Jobs ─────────────────────────────────────────────────────────────────

@@ -25,9 +25,11 @@ Map<String, dynamic> _$PresetToJson(_Preset instance) => <String, dynamic>{
   'id': instance.id,
   'name': instance.name,
   'concept_count': instance.conceptCount,
-  'concepts': instance.concepts,
-  'protect_defaults': instance.protectDefaults,
-  'output_templates': instance.outputTemplates,
+  'concepts': ?instance.concepts,
+  'protect_defaults': ?instance.protectDefaults,
+  'output_templates': ?instance.outputTemplates
+      ?.map((e) => e.toJson())
+      .toList(),
 };
 
 _OutputTemplate _$OutputTemplateFromJson(Map<String, dynamic> json) =>

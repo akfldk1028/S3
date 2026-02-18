@@ -1,7 +1,7 @@
 import '../../features/auth/models/user_model.dart';
 import '../models/job.dart';
-import '../models/job_item.dart';
-import '../models/job_progress.dart';
+import '../models/preset.dart';
+import '../models/rule.dart';
 import 'api_client.dart';
 
 /// Mock implementation of [ApiClient] for development and testing.
@@ -12,36 +12,25 @@ class MockApiClient implements ApiClient {
   /// In-memory job store, keyed by jobId.
   final Map<String, Job> _jobs = {
     'job-001': const Job(
-      jobId: 'job-001',
+      id: 'job-001',
       status: 'done',
-      preset: 'portrait',
-      progress: JobProgress(done: 10, failed: 0, total: 10),
-      outputsReady: [
-        JobItem(
-          idx: 0,
-          resultUrl: 'https://example.com/results/job-001/0.jpg',
-          previewUrl: 'https://picsum.photos/seed/job001/56/56',
-        ),
-      ],
-      createdAt: '2026-02-15T10:30:00.000Z',
+      progress: 100,
     ),
     'job-002': const Job(
-      jobId: 'job-002',
+      id: 'job-002',
       status: 'running',
-      preset: 'landscape',
-      progress: JobProgress(done: 4, failed: 0, total: 8),
-      outputsReady: [],
-      createdAt: '2026-02-16T08:15:00.000Z',
+      progress: 50,
     ),
     'job-003': const Job(
-      jobId: 'job-003',
+      id: 'job-003',
       status: 'failed',
-      preset: 'macro',
-      progress: JobProgress(done: 0, failed: 3, total: 3),
-      outputsReady: [],
-      createdAt: '2026-02-14T14:45:00.000Z',
+      errorMessage: 'GPU timeout',
+      progress: 0,
     ),
   };
+
+  /// In-memory rule store.
+  final List<Rule> _rules = [];
 
   // ── Auth ─────────────────────────────────────────────────────────────────
 
@@ -76,6 +65,91 @@ class MockApiClient implements ApiClient {
     return const User(id: 'user-1', email: 'test@example.com', name: 'Test User');
   }
 
+  // ── Presets ──────────────────────────────────────────────────────────────
+
+  @override
+  Future<List<Preset>> getPresets() async {
+    await _simulateDelay();
+    return const [
+      Preset(id: 'interior', name: 'Interior', conceptCount: 6),
+      Preset(id: 'seller', name: 'Seller', conceptCount: 4),
+    ];
+  }
+
+  @override
+  Future<Preset> getPresetById(String presetId) async {
+    await _simulateDelay();
+    if (presetId == 'interior') {
+      return const Preset(
+        id: 'interior',
+        name: 'Interior',
+        conceptCount: 6,
+        concepts: ['wall', 'floor', 'ceiling', 'furniture', 'window', 'door'],
+        protectDefaults: ['window'],
+      );
+    }
+    return const Preset(
+      id: 'seller',
+      name: 'Seller',
+      conceptCount: 4,
+      concepts: ['background', 'product', 'shadow', 'label'],
+      protectDefaults: ['product'],
+    );
+  }
+
+  // ── Rules ────────────────────────────────────────────────────────────────
+
+  @override
+  Future<List<Rule>> getRules() async {
+    await _simulateDelay();
+    return List.unmodifiable(_rules);
+  }
+
+  @override
+  Future<Rule> createRule({
+    required String name,
+    required String presetId,
+    required Map<String, ConceptAction> concepts,
+    List<String>? protect,
+  }) async {
+    await _simulateDelay();
+    final rule = Rule(
+      id: 'rule-${DateTime.now().millisecondsSinceEpoch}',
+      name: name,
+      presetId: presetId,
+      createdAt: DateTime.now().toIso8601String(),
+      concepts: concepts,
+      protect: protect,
+    );
+    _rules.add(rule);
+    return rule;
+  }
+
+  @override
+  Future<Rule> updateRule(
+    String id, {
+    required String name,
+    required Map<String, ConceptAction> concepts,
+    List<String>? protect,
+  }) async {
+    await _simulateDelay();
+    final idx = _rules.indexWhere((r) => r.id == id);
+    if (idx < 0) throw Exception('Rule not found: $id');
+    final updated = _rules[idx].copyWith(
+      name: name,
+      concepts: concepts,
+      protect: protect,
+    );
+    _rules[idx] = updated;
+    return updated;
+  }
+
+  @override
+  Future<void> deleteRule(String id) async {
+    await _simulateDelay();
+    _rules.removeWhere((r) => r.id == id);
+  }
+
   // ── Jobs ─────────────────────────────────────────────────────────────────
 
   @override
@@ -83,12 +157,9 @@ class MockApiClient implements ApiClient {
     await _simulateDelay();
     final jobId = 'job-${DateTime.now().millisecondsSinceEpoch}';
     final newJob = Job(
-      jobId: jobId,
+      id: jobId,
       status: 'queued',
-      preset: jobData['preset'] as String? ?? 'default',
-      progress: const JobProgress(done: 0, failed: 0, total: 0),
-      outputsReady: const [],
-      createdAt: DateTime.now().toIso8601String(),
+      progress: 0,
     );
     _jobs[jobId] = newJob;
     return newJob;
@@ -117,10 +188,7 @@ class MockApiClient implements ApiClient {
   @override
   Future<List<Job>> listJobs() async {
     await _simulateDelay();
-    // Return all jobs sorted by createdAt, newest first
-    final sorted = List<Job>.from(_jobs.values)
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
-    return sorted;
+    return _jobs.values.toList();
   }
 
   @override

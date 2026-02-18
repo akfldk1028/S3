@@ -28,6 +28,12 @@ class _AuthNotifier extends AsyncNotifier<String?> {
       state = AsyncValue.error(e, st);
     }
   }
+
+  /// Clears the stored JWT and resets auth state.
+  Future<void> logout() async {
+    await _storage.delete(key: _kTokenKey);
+    state = const AsyncValue.data(null);
+  }
 }
 
 /// Provider for JWT-based auth state.

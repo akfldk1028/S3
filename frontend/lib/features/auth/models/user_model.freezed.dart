@@ -15,7 +15,10 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$User {
 
- String get id; String get email; String? get name; String? get profileImage; int get credits; String get plan; int get ruleSlotsUsed; int get ruleSlotsMax;
+ String get id; String get email; String? get name; String? get profileImage; int get credits;/// 'free' or 'pro'
+ String get plan;/// Number of rule slots currently used
+ int get ruleSlotsUsed;/// Maximum rule slots for this plan (2 for free, 20 for pro)
+ int get ruleSlotsMax;
 /// Create a copy of User
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -224,8 +227,11 @@ class _User implements User {
 @override final  String? name;
 @override final  String? profileImage;
 @override@JsonKey() final  int credits;
+/// 'free' or 'pro'
 @override@JsonKey() final  String plan;
+/// Number of rule slots currently used
 @override@JsonKey() final  int ruleSlotsUsed;
+/// Maximum rule slots for this plan (2 for free, 20 for pro)
 @override@JsonKey() final  int ruleSlotsMax;
 
 /// Create a copy of User

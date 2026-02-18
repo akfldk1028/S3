@@ -2,6 +2,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../features/auth/models/user_model.dart';
 import '../models/job.dart';
+import '../models/preset.dart';
+import '../models/rule.dart';
 
 /// Abstract API client interface.
 ///
@@ -19,6 +21,34 @@ abstract class ApiClient {
 
   /// 3. GET /me - Get user status (credits, plan, rule_slots)
   Future<User> getMe();
+
+  /// 4. GET /presets - List all domain presets
+  Future<List<Preset>> getPresets();
+
+  /// 5. GET /presets/:id - Get preset details with concepts
+  Future<Preset> getPresetById(String presetId);
+
+  /// 6. GET /rules - List user's rules
+  Future<List<Rule>> getRules();
+
+  /// 7. POST /rules - Create a new rule
+  Future<Rule> createRule({
+    required String name,
+    required String presetId,
+    required Map<String, ConceptAction> concepts,
+    List<String>? protect,
+  });
+
+  /// 8. PUT /rules/:id - Update an existing rule
+  Future<Rule> updateRule(
+    String id, {
+    required String name,
+    required Map<String, ConceptAction> concepts,
+    List<String>? protect,
+  });
+
+  /// 9. DELETE /rules/:id - Delete a rule
+  Future<void> deleteRule(String id);
 
   /// 10. POST /jobs - Create job + presigned URLs
   Future<Job> createJob(Map<String, dynamic> jobData);

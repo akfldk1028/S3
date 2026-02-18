@@ -1,27 +1,22 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../workspace_provider.dart';
 import '../workspace_state.dart';
 
 /// 작업 결과 이미지를 오버레이 형태로 표시하는 위젯
 ///
-/// [job]의 결과 이미지 목록을 그리드로 표시하고, 각 항목을 탭하면
-/// 전체 화면 다이얼로그로 원본 이미지([JobResultItem.resultUrl])를 표시한다.
-///
-/// [CachedNetworkImage]를 사용하여 이미지를 캐싱한다.
-/// cacheKey는 stable ID(`result_{jobId}_{idx}`)를 사용하여 presigned URL
-/// 만료 후에도 캐시 미스가 발생하지 않도록 한다.
-class ResultsOverlay extends StatelessWidget {
-  const ResultsOverlay({
-    super.key,
-    required this.job,
-  });
-
-  final JobResult job;
+/// workspaceProvider의 activeJob에서 결과 이미지 목록을 읽어 그리드로 표시한다.
+class ResultsOverlay extends ConsumerWidget {
+  const ResultsOverlay({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    if (job.items.isEmpty) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ws = ref.watch(workspaceProvider);
+    final job = ws.activeJob;
+
+    if (job == null || job.items.isEmpty) {
       return const Center(
         child: Text('결과 이미지가 없습니다.'),
       );
@@ -40,17 +35,13 @@ class ResultsOverlay extends StatelessWidget {
         return _ResultTile(
           item: item,
           jobId: job.id,
-          onTap: () => _showFullImage(context, item),
+          onTap: () => _showFullImage(context, job, item),
         );
       },
     );
   }
 
-  /// 전체 이미지 다이얼로그 표시
-  ///
-  /// [item.resultUrl]을 [CachedNetworkImage]로 표시한다.
-  /// cacheKey는 `'result_full_{jobId}_{item.idx}'` 형식의 stable ID를 사용한다.
-  void _showFullImage(BuildContext context, JobResultItem item) {
+  void _showFullImage(BuildContext context, JobResult job, JobResultItem item) {
     showDialog<void>(
       context: context,
       builder: (dialogContext) => Dialog(
@@ -94,10 +85,6 @@ class ResultsOverlay extends StatelessWidget {
   }
 }
 
-/// 개별 결과 이미지 타일 — preview URL을 CachedNetworkImage로 표시
-///
-/// cacheKey는 `'result_{jobId}_{item.idx}'` 형식의 stable ID를 사용하여
-/// presigned URL 만료와 무관하게 안정적인 캐싱을 보장한다.
 class _ResultTile extends StatelessWidget {
   const _ResultTile({
     required this.item,

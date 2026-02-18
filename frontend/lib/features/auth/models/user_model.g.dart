@@ -20,8 +20,8 @@ _User _$UserFromJson(Map<String, dynamic> json) => _User(
 Map<String, dynamic> _$UserToJson(_User instance) => <String, dynamic>{
   'id': instance.id,
   'email': instance.email,
-  'name': instance.name,
-  'profileImage': instance.profileImage,
+  'name': ?instance.name,
+  'profileImage': ?instance.profileImage,
   'credits': instance.credits,
   'plan': instance.plan,
   'ruleSlotsUsed': instance.ruleSlotsUsed,
@@ -48,5 +48,5 @@ Map<String, dynamic> _$LoginResponseToJson(_LoginResponse instance) =>
     <String, dynamic>{
       'accessToken': instance.accessToken,
       'refreshToken': instance.refreshToken,
-      'user': instance.user,
+      'user': instance.user.toJson(),
     };

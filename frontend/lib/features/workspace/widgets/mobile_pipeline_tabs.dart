@@ -477,7 +477,7 @@ class _MobilePipelineTabsState extends ConsumerState<MobilePipelineTabs> {
     );
 
     // Hidden on desktop, when no photos are selected, or after processing completes.
-    if (isDesktop || !hasPhotos || ws.phase == WorkspacePhase.done) {
+    if (isDesktop || !hasPhotos || ws.phase == WorkspacePhase.completed) {
       return const SizedBox.shrink();
     }
 

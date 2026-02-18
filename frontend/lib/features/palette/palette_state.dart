@@ -12,7 +12,7 @@ part 'palette_state.g.dart';         // JSON serialization
 ///
 /// This state is passed to the upload screen to configure job parameters.
 @freezed
-class PaletteState with _$PaletteState {
+abstract class PaletteState with _$PaletteState {
   const factory PaletteState({
     /// Map of concept name to selected instance index (1-based).
     /// If a concept is in this map, it's considered "selected".

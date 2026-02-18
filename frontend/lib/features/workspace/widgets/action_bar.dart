@@ -33,13 +33,13 @@ class ActionBar extends ConsumerWidget {
     );
   }
 
-  Widget _buildContent(WorkspaceState ws, WorkspaceNotifier notifier) {
+  Widget _buildContent(WorkspaceState ws, Workspace notifier) {
     switch (ws.phase) {
       case WorkspacePhase.photosSelected:
         return _PillButton(
           label: 'GO',
           gradient: WsColors.gradientPrimary,
-          onTap: notifier.uploadAndProcess,
+          onTap: () => notifier.uploadAndProcess([]),
         );
 
       case WorkspacePhase.uploading:
@@ -87,7 +87,6 @@ class ActionBar extends ConsumerWidget {
         );
 
       case WorkspacePhase.error:
-        // Calls retryJob() — NOT resetToIdle() — to preserve photos.
         return _PillButton(
           label: 'Retry',
           gradient: LinearGradient(
@@ -96,7 +95,7 @@ class ActionBar extends ConsumerWidget {
           onTap: notifier.retryJob,
         );
 
-      case WorkspacePhase.done:
+      case WorkspacePhase.completed:
         return _PillButton(
           label: 'Start Over',
           gradient: WsColors.gradientPrimary,

@@ -93,12 +93,12 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       final apiClient = ref.read(apiClientProvider);
 
       // 1. POST /jobs to get presigned URLs
-      final jobData = await apiClient.createJob(
-        preset: widget.presetId!,
-        itemCount: _selectedImages.length,
-      );
+      final jobData = await apiClient.createJob({
+        'preset': widget.presetId!,
+        'item_count': _selectedImages.length,
+      });
 
-      final jobId = jobData['job_id'] as String;
+      final jobId = jobData.id;
       // final uploadUrls = jobData['upload'] as List<dynamic>; // Phase 2: Use for Dio PUT
 
       // 2. Mock upload simulation (300ms delay per image)

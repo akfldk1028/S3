@@ -9,6 +9,7 @@ import '../../features/upload/upload_screen.dart';
 import '../../features/rules/rules_screen.dart';
 import '../../features/jobs/job_progress_screen.dart';
 import '../../features/results/results_screen.dart';
+import '../../features/workspace/workspace_state.dart';
 
 /// GoRouter provider with auth guard via redirect callback.
 ///
@@ -118,12 +119,17 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
 
-      // Results - before/after gallery
+      // Results - before/after gallery (deep-link only)
+      // Note: Results are primarily shown as overlay in workspace.
+      // This route is kept for backward compatibility.
       GoRoute(
         path: '/results/:id',
         builder: (context, state) {
           final jobId = state.pathParameters['id']!;
-          return ResultsScreen(jobId: jobId);
+          return ResultsScreen(
+            jobId: jobId,
+            job: const JobResult(id: '', items: []),
+          );
         },
       ),
     ],
