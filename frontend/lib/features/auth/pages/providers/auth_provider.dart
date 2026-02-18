@@ -12,9 +12,16 @@ FlutterSecureStorage secureStorage(Ref ref) {
 class AuthState extends _$AuthState {
   @override
   FutureOr<bool> build() async {
-    final storage = ref.watch(secureStorageProvider);
-    final token = await storage.read(key: 'accessToken');
-    return token != null;
+    try {
+      final storage = ref.watch(secureStorageProvider);
+      final token = await storage.read(key: 'accessToken');
+      return token != null;
+    } catch (_) {
+      // FlutterSecureStorage may throw on web when WebCrypto API
+      // encounters issues (e.g., key generation failure). Treat as
+      // unauthenticated so the splash screen navigates to /login gracefully.
+      return false;
+    }
   }
 
   Future<void> setTokens({

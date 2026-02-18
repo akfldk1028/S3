@@ -3,19 +3,21 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../features/auth/pages/screens/login_screen.dart';
-import '../features/history/history_screen.dart';
 import '../features/home/pages/screens/home_screen.dart';
-import '../features/onboarding/onboarding_screen.dart';
 import '../features/profile/pages/screens/profile_screen.dart';
-import '../features/results/results_screen.dart';
+import '../features/splash/splash_screen.dart';
 
 part 'app_router.g.dart';
 
 @riverpod
 GoRouter appRouter(Ref ref) {
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: '/splash',
     routes: [
+      GoRoute(
+        path: '/splash',
+        builder: (context, state) => const SplashScreen(),
+      ),
       GoRoute(
         path: '/',
         builder: (context, state) => const HomeScreen(),
@@ -25,22 +27,8 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
-        path: '/onboarding',
-        builder: (context, state) => const OnboardingScreen(),
-      ),
-      GoRoute(
         path: '/profile',
         builder: (context, state) => const ProfileScreen(),
-      ),
-      GoRoute(
-        path: '/history',
-        builder: (context, state) => const HistoryScreen(),
-      ),
-      GoRoute(
-        path: '/results/:id',
-        builder: (context, state) => ResultsScreen(
-          jobId: state.pathParameters['id']!,
-        ),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
