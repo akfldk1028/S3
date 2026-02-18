@@ -11,17 +11,14 @@
       "Edit(./**)",
       "Glob(./**)",
       "Grep(./**)",
-<<<<<<< HEAD
-=======
-      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
-      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
-      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
-      "Glob(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
-      "Grep(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
-      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm\\.auto-claude\\specs\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
-      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm\\.auto-claude\\specs\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
-      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm\\.auto-claude\\specs\\024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm/**)",
->>>>>>> auto-claude/024-workers-jobcoordinatordo-상태머신-alarm
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Glob(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Grep(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Read(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527\\.auto-claude\\specs\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Write(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527\\.auto-claude\\specs\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
+      "Edit(C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\014-pricingscreen-free-pro-\ud06c\ub808\ub527\\.auto-claude\\specs\\014-pricingscreen-free-pro-\ud06c\ub808\ub527/**)",
       "Read(C:\\DK\\S3\\.auto-claude/**)",
       "Write(C:\\DK\\S3\\.auto-claude/**)",
       "Edit(C:\\DK\\S3\\.auto-claude/**)",
@@ -34,8 +31,4 @@
       "mcp__context7__get-library-docs(*)"
     ]
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> auto-claude/024-workers-jobcoordinatordo-상태머신-alarm

@@ -1,49 +1,25 @@
 {
-<<<<<<< HEAD
-  "active": false,
-  "spec": "006-gpu-worker-sam3-segmenter",
-  "state": "completed",
-  "subtasks": {
-    "completed": 21,
-    "total": 21,
-    "in_progress": 0,
-    "failed": 0
-  },
-  "phase": {
-    "current": "Docker & Deployment",
-    "id": null,
-    "total": 3
-=======
   "active": true,
-  "spec": "024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm",
+  "spec": "014-pricingscreen-free-pro-\ud06c\ub808\ub527",
   "state": "building",
   "subtasks": {
-    "completed": 15,
-    "total": 16,
+    "completed": 9,
+    "total": 11,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "\ucd5c\uc885 \uac80\uc99d: TypeScript \ucef4\ud30c\uc77c + \ubc30\ud3ec",
+    "current": "Full Project Verification",
     "id": null,
-    "total": 2
->>>>>>> auto-claude/024-workers-jobcoordinatordo-상태머신-alarm
+    "total": 3
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-<<<<<<< HEAD
-    "number": 23,
-    "started_at": "2026-02-14T19:58:30.965824"
+    "number": 2,
+    "started_at": "2026-02-18T03:26:31.477348"
   },
-  "last_update": "2026-02-15T00:00:00.000000"
+  "last_update": "2026-02-18T03:33:24.794493"
 }
-=======
-    "number": 14,
-    "started_at": "2026-02-18T00:29:59.242923"
-  },
-  "last_update": "2026-02-18T00:57:51.209827"
-}
->>>>>>> auto-claude/024-workers-jobcoordinatordo-상태머신-alarm

@@ -1,186 +1,162 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/auth/user_provider.dart';
-import '../theme.dart';
+import '../../auth/pages/providers/auth_provider.dart';
 
-/// Glassmorphism top bar for the workspace screen.
+/// Top app bar widget with a tappable credits/plan badge.
 ///
-/// Shows the app title on the left and a tappable credits pill on the right.
-/// Tapping the credits pill navigates to `/settings`.
+/// The credits pill shows the current plan label and a credits indicator.
+/// Tapping the pill navigates to ['/pricing'] via GoRouter push so that the
+/// pricing screen can be dismissed with the system back button.
 ///
-/// Uses [BackdropFilter] + [ClipRect] for the blur background, consistent
-/// with the SNOW/B612 glassmorphism design system.
+/// The pill is wrapped in a [MouseRegion] with [SystemMouseCursors.click] for
+/// proper hover feedback on web/desktop.
 class TopBar extends ConsumerWidget implements PreferredSizeWidget {
-  const TopBar({super.key});
+  const TopBar({super.key, this.title = 'S3'});
+
+  final String title;
 
   @override
-  Size get preferredSize => const Size.fromHeight(56);
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  // ─── Color constants (consistent with other pricing / workspace widgets) ──
+  static const _bg = Color(0xFF0F172A);
+  static const _surface = Color(0xFF1A1F2E);
+  static const _glassBorder = Color(0x33FFFFFF);
+  static const _textPrimary = Color(0xFFE2E8F0);
+  static const _textSecondary = Color(0xFF94A3B8);
+  static const _accent = Color(0xFF6366F1);
+
+  static const _gradientPrimary = LinearGradient(
+    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+
+  // ─── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final userAsync = ref.watch(userProvider);
+    final authAsync = ref.watch(authStateProvider);
 
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+    return AppBar(
+      backgroundColor: _bg,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      title: _buildLogo(),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: authAsync.when(
+            loading: _buildLoadingIndicator,
+            error: (err, st) => const SizedBox.shrink(),
+            data: (isLoggedIn) => isLoggedIn
+                ? _buildCreditsPill(context)
+                : const SizedBox.shrink(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ─── Logo ──────────────────────────────────────────────────────────────────
+
+  Widget _buildLogo() {
+    return ShaderMask(
+      shaderCallback: (bounds) => _gradientPrimary.createShader(bounds),
+      blendMode: BlendMode.srcIn,
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 20,
+          fontWeight: FontWeight.bold,
+          letterSpacing: -0.3,
+        ),
+      ),
+    );
+  }
+
+  // ─── Loading indicator ─────────────────────────────────────────────────────
+
+  Widget _buildLoadingIndicator() {
+    return const SizedBox(
+      width: 18,
+      height: 18,
+      child: CircularProgressIndicator(
+        strokeWidth: 2,
+        color: _accent,
+      ),
+    );
+  }
+
+  // ─── Credits pill (tappable) ───────────────────────────────────────────────
+
+  /// Credits pill: plan dot • plan label | ⚡ credits count.
+  ///
+  /// Wrapped in [MouseRegion] (pointer cursor on web) +
+  /// [GestureDetector] (tap → push '/pricing').
+  Widget _buildCreditsPill(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: () => context.push('/pricing'),
         child: Container(
-          height: preferredSize.height,
-          decoration: const BoxDecoration(
-            color: WsColors.surface,
-            border: Border(
-              bottom: BorderSide(color: WsColors.glassBorder, width: 0.5),
-            ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: _surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: _glassBorder, width: 0.5),
           ),
-          child: SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  // ── App Title ─────────────────────────────────────────────
-                  const Text(
-                    'S3',
-                    style: TextStyle(
-                      color: WsColors.textPrimary,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const Spacer(),
-
-                  // ── Credits Pill ──────────────────────────────────────────
-                  userAsync.when(
-                    loading: () => const _CreditsPillSkeleton(),
-                    error: (e, _) => const _CreditsPillError(),
-                    data: (user) => MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        onTap: () => context.push('/settings'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: WsColors.bg.withValues(alpha: 0.85),
-                            borderRadius:
-                                BorderRadius.circular(WsTheme.radius),
-                            border: Border.all(
-                              color: WsColors.glassBorder,
-                              width: 0.5,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Credits bolt + count
-                              const Icon(
-                                Icons.bolt,
-                                color: WsColors.warning,
-                                size: 15,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${user.credits}',
-                                style: const TextStyle(
-                                  color: WsColors.textPrimary,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-
-                              // Plan badge pill
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 7,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: (user.isPro
-                                          ? WsColors.accent1
-                                          : WsColors.textMuted)
-                                      .withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(
-                                      WsTheme.radiusSm),
-                                  border: Border.all(
-                                    color: user.isPro
-                                        ? WsColors.accent1
-                                        : WsColors.textMuted,
-                                    width: 0.5,
-                                  ),
-                                ),
-                                child: Text(
-                                  user.isPro ? 'PRO' : 'FREE',
-                                  style: TextStyle(
-                                    color: user.isPro
-                                        ? WsColors.accent1
-                                        : WsColors.textMuted,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    letterSpacing: 0.6,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Plan dot
+              Container(
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(
+                  gradient: _gradientPrimary,
+                  shape: BoxShape.circle,
+                ),
               ),
-            ),
+              const SizedBox(width: 6),
+              // Plan label
+              const Text(
+                'Free',
+                style: TextStyle(
+                  color: _textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              // Divider
+              Container(
+                width: 1,
+                height: 12,
+                margin: const EdgeInsets.symmetric(horizontal: 8),
+                color: _glassBorder,
+              ),
+              // Bolt icon
+              const Icon(
+                Icons.bolt_rounded,
+                size: 14,
+                color: _accent,
+              ),
+              const SizedBox(width: 3),
+              // Credits count
+              const Text(
+                '0',
+                style: TextStyle(
+                  color: _textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Skeleton placeholder shown while [userProvider] is loading.
-class _CreditsPillSkeleton extends StatelessWidget {
-  const _CreditsPillSkeleton();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 80,
-      height: 30,
-      decoration: BoxDecoration(
-        color: WsColors.glassWhite,
-        borderRadius: BorderRadius.circular(WsTheme.radius),
-        border: Border.all(color: WsColors.glassBorder, width: 0.5),
-      ),
-    );
-  }
-}
-
-/// Minimal fallback shown when [userProvider] returns an error.
-class _CreditsPillError extends StatelessWidget {
-  const _CreditsPillError();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: WsColors.error.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(WsTheme.radius),
-        border: Border.all(
-          color: WsColors.error.withValues(alpha: 0.40),
-          width: 0.5,
-        ),
-      ),
-      child: const Icon(
-        Icons.person_outline,
-        color: WsColors.error,
-        size: 16,
       ),
     );
   }
