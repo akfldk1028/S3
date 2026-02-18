@@ -1,59 +1,70 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../common_widgets/shimmer_list.dart';
+import '../theme.dart';
 
-/// Provider for the list of domain presets.
+/// Workspace domain selection section.
 ///
-/// Returns an empty list by default. Replace with a real API call when the
-/// preset data source is available.
-final presetsProvider = FutureProvider<List<String>>((ref) async {
-  // TODO(spec-018): Replace with actual presets API call once presets API is implemented.
-  return <String>[];
-});
+/// Renders a horizontal list of domain option chips (toggleable).
+/// Each chip represents a processing domain (e.g., Portrait, Landscape, Product).
+class DomainSection extends StatelessWidget {
+  const DomainSection({
+    super.key,
+    required this.domains,
+    required this.selectedDomain,
+    required this.onDomainSelected,
+  });
 
-/// A widget that displays the domain/preset section of the workspace.
-///
-/// Shows a [ShimmerList] skeleton while [presetsProvider] is loading,
-/// an error message if it fails, or the preset list once data is available.
-class DomainSection extends ConsumerWidget {
-  const DomainSection({super.key});
+  /// Full list of available domain labels.
+  final List<String> domains;
+
+  /// Currently selected domain label, or null if none selected.
+  final String? selectedDomain;
+
+  /// Callback fired when the user taps a domain chip.
+  final ValueChanged<String> onDomainSelected;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final presetsAsync = ref.watch(presetsProvider);
-
-    return presetsAsync.when(
-      loading: () => const ShimmerList(count: 3),
-      error: (error, _) => Center(
-        child: Text(
-          'Failed to load presets: $error',
-          style: const TextStyle(color: Colors.red),
-        ),
-      ),
-      data: (presets) {
-        if (presets.isEmpty) {
-          return const Center(
-            child: Text(
-              'No presets available.',
-              style: TextStyle(color: Colors.white70),
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: domains.map((domain) {
+          final isSelected = domain == selectedDomain;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => onDomainSelected(domain),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? WsColors.accent1.withValues(alpha: 0.2)
+                      : WsColors.glassWhite,
+                  borderRadius:
+                      BorderRadius.circular(WsTheme.radiusXl),
+                  border: Border.all(
+                    color:
+                        isSelected ? WsColors.accent1 : WsColors.glassBorder,
+                    width: isSelected ? 1.5 : 0.5,
+                  ),
+                ),
+                child: Text(
+                  domain,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight:
+                        isSelected ? FontWeight.w600 : FontWeight.w400,
+                    color: isSelected ? WsColors.accent1 : WsColors.textSecondary,
+                  ),
+                ),
+              ),
             ),
           );
-        }
-        return ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: presets.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            return Card(
-              child: ListTile(
-                title: Text(presets[index]),
-              ),
-            );
-          },
-        );
-      },
+        }).toList(),
+      ),
     );
   }
 }

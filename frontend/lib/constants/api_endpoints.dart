@@ -14,7 +14,7 @@ class ApiEndpoints {
   /// POST — 익명 유저 생성 + JWT 발급
   static const authAnon = '/auth/anon';
 
-  /// POST — 이메일/비밀번호 로그인 + JWT 발급
+  /// POST — 이메일/패스워드 로그인 + JWT 발급
   static const login = '/auth/login';
 
   // ── User (1개) ────────────────────────────────────────

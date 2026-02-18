@@ -1,73 +1,133 @@
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 
 import '../../core/models/job.dart';
 
-/// Phases of the workspace UI lifecycle.
-enum WorkspacePhase { idle, uploading, processing, done, error }
+/// The phases of the workspace processing pipeline.
+///
+/// State machine: idle → photosSelected → uploading → processing → done | error
+enum WorkspacePhase {
+  /// No photos selected; initial state
+  idle,
 
-/// An image selected by the user before submitting a job.
-class SelectedImage {
-  /// File path on the local filesystem.
-  final String path;
+  /// At least one photo has been selected; ready to process
+  photosSelected,
 
-  /// Raw bytes of the image — used as the "Before" side of the comparison slider.
-  final Uint8List bytes;
+  /// Photos are being uploaded to presigned S3 URLs
+  uploading,
 
-  /// Display name (file name).
-  final String name;
+  /// Upload complete; job is queued/running on the GPU worker
+  processing,
 
-  const SelectedImage({
-    required this.path,
-    required this.bytes,
-    required this.name,
-  });
+  /// Job completed successfully
+  done,
+
+  /// An error occurred (credit check failure, network error, or job failure)
+  error,
 }
 
-/// Immutable state snapshot for the workspace feature.
+/// Immutable state for the workspace feature.
+///
+/// All mutations go through [WorkspaceNotifier.state] via [copyWith].
+@immutable
 class WorkspaceState {
-  final WorkspacePhase phase;
-  final String? selectedPresetId;
-
-  /// Original uploaded images — indexed 0-based.
-  /// Maps to [JobItem.idx] via [selectedImages[item.idx - 1]].
-  final List<SelectedImage> selectedImages;
-
-  final String? activeJobId;
-  final double uploadProgress;
-  final Job? activeJob;
-  final String? selectedRuleId;
-  final String? errorMessage;
-
   const WorkspaceState({
     this.phase = WorkspacePhase.idle,
-    this.selectedPresetId,
     this.selectedImages = const [],
-    this.activeJobId,
     this.uploadProgress = 0.0,
+    this.activeJobId,
     this.activeJob,
-    this.selectedRuleId,
     this.errorMessage,
+    this.networkRetryCount = 0,
   });
 
+  /// Current phase of the processing pipeline
+  final WorkspacePhase phase;
+
+  /// Raw bytes of photos selected by the user; preserved across retries
+  final List<Uint8List> selectedImages;
+
+  /// Upload progress [0.0, 1.0]; only meaningful during [WorkspacePhase.uploading]
+  final double uploadProgress;
+
+  /// Server-assigned job ID, set after POST /jobs succeeds
+  final String? activeJobId;
+
+  /// Latest job status polled from GET /jobs/:id
+  final Job? activeJob;
+
+  /// Human-readable error message shown in the error banner
+  final String? errorMessage;
+
+  /// Number of consecutive network failures during polling (for UI feedback)
+  final int networkRetryCount;
+
+  /// Returns a copy of this state with the specified fields replaced.
+  ///
+  /// For nullable fields ([activeJobId], [activeJob], [errorMessage]), pass
+  /// `null` to explicitly clear them. The default sentinel value means
+  /// "keep the current value".
   WorkspaceState copyWith({
     WorkspacePhase? phase,
-    String? selectedPresetId,
-    List<SelectedImage>? selectedImages,
-    String? activeJobId,
+    List<Uint8List>? selectedImages,
     double? uploadProgress,
-    Job? activeJob,
-    String? selectedRuleId,
-    String? errorMessage,
+    Object? activeJobId = _unset,
+    Object? activeJob = _unset,
+    Object? errorMessage = _unset,
+    int? networkRetryCount,
   }) {
     return WorkspaceState(
       phase: phase ?? this.phase,
-      selectedPresetId: selectedPresetId ?? this.selectedPresetId,
       selectedImages: selectedImages ?? this.selectedImages,
-      activeJobId: activeJobId ?? this.activeJobId,
       uploadProgress: uploadProgress ?? this.uploadProgress,
-      activeJob: activeJob ?? this.activeJob,
-      selectedRuleId: selectedRuleId ?? this.selectedRuleId,
-      errorMessage: errorMessage ?? this.errorMessage,
+      activeJobId:
+          identical(activeJobId, _unset) ? this.activeJobId : activeJobId as String?,
+      activeJob:
+          identical(activeJob, _unset) ? this.activeJob : activeJob as Job?,
+      errorMessage:
+          identical(errorMessage, _unset) ? this.errorMessage : errorMessage as String?,
+      networkRetryCount: networkRetryCount ?? this.networkRetryCount,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is WorkspaceState &&
+          runtimeType == other.runtimeType &&
+          phase == other.phase &&
+          listEquals(selectedImages, other.selectedImages) &&
+          uploadProgress == other.uploadProgress &&
+          activeJobId == other.activeJobId &&
+          activeJob == other.activeJob &&
+          errorMessage == other.errorMessage &&
+          networkRetryCount == other.networkRetryCount;
+
+  @override
+  int get hashCode => Object.hash(
+        phase,
+        Object.hashAll(selectedImages),
+        uploadProgress,
+        activeJobId,
+        activeJob,
+        errorMessage,
+        networkRetryCount,
+      );
+
+  @override
+  String toString() => 'WorkspaceState('
+      'phase: $phase, '
+      'photos: ${selectedImages.length}, '
+      'uploadProgress: ${uploadProgress.toStringAsFixed(2)}, '
+      'activeJobId: $activeJobId, '
+      'activeJob: $activeJob, '
+      'errorMessage: $errorMessage, '
+      'networkRetryCount: $networkRetryCount'
+      ')';
+}
+
+// Private sentinel to distinguish "not provided" from explicit null in copyWith
+const _unset = _Unset();
+
+class _Unset {
+  const _Unset();
 }
