@@ -122,7 +122,8 @@
       "Bash(powershell:*)",
       "Bash(git -C \"C:\\\\DK\\\\S3\" worktree list)",
       "Bash(ls -la \"C:\\\\DK\\\\S3\\\\.auto-claude\\\\specs\"\" 2>&1 || echo \"Directory not found \")",
-      "Bash(git worktree remove:*)"
+      "Bash(git worktree remove:*)",
+      "Bash(git merge:*)"
     ]
   }
 }

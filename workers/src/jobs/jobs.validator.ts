@@ -1,22 +1,30 @@
 /**
  * Jobs Zod Validators
- *
- * TODO: Auto-Claude 구현
- * - CreateJobSchema: { preset: string, item_count: number }
- * - ExecuteJobSchema: { concepts, protect, rule_id?, output_template? }
- * - CallbackSchema: { idx, status, output_key?, preview_key?, error?, idempotency_key }
  */
 
 import { z } from 'zod';
 
 export const CreateJobSchema = z.object({
-  // TODO: define schema
+  preset: z.string().min(1),
+  item_count: z.number().int().min(1).max(200),
 });
 
 export const ExecuteJobSchema = z.object({
-  // TODO: define schema
+  concepts: z.record(
+    z.object({
+      action: z.string(),
+      value: z.string(),
+    }),
+  ),
+  protect: z.array(z.string()).optional().default([]),
+  rule_id: z.string().optional(),
 });
 
 export const CallbackSchema = z.object({
-  // TODO: define schema
+  idx: z.number().int().min(0),
+  status: z.enum(['done', 'failed']),
+  output_key: z.string().optional(),
+  preview_key: z.string().optional(),
+  error: z.string().optional(),
+  idempotency_key: z.string().min(1),
 });

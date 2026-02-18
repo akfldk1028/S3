@@ -30,13 +30,37 @@
       "current_subtask": "subtask-2-5",
       "phase": "coding",
       "session": 8
+    },
+    "013-settings-profile-credits-plan": {
+      "spec_id": "013-settings-profile-credits-plan",
+      "spec_dir": "C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\013-settings-profile-credits-plan\\.auto-claude\\specs\\013-settings-profile-credits-plan",
+      "status": "in_progress",
+      "is_running": true,
+      "started_at": "2026-02-18T05:31:38.438354+00:00",
+      "last_update": "2026-02-18T07:15:48.127680+00:00",
+      "task_type": "impl",
+      "current_subtask": "subtask-3-3",
+      "phase": "coding",
+      "session": 793
+    },
+    "028-flutter-camera-plus-album": {
+      "spec_id": "028-flutter-camera-plus-album",
+      "spec_dir": "C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\028-flutter-camera-plus-album\\.auto-claude\\specs\\028-flutter-camera-plus-album",
+      "status": "in_progress",
+      "is_running": true,
+      "started_at": "2026-02-18T05:31:32.560836+00:00",
+      "last_update": "2026-02-18T07:15:47.699613+00:00",
+      "task_type": "impl",
+      "current_subtask": "subtask-1-1",
+      "phase": "coding",
+      "session": 795
     }
   },
   "queued_tasks": [],
   "stats": {
-    "running": 2,
+    "running": 4,
     "queued": 0,
-    "completed": 3
+    "completed": 5
   },
-  "timestamp": "2026-02-14T08:33:07.503446+00:00"
+  "timestamp": "2026-02-18T07:15:48.127680+00:00"
 }

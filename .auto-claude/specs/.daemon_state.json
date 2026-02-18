@@ -1,18 +1,29 @@
 {
-  "recovery_counts": {},
-  "error_counts": {
-    "006-gpu-worker-sam3-segmenter": 1,
-    "007-frontend-flutter-freezed-models": 1
+  "recovery_counts": {
+    "028-flutter-camera-plus-album": 1,
+    "013-settings-profile-credits-plan": 1
   },
-  "last_errors": {
-    "006-gpu-worker-sam3-segmenter": "Exit code 1",
-    "007-frontend-flutter-freezed-models": "Exit code 1"
-  },
+  "error_counts": {},
+  "last_errors": {},
   "completed_tasks": [
     "002-workers-foundation-schema-auth",
-    "003-workers-advanced-userlimiterdo-jobcoordinatordo"
+    "003-workers-advanced-userlimiterdo-jobcoordinatordo",
+    "011-gpu-worker-env-example",
+    "022-flutter-tier-\ub9c8\uc774\ud06c\ub85c\uc778\ud130\ub799\uc158-hapticfeedback",
+    "017-onboarding-tutorial-\ud50c\ub85c\uc6b0-pageview",
+    "026-flutter-\ubaa8\ubc14\uc77c-\ud30c\uc774\ud504\ub77c\uc778-pro",
+    "024-workers-jobcoordinatordo-\uc0c1\ud0dc\uba38\uc2e0-alarm",
+    "023-flutter-before-after-\uc2ac\ub77c\uc774\ub354",
+    "025-workers-cors-\uc77c\uad00\uc131-cors",
+    "012-frontend-sam3-\ud504\ub86c\ud504\ud2b8-sidepanel\uc758",
+    "021-flutter-\ubaa8\ubc14\uc77c-\ub808\uc774\uc544\uc6c3-\ud06c\ub808\ub527",
+    "018-polish-splash-screen-gradient",
+    "027-flutter-\uc774\ubbf8\uc9c0-\uba54\ubaa8\ub9ac-\ucd5c\uc801\ud654",
+    "019-workers-\ud06c\ub808\ub527-critical-jobs",
+    "014-pricingscreen-free-pro-\ud06c\ub808\ub527",
+    "015-job-history-historyscreen\uc5d0-job"
   ],
   "task_hierarchy": {},
-  "started_at": "2026-02-14T08:34:13.999040+00:00",
-  "last_updated": "2026-02-14T08:35:07.268561+00:00"
+  "started_at": "2026-02-17T10:42:18.502382+00:00",
+  "last_updated": "2026-02-18T05:31:30.727660+00:00"
 }

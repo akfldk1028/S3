@@ -1,7 +1,7 @@
 {
   "project_dir": "C:\\DK\\S3",
   "running": true,
-  "started_at": "2026-02-14T08:34:13.999040+00:00",
+  "started_at": "2026-02-17T10:42:18.502382+00:00",
   "config": {
     "max_concurrent_tasks": 3,
     "stuck_timeout": 600,
@@ -9,13 +9,57 @@
     "use_worktrees": true,
     "skip_qa": false
   },
-  "running_tasks": {},
-  "queued_tasks": [],
-  "stats": {
-    "running": 0,
-    "queued": 0,
-    "completed": 2
+  "running_tasks": {
+    "028-flutter-camera-plus-album": {
+      "spec_id": "028-flutter-camera-plus-album",
+      "spec_dir": "C:\\DK\\S3\\.auto-claude\\specs\\028-flutter-camera-plus-album",
+      "pid": 150856,
+      "status": "in_progress",
+      "started_at": "2026-02-18T05:31:30.737550+00:00",
+      "last_update": "2026-02-18T07:15:36.402057+00:00",
+      "error_count": 0,
+      "recovery_count": 0,
+      "last_error": null,
+      "is_running": true,
+      "task_type": "default",
+      "priority": 2,
+      "depends_on": [],
+      "parent_task": null,
+      "child_tasks": [],
+      "worktree_path": null,
+      "execution_mode": "headless"
+    },
+    "013-settings-profile-credits-plan": {
+      "spec_id": "013-settings-profile-credits-plan",
+      "spec_dir": "C:\\DK\\S3\\.auto-claude\\specs\\013-settings-profile-credits-plan",
+      "pid": 145864,
+      "status": "in_progress",
+      "started_at": "2026-02-18T05:31:37.047935+00:00",
+      "last_update": "2026-02-18T07:15:36.419288+00:00",
+      "error_count": 0,
+      "recovery_count": 0,
+      "last_error": null,
+      "is_running": true,
+      "task_type": "default",
+      "priority": 2,
+      "depends_on": [],
+      "parent_task": null,
+      "child_tasks": [],
+      "worktree_path": null,
+      "execution_mode": "headless"
+    }
   },
-  "timestamp": "2026-02-14T17:42:37.428948",
+  "queued_tasks": [
+    {
+      "spec_id": "010-workers-userlimiterdo-sql-파라미터",
+      "priority": 2
+    }
+  ],
+  "stats": {
+    "running": 2,
+    "queued": 1,
+    "completed": 16
+  },
+  "timestamp": "2026-02-18T16:15:39.311486",
   "ws_port": 18800
 }

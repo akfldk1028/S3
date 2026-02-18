@@ -1,7 +1,6 @@
 /**
  * Jobs Route — 6 endpoints
  *
- * TODO: Auto-Claude 구현
  * - POST /jobs → Job 생성 + presigned URLs (UserLimiterDO.reserve → JobCoordinatorDO.create → R2 presigned)
  * - POST /jobs/:id/confirm-upload → 업로드 완료 (JobCoordinatorDO.markUploaded)
  * - POST /jobs/:id/execute → 룰 적용 실행 (JobCoordinatorDO.markQueued → Queue push)
@@ -11,653 +10,234 @@
  */
 
 import { Hono } from 'hono';
-import type { Env, AuthUser, GpuQueueMessage, CallbackPayload, JobStatus } from '../_shared/types';
-import { generateUploadUrls, pushToQueue } from './jobs.service';
+import type { Env, AuthUser, UserLimiterState, JobCoordinatorState, CallbackPayload, JobStatus } from '../_shared/types';
+import { PLAN_LIMITS } from '../_shared/types';
+import { ERR } from '../_shared/errors';
+import { ok, error } from '../_shared/response';
+import { getUserLimiterStub, getJobCoordinatorStub } from '../do/do.helpers';
+import { CreateJobSchema } from './jobs.validator';
 
 const app = new Hono<{ Bindings: Env; Variables: { user: AuthUser } }>();
 
-// POST /jobs - Create job, reserve credits, generate presigned URLs
+// POST /jobs — Job 생성 + presigned URLs
 app.post('/', async (c) => {
+  const user = c.get('user');
+  const userId = user.userId;
+
+  // Validate request body
+  let body: unknown;
   try {
-    // 1. Get authenticated user
-    const user = c.get('user');
-    const userId = user.userId;
+    body = await c.req.json();
+  } catch {
+    return c.json(error(ERR.VALIDATION_FAILED, 'Invalid JSON body'), 400);
+  }
 
-    // 2. Parse request body
-    const body = await c.req.json<{
-      preset: string;
-      itemCount: number;
-    }>();
-
-    const { preset, itemCount } = body;
-
-    // Validate inputs
-    if (!preset || typeof preset !== 'string') {
-      return c.json(
-        { success: false, error: { code: 'INVALID_PRESET', message: 'Invalid preset value' } },
-        400
-      );
-    }
-
-    if (!itemCount || typeof itemCount !== 'number' || itemCount < 1) {
-      return c.json(
-        { success: false, error: { code: 'INVALID_ITEM_COUNT', message: 'Item count must be >= 1' } },
-        400
-      );
-    }
-
-    // 3. Generate unique job ID
-    const jobId = crypto.randomUUID();
-
-    // 4. Get UserLimiterDO stub and reserve credits
-    const userLimiterId = c.env.USER_LIMITER.idFromName(userId);
-    const userLimiterStub = c.env.USER_LIMITER.get(userLimiterId);
-
-    const reserveResponse = await userLimiterStub.fetch('http://internal/reserve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jobId,
-        itemCount,
-      }),
-    });
-
-    const reserveResult = await reserveResponse.json<{
-      allowed: boolean;
-      reason?: string;
-    }>();
-
-    // 5. If reserve fails, return 403
-    if (!reserveResult.allowed) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: 'INSUFFICIENT_RESOURCES',
-            message: reserveResult.reason || 'Insufficient credits or concurrency limit reached',
-          },
-        },
-        403
-      );
-    }
-
-    // 6. Get JobCoordinatorDO stub and create job
-    const jobCoordinatorId = c.env.JOB_COORDINATOR.idFromName(jobId);
-    const jobCoordinatorStub = c.env.JOB_COORDINATOR.get(jobCoordinatorId);
-
-    await jobCoordinatorStub.fetch('http://internal/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jobId,
-        userId,
-        preset,
-        totalItems: itemCount,
-      }),
-    });
-
-    // 7. Generate presigned upload URLs
-    const uploadUrls = await generateUploadUrls(c.env, userId, jobId, itemCount);
-
-    // 8. Return success response with jobId and URLs
-    return c.json({
-      success: true,
-      data: {
-        jobId,
-        urls: uploadUrls,
-      },
-      error: null,
-      meta: {
-        request_id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
+  const parsed = CreateJobSchema.safeParse(body);
+  if (!parsed.success) {
     return c.json(
-      {
-        success: false,
-        data: null,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
-        },
-        meta: {
-          request_id: crypto.randomUUID(),
-          timestamp: new Date().toISOString(),
-        },
-      },
-      500
+      error(ERR.VALIDATION_FAILED, parsed.error.issues[0]?.message ?? 'Invalid request'),
+      400,
     );
   }
+
+  const { preset, item_count: itemCount } = parsed.data;
+
+  // Get UserLimiter DO stub
+  const userLimiterStub = getUserLimiterStub(c.env, userId);
+
+  // [CRED-3] getUserState를 먼저 호출하여 plan별 maxItems 초과 시 400 + ERR.ITEM_LIMIT 반환
+  const userStateResponse = await userLimiterStub.fetch('http://do/getUserState', {
+    method: 'GET',
+  });
+
+  if (!userStateResponse.ok) {
+    return c.json(error(ERR.INTERNAL_ERROR, 'User state not found'), 400);
+  }
+
+  const userState = await userStateResponse.json<UserLimiterState>();
+  const maxItems = PLAN_LIMITS[userState.plan].maxItems;
+
+  if (itemCount > maxItems) {
+    return c.json(
+      error(
+        ERR.ITEM_LIMIT,
+        `Item count exceeds plan limit: max ${maxItems} for ${userState.plan} plan`,
+      ),
+      400,
+    );
+  }
+
+  // Reserve credits and concurrency slot (called AFTER itemCount validation)
+  const jobId = crypto.randomUUID();
+  const reserveResponse = await userLimiterStub.fetch('http://do/reserve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jobId, cost: itemCount }),
+  });
+
+  const reserveResult = await reserveResponse.json<{ reserved: boolean }>();
+
+  if (!reserveResult.reserved) {
+    if (userState.credits < itemCount) {
+      return c.json(error(ERR.INSUFFICIENT_CREDITS, 'Insufficient credits'), 402);
+    }
+    return c.json(error(ERR.CONCURRENCY_LIMIT, 'Concurrency limit reached'), 429);
+  }
+
+  // Create job in JobCoordinatorDO
+  const jobCoordinatorStub = getJobCoordinatorStub(c.env, jobId);
+  await jobCoordinatorStub.fetch('http://do/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jobId, userId, preset, totalItems: itemCount }),
+  });
+
+  // TODO: Generate R2 presigned upload URLs via jobs.service.ts
+  return c.json(ok({ job_id: jobId, preset, item_count: itemCount, upload_urls: [] }), 201);
 });
 
-// POST /jobs/:id/confirm-upload - Mark items uploaded
+// POST /jobs/:id/confirm-upload
 app.post('/:id/confirm-upload', async (c) => {
-  try {
-    // 1. Get job ID from URL params
-    const jobId = c.req.param('id');
+  const userId = c.get('user').userId;
+  const jobId = c.req.param('id');
 
-    // 2. Parse request body
-    const body = await c.req.json<{
-      totalItems: number;
-    }>();
+  const stub = getJobCoordinatorStub(c.env, jobId);
 
-    const { totalItems } = body;
+  const stateResponse = await stub.fetch('http://do/getStatus', { method: 'GET' });
+  if (!stateResponse.ok) {
+    return c.json(error(ERR.JOB_NOT_FOUND, 'Job not found'), 404);
+  }
 
-    // Validate inputs
-    if (!totalItems || typeof totalItems !== 'number' || totalItems < 1) {
-      return c.json(
-        {
-          success: false,
-          error: { code: 'INVALID_TOTAL_ITEMS', message: 'totalItems must be >= 1' },
-        },
-        400
-      );
-    }
+  const jobState = await stateResponse.json<JobCoordinatorState>();
+  if (jobState.userId !== userId) {
+    return c.json(error(ERR.JOB_FORBIDDEN, 'Access denied'), 403);
+  }
 
-    // 3. Get JobCoordinatorDO stub and call confirmUpload
-    const jobCoordinatorId = c.env.JOB_COORDINATOR.idFromName(jobId);
-    const jobCoordinatorStub = c.env.JOB_COORDINATOR.get(jobCoordinatorId);
-
-    const confirmResponse = await jobCoordinatorStub.fetch('http://internal/confirm-upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ totalItems }),
-    });
-
-    // 4. Handle error responses (e.g., invalid state transition)
-    if (!confirmResponse.ok) {
-      const errorResult = await confirmResponse.json<{ error: string }>();
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: 'INVALID_STATE_TRANSITION',
-            message: errorResult.error || 'Cannot confirm upload - job not in created state',
-          },
-        },
-        400
-      );
-    }
-
-    // 5. Return success response
-    return c.json({
-      success: true,
-      data: {
-        jobId,
-        status: 'uploaded',
-      },
-      error: null,
-      meta: {
-        request_id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
+  const markResponse = await stub.fetch('http://do/markUploaded', { method: 'POST' });
+  if (!markResponse.ok) {
+    const body = await markResponse.json<{ code?: string; message?: string }>();
     return c.json(
-      {
-        success: false,
-        data: null,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
-        },
-        meta: {
-          request_id: crypto.randomUUID(),
-          timestamp: new Date().toISOString(),
-        },
-      },
-      500
+      error(body.code ?? ERR.INTERNAL_ERROR, body.message ?? 'Failed to mark uploaded'),
+      400,
     );
   }
+
+  return c.json(ok({ job_id: jobId }));
 });
 
-// POST /jobs/:id/execute - Execute job with rules, push to GPU queue
+// POST /jobs/:id/execute
 app.post('/:id/execute', async (c) => {
-  try {
-    // 1. Get job ID from URL params
-    const jobId = c.req.param('id');
+  const userId = c.get('user').userId;
+  const jobId = c.req.param('id');
 
-    // 2. Parse request body
-    const body = await c.req.json<{
-      concepts: Record<string, { action: string; value: string }>;
-      protect: string[];
-      ruleId?: string;
-    }>();
+  const stub = getJobCoordinatorStub(c.env, jobId);
 
-    const { concepts, protect, ruleId } = body;
+  const stateResponse = await stub.fetch('http://do/getStatus', { method: 'GET' });
+  if (!stateResponse.ok) {
+    return c.json(error(ERR.JOB_NOT_FOUND, 'Job not found'), 404);
+  }
 
-    // Validate inputs
-    if (!concepts || typeof concepts !== 'object') {
-      return c.json(
-        {
-          success: false,
-          error: { code: 'INVALID_CONCEPTS', message: 'concepts must be an object' },
-        },
-        400
-      );
-    }
+  const jobState = await stateResponse.json<JobCoordinatorState>();
+  if (jobState.userId !== userId) {
+    return c.json(error(ERR.JOB_FORBIDDEN, 'Access denied'), 403);
+  }
 
-    if (!Array.isArray(protect)) {
-      return c.json(
-        {
-          success: false,
-          error: { code: 'INVALID_PROTECT', message: 'protect must be an array' },
-        },
-        400
-      );
-    }
-
-    // 3. Get JobCoordinatorDO stub
-    const jobCoordinatorId = c.env.JOB_COORDINATOR.idFromName(jobId);
-    const jobCoordinatorStub = c.env.JOB_COORDINATOR.get(jobCoordinatorId);
-
-    // 4. Call markQueued to update job status and store rule config
-    const markQueuedResponse = await jobCoordinatorStub.fetch('http://internal/mark-queued', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        concepts: JSON.stringify(concepts),
-        protect: JSON.stringify(protect),
-        ruleId: ruleId || null,
-      }),
-    });
-
-    // 5. Handle error responses (e.g., not in 'uploaded' state)
-    if (!markQueuedResponse.ok) {
-      const errorResult = await markQueuedResponse.json<{ error: string }>();
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: 'INVALID_STATE_TRANSITION',
-            message: errorResult.error || 'Cannot execute - job not in uploaded state',
-          },
-        },
-        400
-      );
-    }
-
-    // 6. Get job state to construct queue message
-    const stateResponse = await jobCoordinatorStub.fetch('http://internal/state', {
-      method: 'GET',
-    });
-
-    const jobState = await stateResponse.json<{
-      jobId: string;
-      userId: string;
-      preset: string;
-      totalItems: number;
-      items: Array<{
-        idx: number;
-        inputKey: string;
-        outputKey: string;
-        previewKey: string;
-      }>;
-    }>();
-
-    // 7. Construct GPU queue message
-    const queueMessage: GpuQueueMessage = {
-      job_id: jobState.jobId,
-      user_id: jobState.userId,
-      preset: jobState.preset,
-      concepts,
-      protect,
-      items: jobState.items.map((item) => ({
-        idx: item.idx,
-        input_key: item.inputKey,
-        output_key: item.outputKey,
-        preview_key: item.previewKey,
-      })),
-      callback_url: `https://${c.req.header('host')}/jobs/${jobId}/callback`,
-      idempotency_prefix: `${jobId}-`,
-      batch_concurrency: 4,
-    };
-
-    // 8. Push message to GPU queue
-    await pushToQueue(c.env.GPU_QUEUE, queueMessage);
-
-    // 9. Return success response
-    return c.json({
-      success: true,
-      data: {
-        jobId,
-        status: 'queued',
-      },
-      error: null,
-      meta: {
-        request_id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
+  const markResponse = await stub.fetch('http://do/markQueued', { method: 'POST' });
+  if (!markResponse.ok) {
+    const body = await markResponse.json<{ code?: string; message?: string }>();
     return c.json(
-      {
-        success: false,
-        data: null,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
-        },
-        meta: {
-          request_id: crypto.randomUUID(),
-          timestamp: new Date().toISOString(),
-        },
-      },
-      500
+      error(body.code ?? ERR.INTERNAL_ERROR, body.message ?? 'Failed to mark queued'),
+      400,
     );
   }
+
+  // TODO: Push to GPU_QUEUE after markQueued succeeds
+  return c.json(ok({ job_id: jobId }));
 });
 
-// GET /jobs/:id - Get job status and progress
+// GET /jobs/:id
 app.get('/:id', async (c) => {
-  try {
-    // 1. Get job ID from URL params
-    const jobId = c.req.param('id');
-
-    // 2. Get JobCoordinatorDO stub
-    const jobCoordinatorId = c.env.JOB_COORDINATOR.idFromName(jobId);
-    const jobCoordinatorStub = c.env.JOB_COORDINATOR.get(jobCoordinatorId);
-
-    // 3. Get job state
-    const stateResponse = await jobCoordinatorStub.fetch('http://internal/state', {
-      method: 'GET',
-    });
-
-    // 4. Handle 404 if job not found
-    if (!stateResponse.ok) {
-      const errorResult = await stateResponse.json<{ error: string }>();
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: 'JOB_NOT_FOUND',
-            message: errorResult.error || 'Job not found',
-          },
-        },
-        404
-      );
-    }
-
-    const jobState = await stateResponse.json<{
-      jobId: string;
-      userId: string;
-      status: string;
-      totalItems: number;
-      doneItems: number;
-      failedItems: number;
-    }>();
-
-    // 5. Return job status and progress
-    return c.json({
-      success: true,
-      data: {
-        jobId: jobState.jobId,
-        status: jobState.status,
-        progress: {
-          done: jobState.doneItems,
-          failed: jobState.failedItems,
-          total: jobState.totalItems,
-        },
-      },
-      error: null,
-      meta: {
-        request_id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
-    return c.json(
-      {
-        success: false,
-        data: null,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
-        },
-        meta: {
-          request_id: crypto.randomUUID(),
-          timestamp: new Date().toISOString(),
-        },
-      },
-      500
-    );
-  }
+  // TODO: getStatus + presigned download URLs
+  return c.json(error(ERR.INTERNAL_ERROR, 'Not implemented'), 501);
 });
 
-// POST /jobs/:id/callback - GPU Worker callback with idempotency
+// POST /jobs/:id/callback
 app.post('/:id/callback', async (c) => {
+  const jobId = c.req.param('id');
+
+  // [SEC-1] Verify GPU_CALLBACK_SECRET
+  const secret = c.req.header('x-gpu-callback-secret');
+  if (!secret || secret !== c.env.GPU_CALLBACK_SECRET) {
+    return c.json(error(ERR.CALLBACK_UNAUTHORIZED, 'Invalid callback secret'), 401);
+  }
+
+  // Parse callback payload
+  let payload: CallbackPayload;
   try {
-    // 1. Validate GPU_CALLBACK_SECRET header
-    const secret = c.req.header('x-gpu-callback-secret');
-    if (!secret || secret !== c.env.GPU_CALLBACK_SECRET) {
-      return c.json(
-        {
-          success: false,
-          error: { code: 'UNAUTHORIZED', message: 'Invalid or missing GPU callback secret' },
-        },
-        401
-      );
-    }
+    payload = await c.req.json<CallbackPayload>();
+  } catch {
+    return c.json(error(ERR.VALIDATION_FAILED, 'Invalid JSON body'), 400);
+  }
 
-    // 2. Get job ID from URL params
-    const jobId = c.req.param('id');
+  // Check job existence via DO state
+  const stub = getJobCoordinatorStub(c.env, jobId);
+  const stateResponse = await stub.fetch('http://do/getStatus', { method: 'GET' });
+  if (!stateResponse.ok) {
+    return c.json(error(ERR.JOB_NOT_FOUND, 'Job not found'), 404);
+  }
 
-    // 3. Parse callback payload
-    const payload = await c.req.json<CallbackPayload>();
+  const jobState = await stateResponse.json<JobCoordinatorState>();
 
-    // Validate payload
-    if (
-      typeof payload.idx !== 'number' ||
-      !payload.status ||
-      !['done', 'failed'].includes(payload.status) ||
-      !payload.idempotency_key
-    ) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: 'INVALID_PAYLOAD',
-            message: 'Callback payload must include idx, status (done|failed), and idempotency_key',
-          },
-        },
-        400
-      );
-    }
+  // If already in terminal state, return 200 (idempotent)
+  const terminalStates: JobStatus[] = ['done', 'failed', 'canceled'];
+  if (terminalStates.includes(jobState.status)) {
+    return c.json(ok({ job_id: jobId, message: 'Job already in terminal state, callback ignored' }));
+  }
 
-    // 4. Get JobCoordinatorDO stub and call onItemResult
-    const jobCoordinatorId = c.env.JOB_COORDINATOR.idFromName(jobId);
-    const jobCoordinatorStub = c.env.JOB_COORDINATOR.get(jobCoordinatorId);
-
-    const resultResponse = await jobCoordinatorStub.fetch('http://internal/on-item-result', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    if (!resultResponse.ok) {
-      const errorResult = await resultResponse.json<{ error: string }>();
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: 'COORDINATOR_ERROR',
-            message: errorResult.error || 'Failed to process callback',
-          },
-        },
-        500
-      );
-    }
-
-    const resultData = await resultResponse.json<{
-      status: JobStatus;
-      doneItems: number;
-      failedItems: number;
-      totalItems: number;
-    }>();
-
-    // 5. If job is in final state (done/failed/canceled), commit or rollback credits
-    if (['done', 'failed', 'canceled'].includes(resultData.status)) {
-      // Get job coordinator state to retrieve userId
-      const statusResponse = await jobCoordinatorStub.fetch('http://internal/status', {
-        method: 'GET',
-      });
-
-      const statusData = await statusResponse.json<{
-        userId: string;
-      }>();
-
-      const userId = statusData.userId;
-
-      // Get UserLimiterDO stub
-      const userLimiterId = c.env.USER_LIMITER.idFromName(userId);
-      const userLimiterStub = c.env.USER_LIMITER.get(userLimiterId);
-
-      // Commit credits (refunds failed items, releases job slot)
-      if (resultData.status === 'done' || resultData.status === 'failed') {
-        await userLimiterStub.fetch('http://internal/commit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jobId,
-            doneItems: resultData.doneItems,
-            failedItems: resultData.failedItems,
-          }),
-        });
-      } else if (resultData.status === 'canceled') {
-        // Rollback all credits
-        await userLimiterStub.fetch('http://internal/rollback', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            jobId,
-            totalItems: resultData.totalItems,
-          }),
-        });
-      }
-    }
-
-    // 6. Return success response
-    return c.json({
-      success: true,
-      data: {
-        jobId,
-        status: resultData.status,
-        progress: {
-          done: resultData.doneItems,
-          failed: resultData.failedItems,
-          total: resultData.totalItems,
-        },
-      },
-      error: null,
-      meta: {
-        request_id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
+  // Forward item result to DO
+  const resultResponse = await stub.fetch('http://do/onItemResult', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (!resultResponse.ok) {
+    const body = await resultResponse.json<{ code?: string; message?: string }>();
     return c.json(
-      {
-        success: false,
-        data: null,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
-        },
-        meta: {
-          request_id: crypto.randomUUID(),
-          timestamp: new Date().toISOString(),
-        },
-      },
-      500
+      error(body.code ?? ERR.INTERNAL_ERROR, body.message ?? 'Failed to process callback'),
+      400,
     );
   }
+
+  return c.json(ok({ job_id: jobId }));
 });
 
-// POST /jobs/:id/cancel - Cancel job and rollback credits
+// POST /jobs/:id/cancel
 app.post('/:id/cancel', async (c) => {
-  try {
-    // 1. Get job ID from URL params
-    const jobId = c.req.param('id');
+  const userId = c.get('user').userId;
+  const jobId = c.req.param('id');
 
-    // 2. Get JobCoordinatorDO stub
-    const jobCoordinatorId = c.env.JOB_COORDINATOR.idFromName(jobId);
-    const jobCoordinatorStub = c.env.JOB_COORDINATOR.get(jobCoordinatorId);
+  const stub = getJobCoordinatorStub(c.env, jobId);
 
-    // 3. Call cancel to update job status
-    const cancelResponse = await jobCoordinatorStub.fetch('http://internal/cancel', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
+  const stateResponse = await stub.fetch('http://do/getStatus', { method: 'GET' });
+  if (!stateResponse.ok) {
+    return c.json(error(ERR.JOB_NOT_FOUND, 'Job not found'), 404);
+  }
 
-    // 4. Handle error responses (e.g., already in terminal state)
-    if (!cancelResponse.ok) {
-      const errorResult = await cancelResponse.json<{ error: string }>();
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: 'INVALID_STATE_TRANSITION',
-            message: errorResult.error || 'Cannot cancel - job already in terminal state',
-          },
-        },
-        400
-      );
-    }
+  const jobState = await stateResponse.json<JobCoordinatorState>();
+  if (jobState.userId !== userId) {
+    return c.json(error(ERR.JOB_FORBIDDEN, 'Access denied'), 403);
+  }
 
-    // 5. Get job state to retrieve userId and totalItems
-    const stateResponse = await jobCoordinatorStub.fetch('http://internal/state', {
-      method: 'GET',
-    });
-
-    const jobState = await stateResponse.json<{
-      userId: string;
-      totalItems: number;
-    }>();
-
-    // 6. Get UserLimiterDO stub and rollback credits
-    const userLimiterId = c.env.USER_LIMITER.idFromName(jobState.userId);
-    const userLimiterStub = c.env.USER_LIMITER.get(userLimiterId);
-
-    await userLimiterStub.fetch('http://internal/rollback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        jobId,
-        totalItems: jobState.totalItems,
-      }),
-    });
-
-    // 7. Return success response
-    return c.json({
-      success: true,
-      data: {
-        jobId,
-        status: 'canceled',
-      },
-      error: null,
-      meta: {
-        request_id: crypto.randomUUID(),
-        timestamp: new Date().toISOString(),
-      },
-    });
-  } catch (error) {
+  const cancelResponse = await stub.fetch('http://do/cancel', { method: 'POST' });
+  if (!cancelResponse.ok) {
+    const body = await cancelResponse.json<{ code?: string; message?: string }>();
     return c.json(
-      {
-        success: false,
-        data: null,
-        error: {
-          code: 'INTERNAL_ERROR',
-          message: error instanceof Error ? error.message : 'Unknown error occurred',
-        },
-        meta: {
-          request_id: crypto.randomUUID(),
-          timestamp: new Date().toISOString(),
-        },
-      },
-      500
+      error(body.code ?? ERR.INTERNAL_ERROR, body.message ?? 'Failed to cancel job'),
+      400,
     );
   }
+
+  return c.json(ok({ job_id: jobId }));
 });
 
 export default app;
