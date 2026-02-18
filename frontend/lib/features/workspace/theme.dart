@@ -1,82 +1,71 @@
 import 'package:flutter/material.dart';
 
-/// SNOW / B612-inspired dark colour palette for the workspace screens.
-abstract class WsColors {
-  /// Deep dark navy — main background.
-  static const bg = Color(0xFF0F0F17);
+/// Workspace colour tokens and theme helpers.
+///
+/// All workspace widgets should reference [WsColors] for consistent theming.
+/// Do NOT use hard-coded colour literals elsewhere in the workspace feature.
+class WsColors {
+  WsColors._();
 
-  /// Slightly lighter dark — surface / card background.
-  static const surface = Color(0xFF1A1A2E);
+  // ── Primary accent palette ────────────────────────────────────────────────
+  static const Color accent1 = Color(0xFF667EEA); // purple-blue
+  static const Color accent2 = Color(0xFFFF6B9D); // pink
 
-  /// Accent 1 — purple-blue.
-  static const accent1 = Color(0xFF6C63FF);
+  // ── Glass / overlay surfaces ──────────────────────────────────────────────
+  static const Color glassWhite = Color(0x1AFFFFFF); // 10% white
+  static const Color glassBorder = Color(0x33FFFFFF); // 20% white
+  static const Color glassHover = Color(0x26FFFFFF); // 15% white
 
-  /// Accent 2 — pink / rose.
-  static const accent2 = Color(0xFFFF6B9D);
+  // ── Text ──────────────────────────────────────────────────────────────────
+  static const Color textPrimary = Colors.white;
+  static const Color textSecondary = Color(0xB3FFFFFF); // 70% white
+  static const Color textTertiary = Color(0x80FFFFFF); // 50% white
 
-  /// Error / destructive colour.
-  static const error = Color(0xFFFF4D6A);
+  // ── Background ────────────────────────────────────────────────────────────
+  static const Color bgDark = Color(0xFF0F0F1A);
+  static const Color bgCard = Color(0x1AFFFFFF);
 
-  /// Glass overlay white — 10 % opacity.
-  static const glassWhite = Color(0x1AFFFFFF);
+  // ── Status ────────────────────────────────────────────────────────────────
+  static const Color statusRunning = Color(0xFF667EEA);
+  static const Color statusSuccess = Color(0xFF4ADE80);
+  static const Color statusError = Color(0xFFFF6B6B);
 
-  /// Glass border — 20 % opacity white.
-  static const glassBorder = Color(0x33FFFFFF);
+  // ── Gradients ─────────────────────────────────────────────────────────────
+  static const LinearGradient gradientPrimary = LinearGradient(
+    colors: [accent1, accent2],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
 
-  /// Primary text colour.
-  static const text = Color(0xFFFFFFFF);
-
-  /// High-emphasis text (87% white).
-  static const textPrimary = Color(0xDEFFFFFF);
-
-  /// Secondary / subdued text colour.
-  static const textSecondary = Color(0xFF9CA3AF);
-
-  /// Muted placeholder/hint text (50% white).
-  static const textMuted = Color(0x80FFFFFF);
-
-  /// Primary gradient: accent1 (top-left) → accent2 (bottom-right).
-  static const gradientPrimary = LinearGradient(
+  static const LinearGradient gradientDiagonal = LinearGradient(
     colors: [accent1, accent2],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 }
 
-/// Design tokens for the workspace UI.
-abstract class WsTheme {
-  /// Default corner radius for cards and containers.
-  static const double radius = 12.0;
+/// Layout and dimension tokens for the workspace feature.
+class WsTheme {
+  WsTheme._();
 
-  /// Small corner radius (grid thumbnails, chips).
-  static const double radiusSm = 8.0;
+  static const double borderRadius = 12.0;
+  static const double borderRadiusSm = 8.0;
+  static const double borderRadiusLg = 16.0;
+  static const double borderRadiusPill = 24.0;
 
-  /// Large corner radius (sheets, bottom panels).
-  static const double radiusLg = 20.0;
+  static const double spacing = 12.0;
+  static const double spacingSm = 8.0;
+  static const double spacingLg = 16.0;
+  static const double spacingXl = 24.0;
 
-  /// Extra-large corner radius (pill buttons, bottom sheets).
-  static const double radiusXl = 28.0;
+  static const double iconSize = 18.0;
+  static const double iconSizeSm = 14.0;
+  static const double iconSizeLg = 22.0;
 
-  /// Standard card decoration.
-  static BoxDecoration get cardDecoration => BoxDecoration(
-        color: WsColors.glassWhite,
-        borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: WsColors.glassBorder, width: 0.5),
-      );
+  static const Duration animFast = Duration(milliseconds: 150);
+  static const Duration animNormal = Duration(milliseconds: 250);
+  static const Duration animSlow = Duration(milliseconds: 400);
 
-  /// Glassmorphism container decoration.
-  /// MUST be used inside a [Stack] over a blurrable (non-opaque) background,
-  /// combined with [BackdropFilter].
-  static final glassDecoration = BoxDecoration(
-    color: WsColors.glassWhite,
-    borderRadius: BorderRadius.circular(radius),
-    border: Border.all(color: WsColors.glassBorder, width: 0.5),
-  );
-
-  /// Glassmorphism decoration with smaller radius (for compact elements).
-  static final glassDecorationSm = BoxDecoration(
-    color: WsColors.glassWhite,
-    borderRadius: BorderRadius.circular(radiusSm),
-    border: Border.all(color: WsColors.glassBorder, width: 0.5),
-  );
+  static const double actionBarHeight = 72.0;
+  static const double actionBarPadding = 16.0;
 }

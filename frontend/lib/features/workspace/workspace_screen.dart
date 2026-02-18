@@ -1,349 +1,339 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/auth/auth_provider.dart';
 import 'theme.dart';
-import 'workspace_provider.dart';
-import 'workspace_state.dart';
 import 'widgets/action_bar.dart';
-import 'widgets/mobile_bottom_sheet.dart';
+import 'widgets/concepts_section.dart';
 import 'widgets/photo_grid.dart';
 import 'widgets/progress_overlay.dart';
-import 'widgets/results_overlay.dart';
-import 'widgets/side_panel.dart';
-import 'widgets/top_bar.dart';
+import 'widgets/protect_section.dart';
 
-/// Main workspace screen for the S3 photo-editing pipeline.
+// ─────────────────────────────────────────────────────────────────────────────
+// WorkspaceScreen
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Main workspace screen.
 ///
-/// Handles:
-/// - Anonymous auth gate (auto-login on mount)
-/// - Responsive layout: desktop (≥ 600 px) shows [SidePanel] inline;
-///   mobile (< 600 px) hides [SidePanel] and exposes it via FAB → [MobileBottomSheet]
-/// - SNOW-style photo-first UX: full-screen empty state until photos are added
-class WorkspaceScreen extends ConsumerStatefulWidget {
+/// Manages photo selection, concept configuration, and job submission.
+///
+/// Layout is responsive:
+/// - Desktop (≥ 840 px wide): sidebar + photo area side-by-side.
+/// - Mobile (< 840 px): single-column scrollable layout.
+///
+/// Two ambient gradient orbs are rendered as the first [Positioned] children
+/// in both the desktop and mobile [Stack]s (see [_buildBody]) to create a
+/// subtle depth backdrop without intercepting touch events.
+class WorkspaceScreen extends StatefulWidget {
   const WorkspaceScreen({super.key});
 
   @override
-  ConsumerState<WorkspaceScreen> createState() => _WorkspaceScreenState();
+  State<WorkspaceScreen> createState() => _WorkspaceScreenState();
 }
 
-class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen> {
-  bool _autoLoginAttempted = false;
+class _WorkspaceScreenState extends State<WorkspaceScreen> {
+  // ── Photo state ───────────────────────────────────────────────────────────
+  final List<PhotoItem> _photos = [];
 
-  @override
-  void initState() {
-    super.initState();
-    _tryAutoLogin();
+  // ── Concept state ─────────────────────────────────────────────────────────
+  static const List<String> _allConcepts = [
+    'Modern',
+    'Minimalist',
+    'Industrial',
+    'Scandinavian',
+    'Bohemian',
+    'Classic',
+  ];
+
+  final Set<String> _selectedConcepts = {};
+  int _instanceCount = 1;
+
+  // ── Protect state ─────────────────────────────────────────────────────────
+  static const List<String> _protectOptions = [
+    'Furniture',
+    'Windows',
+    'Doors',
+    'Fixtures',
+    'Artwork',
+  ];
+
+  final Set<String> _selectedProtects = {};
+
+  // ── Job / upload state ────────────────────────────────────────────────────
+  OverlayStatus? _overlayStatus;
+  double _progressValue = 0.0;
+  ActionBarState _actionBarState = ActionBarState.idle;
+  double _uploadProgress = 0.0;
+
+  // ── Photo callbacks ───────────────────────────────────────────────────────
+  void _handleAddPhotos() {
+    setState(() {
+      _photos.add(PhotoItem(
+        id: 'photo_${_photos.length}',
+        path: 'assets/placeholder_${_photos.length}.jpg',
+      ));
+    });
   }
 
-  Future<void> _tryAutoLogin() async {
-    if (_autoLoginAttempted) return;
-    _autoLoginAttempted = true;
+  void _handleRemovePhoto(String id) {
+    setState(() {
+      _photos.removeWhere((p) => p.id == id);
+    });
+  }
 
-    final authState = ref.read(authProvider);
-    final token = authState.value;
-
-    if (token == null || token.isEmpty) {
-      try {
-        await ref.read(authProvider.notifier).login();
-      } catch (_) {
-        // Auth failed — error state is propagated via authProvider
+  // ── Concept callbacks ─────────────────────────────────────────────────────
+  void _handleConceptToggled(String concept) {
+    setState(() {
+      if (_selectedConcepts.contains(concept)) {
+        _selectedConcepts.remove(concept);
+      } else {
+        _selectedConcepts.add(concept);
       }
-    }
+    });
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final authState = ref.watch(authProvider);
+  void _handleInstanceSelected(int count) {
+    setState(() => _instanceCount = count);
+  }
 
-    return authState.when(
-      loading: () => Scaffold(
-        backgroundColor: WsColors.bg,
-        body: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+  // ── Protect callbacks ─────────────────────────────────────────────────────
+  void _handleProtectToggled(String option) {
+    setState(() {
+      if (_selectedProtects.contains(option)) {
+        _selectedProtects.remove(option);
+      } else {
+        _selectedProtects.add(option);
+      }
+    });
+  }
+
+  // ── Action bar callbacks ──────────────────────────────────────────────────
+  void _handleGo() {
+    if (_photos.isEmpty || _selectedConcepts.isEmpty) return;
+    setState(() {
+      _actionBarState = ActionBarState.uploading;
+      _uploadProgress = 0.0;
+    });
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      setState(() {
+        _actionBarState = ActionBarState.running;
+        _overlayStatus = OverlayStatus.running;
+        _progressValue = 0.0;
+      });
+    });
+  }
+
+  void _handleCancel() {
+    setState(() {
+      _actionBarState = ActionBarState.idle;
+      _overlayStatus = null;
+      _progressValue = 0.0;
+      _uploadProgress = 0.0;
+    });
+  }
+
+  void _handleRetry() {
+    setState(() {
+      _actionBarState = ActionBarState.idle;
+      _overlayStatus = null;
+      _progressValue = 0.0;
+      _uploadProgress = 0.0;
+    });
+  }
+
+  // ── Sidebar ───────────────────────────────────────────────────────────────
+  Widget _buildSidebar() {
+    return Container(
+      width: 280,
+      decoration: const BoxDecoration(
+        color: WsColors.glassWhite,
+        border: Border(
+          right: BorderSide(color: WsColors.glassBorder, width: 0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const Padding(
+            padding: EdgeInsets.all(WsTheme.spacingXl),
+            child: Text(
+              'Workspace',
+              style: TextStyle(
+                color: WsColors.textPrimary,
+                fontSize: 22,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          const Divider(color: WsColors.glassBorder, height: 0.5),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(WsTheme.spacingLg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ConceptsSection(
+                    concepts: _allConcepts,
+                    selectedConcepts: _selectedConcepts,
+                    onConceptToggled: _handleConceptToggled,
+                    instanceCount: _instanceCount,
+                    onInstanceSelected: _handleInstanceSelected,
+                  ),
+                  const SizedBox(height: WsTheme.spacingLg),
+                  ProtectSection(
+                    protectItems: _protectOptions,
+                    selectedItems: _selectedProtects,
+                    onItemToggled: _handleProtectToggled,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Photo area ────────────────────────────────────────────────────────────
+  Widget _buildPhotoArea() {
+    return Expanded(
+      child: Stack(
+        children: [
+          PhotoGrid(
+            photos: _photos,
+            onAddPhotos: _handleAddPhotos,
+            onRemovePhoto: _handleRemovePhoto,
+          ),
+          if (_overlayStatus != null)
+            ProgressOverlay(
+              status: _overlayStatus!,
+              progressValue: _progressValue,
+              onCancel: _handleCancel,
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Body ──────────────────────────────────────────────────────────────────
+  /// Returns the responsive body, switching between a desktop two-column
+  /// layout and a mobile single-column layout based on available width.
+  ///
+  /// Both layouts use a [Stack] whose FIRST two children are ambient gradient
+  /// orbs (wrapped in [IgnorePointer]) so they render behind all interactive
+  /// content without consuming pointer events.
+  Widget _buildBody() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth >= 840;
+
+        if (isDesktop) {
+          // ── Desktop layout ──────────────────────────────────────────────
+          return Stack(
             children: [
-              SizedBox(
-                width: 40,
-                height: 40,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: WsColors.accent1,
-                  backgroundColor: WsColors.glassWhite,
+              // Orb 1 — top-left, accent1 at 8 % opacity.
+              IgnorePointer(
+                child: Positioned(
+                  top: -150,
+                  left: -150,
+                  child: Container(
+                    width: 600,
+                    height: 600,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: WsColors.accent1.withValues(alpha: 0.08),
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Setting up…',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: WsColors.textSecondary,
+              // Orb 2 — bottom-right, accent2 at 4 % opacity.
+              IgnorePointer(
+                child: Positioned(
+                  bottom: -150,
+                  right: -150,
+                  child: Container(
+                    width: 600,
+                    height: 600,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: WsColors.accent2.withValues(alpha: 0.04),
+                    ),
+                  ),
                 ),
+              ),
+              // Main desktop content.
+              Row(
+                children: [
+                  _buildSidebar(),
+                  _buildPhotoArea(),
+                ],
               ),
             ],
-          ),
-        ),
-      ),
-      error: (e, _) => Scaffold(
-        backgroundColor: WsColors.bg,
-        body: Center(
-          child: Container(
-            width: 320,
-            padding: const EdgeInsets.all(28),
-            decoration: BoxDecoration(
-              color: WsColors.surface,
-              borderRadius: BorderRadius.circular(WsTheme.radiusLg),
-              border: Border.all(color: WsColors.glassBorder, width: 0.5),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: WsColors.error.withValues(alpha: 0.1),
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: WsColors.error.withValues(alpha: 0.3),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: const Icon(Icons.wifi_off_rounded,
-                      size: 24, color: WsColors.error),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Connection Failed',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: WsColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '$e',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: WsColors.textMuted,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                GestureDetector(
-                  onTap: () {
-                    _autoLoginAttempted = false;
-                    _tryAutoLogin();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 24, vertical: 12),
-                    decoration: BoxDecoration(
-                      gradient: WsColors.gradientPrimary,
-                      borderRadius: BorderRadius.circular(WsTheme.radiusXl),
-                    ),
-                    child: const Text(
-                      'Retry',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      data: (token) {
-        if (token == null || token.isEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!_autoLoginAttempted) _tryAutoLogin();
-          });
-          return Scaffold(
-            backgroundColor: WsColors.bg,
-            body: Center(
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: WsColors.accent1,
-                backgroundColor: WsColors.glassWhite,
-              ),
-            ),
           );
         }
 
-        return _buildWorkspace(context);
+        // ── Mobile layout ────────────────────────────────────────────────
+        return Stack(
+          children: [
+            // Orb 1 — top-left, accent1 at 8 % opacity.
+            IgnorePointer(
+              child: Positioned(
+                top: -150,
+                left: -150,
+                child: Container(
+                  width: 600,
+                  height: 600,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: WsColors.accent1.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+            ),
+            // Orb 2 — bottom-right, accent2 at 4 % opacity.
+            IgnorePointer(
+              child: Positioned(
+                bottom: -150,
+                right: -150,
+                child: Container(
+                  width: 600,
+                  height: 600,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: WsColors.accent2.withValues(alpha: 0.04),
+                  ),
+                ),
+              ),
+            ),
+            // Main mobile content.
+            Column(
+              children: [
+                _buildPhotoArea(),
+              ],
+            ),
+          ],
+        );
       },
     );
   }
 
-  Widget _buildWorkspace(BuildContext context) {
-    final ws = ref.watch(workspaceProvider);
-
-    // ── Breakpoint ───────────────────────────────────────────────────────────
-    // 600 px is the standard mobile/tablet split.
-    // On 375 px mobile: isDesktop == false → SidePanel is NOT shown inline.
-    // On ≥ 600 px desktop/tablet: isDesktop == true → SidePanel rendered beside
-    // PhotoGrid in a Row.
-    final isDesktop = MediaQuery.of(context).size.width >= 600;
-
-    final hasPhotos = ws.selectedImages.isNotEmpty;
-    final showControls = hasPhotos && ws.phase != WorkspacePhase.done;
-
-    return Scaffold(
-      backgroundColor: WsColors.bg,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            // Minimal top bar — only shown once photos have been selected
-            if (hasPhotos) const TopBar(),
-            Expanded(
-              child: _buildBody(ws, isDesktop),
-            ),
-            if (showControls) const ActionBar(),
-          ],
-        ),
-      ),
-      // ── FAB (mobile only) ─────────────────────────────────────────────────
-      // The FAB is only shown on mobile (!isDesktop) and only when the user has
-      // photos. It opens [MobileBottomSheet] so the user can access settings
-      // that are normally in [SidePanel] on desktop.
-      //
-      // Padding(bottom: 80) ensures the FAB does not overlap the last photo
-      // thumbnail in [PhotoGrid].
-      floatingActionButton: !isDesktop && showControls
-          ? Padding(
-              padding: const EdgeInsets.only(bottom: 80.0),
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: WsColors.gradientPrimary,
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: WsColors.accent1.withValues(alpha: 0.3),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: FloatingActionButton.small(
-                  onPressed: () => MobileBottomSheet.show(context),
-                  backgroundColor: Colors.transparent,
-                  elevation: 0,
-                  child: const Icon(Icons.tune_rounded,
-                      color: Colors.white, size: 20),
-                ),
-              ),
-            )
-          : null,
-    );
-  }
-
-  /// Builds the main body, gating [SidePanel] behind the desktop breakpoint.
-  ///
-  /// **Mobile (< 600 px)**: [SidePanel] is OMITTED entirely — not hidden with
-  /// Visibility, not wrapped in Offstage. This prevents the 280 px panel from
-  /// pushing [PhotoGrid] off-screen on 375 px viewports.
-  ///
-  /// **Desktop (≥ 600 px)**: [SidePanel] is shown to the left of [PhotoGrid]
-  /// in a [Row].
-  Widget _buildBody(WorkspaceState ws, bool isDesktop) {
-    if (ws.phase == WorkspacePhase.done) {
-      return const ResultsOverlay();
-    }
-
-    final hasPhotos = ws.selectedImages.isNotEmpty;
-
-    // SNOW-like: full-screen photo picker when no photos yet.
-    if (!hasPhotos) {
-      return const PhotoGrid();
-    }
-
-    if (isDesktop) {
-      // ── Desktop layout ─────────────────────────────────────────────────
-      // SidePanel (280 px fixed) + PhotoGrid (flexible) side by side.
-      return Row(
-        children: [
-          const SidePanel(),
-          Expanded(
-            child: Stack(
-              children: [
-                const PhotoGrid(),
-                if (ws.phase == WorkspacePhase.processing)
-                  const ProgressOverlay(),
-                if (ws.errorMessage != null)
-                  _ErrorBanner(message: ws.errorMessage!),
-              ],
-            ),
-          ),
-        ],
-      );
-    }
-
-    // ── Mobile layout ───────────────────────────────────────────────────────
-    // SidePanel is intentionally NOT included — the 280 px panel would push
-    // PhotoGrid completely off-screen on 375 px viewports.
-    return Stack(
-      children: [
-        const PhotoGrid(),
-        if (ws.phase == WorkspacePhase.processing) const ProgressOverlay(),
-        if (ws.errorMessage != null)
-          _ErrorBanner(message: ws.errorMessage!),
-      ],
-    );
-  }
-}
-
-/// Translucent error banner shown at the top of the body when [errorMessage]
-/// is set in [WorkspaceState].
-class _ErrorBanner extends StatelessWidget {
-  final String message;
-
-  const _ErrorBanner({required this.message});
-
+  // ── Root widget ───────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: const BoxDecoration(
-              color: Color(0x26FF4D6A), // WsColors.error at ~15% opacity
-              border: Border(
-                bottom: BorderSide(color: WsColors.glassBorder, width: 0.5),
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.error_outline_rounded,
-                    size: 16, color: WsColors.error),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    message,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: WsColors.error,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+    final canGo = _photos.isNotEmpty && _selectedConcepts.isNotEmpty;
+
+    return Scaffold(
+      backgroundColor: WsColors.bgDark,
+      body: Column(
+        children: [
+          Expanded(child: _buildBody()),
+          WorkspaceActionBar(
+            state: _actionBarState,
+            uploadProgress: _uploadProgress,
+            onGo: canGo ? _handleGo : null,
+            onCancel: _handleCancel,
+            onRetry: _handleRetry,
           ),
-        ),
+        ],
       ),
     );
   }

@@ -1,113 +1,309 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../theme.dart';
-import '../workspace_provider.dart';
+import '../../../shared/widgets/tap_scale.dart';
 
-/// Full-screen overlay shown while a job is processing (phase == processing).
+// ─────────────────────────────────────────────────────────────────────────────
+// Status enum
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Current state of the workspace job driving [ProgressOverlay].
+enum OverlayStatus {
+  /// Upload or server-side queuing is in progress — no explicit percentage yet.
+  waiting,
+
+  /// Processing is actively running — use [ProgressOverlay.progressValue].
+  running,
+
+  /// Processing finished successfully.
+  done,
+
+  /// Processing failed with an error.
+  error,
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Public API
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Full-screen modal overlay displayed while a workspace job is in progress.
 ///
-/// Renders a progress ring and status badge.
-/// When [activeJob.status == 'failed'], shows a **Retry** button that calls
-/// [WorkspaceNotifier.retryJob] (NOT resetToIdle) so photos are preserved.
-class ProgressOverlay extends ConsumerWidget {
-  const ProgressOverlay({super.key});
+/// Renders one of two sub-views:
+/// - **Waiting** ([OverlayStatus.waiting]) — indeterminate ring at progress 0,
+///   "Please wait…" label, and an optional Cancel button.
+/// - **Running** ([OverlayStatus.running]) — determinate [_SweepRingPainter]
+///   ring driven by [progressValue], a percentage label, and a status pill.
+///
+/// Both ring variants use [_SweepRingPainter] instead of the stock
+/// [CircularProgressIndicator] for a gradient accent1→accent2 sweep.
+class ProgressOverlay extends StatelessWidget {
+  const ProgressOverlay({
+    super.key,
+    required this.status,
+    this.progressValue = 0.0,
+    this.onCancel,
+  });
+
+  /// Current job phase controlling which sub-view is shown.
+  final OverlayStatus status;
+
+  /// Fractional progress in range [0.0, 1.0].
+  ///
+  /// Only meaningful when [status] is [OverlayStatus.running].
+  final double progressValue;
+
+  /// Called when the user taps the Cancel button (waiting state).
+  ///
+  /// If null the Cancel button is hidden.
+  final VoidCallback? onCancel;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final ws = ref.watch(workspaceProvider);
-    final notifier = ref.read(workspaceProvider.notifier);
-    final jobFailed = ws.activeJob?.status == 'failed';
-
-    return Container(
-      color: WsColors.bg.withValues(alpha: 0.85),
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: WsColors.bgDark.withValues(alpha: 0.88),
       child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Progress ring
-            SizedBox(
-              width: 72,
-              height: 72,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                color: jobFailed ? WsColors.error : WsColors.accent1,
-                backgroundColor: WsColors.glassWhite,
-              ),
-            ),
-            const SizedBox(height: 20),
+        child: status == OverlayStatus.waiting
+            ? _buildWaiting()
+            : _ProgressCard(progressValue: progressValue),
+      ),
+    );
+  }
 
-            // Status badge
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+  // ── Waiting sub-view (L45 – L79) ────────────────────────────────────────
+
+  /// Waiting / upload phase — indeterminate ring (progress=0) + Cancel button.
+  Widget _buildWaiting() {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ── Sweep ring — indeterminate (progress = 0.0) ──────────────────
+        SizedBox(
+          width: 64,
+          height: 64,
+          child: CustomPaint(
+            painter: _SweepRingPainter(0.0),
+          ),
+        ),
+
+        const SizedBox(height: WsTheme.spacingXl),
+
+        // "Please wait…" label.
+        const Text(
+          'Please wait…',
+          style: TextStyle(
+            color: WsColors.textSecondary,
+            fontSize: 15,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+
+        const SizedBox(height: WsTheme.spacingLg),
+
+        // Optional Cancel button.
+        if (onCancel != null)
+          TapScale(
+            onTap: () {
+              HapticFeedback.lightImpact();
+              onCancel!();
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: WsTheme.spacingXl,
+                vertical: WsTheme.spacingLg,
+              ),
               decoration: BoxDecoration(
                 color: WsColors.glassWhite,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: WsColors.glassBorder, width: 0.5),
+                borderRadius: BorderRadius.circular(WsTheme.borderRadiusPill),
+                border: Border.all(color: WsColors.glassBorder, width: 1.0),
               ),
-              child: Text(
-                jobFailed ? 'Processing Failed' : 'Processing…',
+              child: const Text(
+                'Cancel',
                 style: TextStyle(
-                  fontSize: 13,
-                  color: jobFailed ? WsColors.error : WsColors.textSecondary,
-                  fontWeight: FontWeight.w500,
+                  color: WsColors.textSecondary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-
-            const SizedBox(height: 24),
-
-            // Retry button shown when job failed; Cancel shown otherwise.
-            if (jobFailed)
-              _OverlayButton(
-                label: 'Retry',
-                color: WsColors.error,
-                onTap: notifier.retryJob,
-              )
-            else
-              _OverlayButton(
-                label: 'Cancel',
-                color: WsColors.textMuted,
-                onTap: notifier.cancelJob,
-              ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 }
 
-class _OverlayButton extends StatelessWidget {
-  final String label;
-  final Color color;
-  final VoidCallback? onTap;
+// ─────────────────────────────────────────────────────────────────────────────
+// _ProgressCard
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const _OverlayButton({
-    required this.label,
-    required this.color,
-    this.onTap,
-  });
+/// Running phase — determinate [_SweepRingPainter] ring with percentage label
+/// and an [AnimatedSwitcher] carousel that cycles through processing status
+/// messages every 3 seconds.
+class _ProgressCard extends StatefulWidget {
+  const _ProgressCard({required this.progressValue});
+
+  /// Fractional progress in range [0.0, 1.0].
+  final double progressValue;
+
+  @override
+  State<_ProgressCard> createState() => _ProgressCardState();
+}
+
+class _ProgressCardState extends State<_ProgressCard> {
+  static const List<String> _messages = [
+    'Detecting walls...',
+    'Generating masks...',
+    'Applying rules...',
+    'Finalizing...',
+  ];
+
+  int _msgIndex = 0;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) {
+        setState(() {
+          _msgIndex = (_msgIndex + 1) % _messages.length;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(WsTheme.radiusXl),
-          border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
+    final pct = (widget.progressValue * 100).round();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // ── Sweep ring with percentage label centred inside ──────────────
+        SizedBox(
+          width: 96,
+          height: 96,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Gradient arc driven by progressValue.
+              CustomPaint(
+                size: const Size(96, 96),
+                painter: _SweepRingPainter(widget.progressValue),
+              ),
+
+              // Percentage text inside the ring.
+              Text(
+                '$pct%',
+                style: const TextStyle(
+                  color: WsColors.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
         ),
-      ),
+
+        const SizedBox(height: WsTheme.spacingXl),
+
+        // ── Animated message carousel ────────────────────────────────────
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: Text(
+            _messages[_msgIndex],
+            key: ValueKey(_msgIndex),
+            style: const TextStyle(
+              color: WsColors.textSecondary,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+
+        const SizedBox(height: WsTheme.spacingLg),
+
+        // Sub-label under the message carousel.
+        const Text(
+          'Processing your workspace…',
+          style: TextStyle(
+            color: WsColors.textTertiary,
+            fontSize: 13,
+          ),
+        ),
+      ],
     );
   }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// _SweepRingPainter
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// [CustomPainter] that draws a two-layer progress ring:
+///
+/// 1. **Track** — full circle in [WsColors.glassWhite], strokeWidth = 4.
+/// 2. **Arc**   — sweep arc from –π/2 using a [SweepGradient] from
+///    [WsColors.accent1] to [WsColors.accent2], strokeWidth = 4.
+///
+/// [progress] is clamped to [0.0, 1.0].
+class _SweepRingPainter extends CustomPainter {
+  const _SweepRingPainter(this.progress);
+
+  /// Fractional fill level of the arc — 0.0 means no arc, 1.0 means full circle.
+  final double progress;
+
+  static const double _strokeWidth = 4.0;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.shortestSide - _strokeWidth) / 2;
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    // ── Track (full circle) ────────────────────────────────────────────────
+    final trackPaint = Paint()
+      ..color = WsColors.glassWhite
+      ..strokeWidth = _strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(center, radius, trackPaint);
+
+    // ── Sweep arc ──────────────────────────────────────────────────────────
+    final clampedProgress = progress.clamp(0.0, 1.0);
+    if (clampedProgress == 0.0) return; // nothing to draw
+
+    final sweepAngle = 2 * math.pi * clampedProgress;
+
+    final sweepPaint = Paint()
+      ..shader = const SweepGradient(
+        colors: [WsColors.accent1, WsColors.accent2],
+        startAngle: -math.pi / 2,
+        endAngle: -math.pi / 2 + 2 * math.pi,
+      ).createShader(rect)
+      ..strokeWidth = _strokeWidth
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawArc(
+      rect,
+      -math.pi / 2,      // start at 12 o'clock
+      sweepAngle,
+      false,
+      sweepPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_SweepRingPainter old) => old.progress != progress;
 }
