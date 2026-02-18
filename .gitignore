@@ -87,6 +87,7 @@ nul
 *.tmp
 *.bak
 
+<<<<<<< HEAD
 # Auto Claude
 .auto-claude/
 .auto-claude-security.json
@@ -95,3 +96,7 @@ nul
 .worktrees/
 .security-key
 logs/security/
+=======
+# Auto Claude data directory
+.auto-claude/
+>>>>>>> auto-claude/024-workers-jobcoordinatordo-상태머신-alarm
