@@ -1,16 +1,20 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+/// A single processed image result returned from the AI worker.
+///
+/// [idx] is **1-based** — use `selectedImages[idx - 1]` when looking up the
+/// original input bytes in [WorkspaceState.selectedImages].
+class JobItem {
+  const JobItem({
+    required this.idx,
+    required this.resultUrl,
+    required this.previewUrl,
+  });
 
-part 'job_item.freezed.dart';
-part 'job_item.g.dart';
+  /// 1-based position of this item within the current job batch.
+  final int idx;
 
-@freezed
-abstract class JobItem with _$JobItem {
-  const factory JobItem({
-    required int idx,
-    @JsonKey(name: 'result_url') required String resultUrl,
-    @JsonKey(name: 'preview_url') required String previewUrl,
-  }) = _JobItem;
+  /// Full-resolution output image URL (AI-processed result).
+  final String resultUrl;
 
-  factory JobItem.fromJson(Map<String, dynamic> json) =>
-      _$JobItemFromJson(json);
+  /// Thumbnail / preview URL (lower-resolution preview of the result).
+  final String previewUrl;
 }

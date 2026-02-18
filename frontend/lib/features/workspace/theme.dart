@@ -1,44 +1,63 @@
 import 'package:flutter/material.dart';
 
-/// WsColors — SNOW/B612-inspired dark theme color palette.
-/// All UI code should reference these constants exclusively.
-class WsColors {
-  WsColors._();
+/// SNOW / B612-inspired dark colour palette for the workspace screens.
+abstract class WsColors {
+  /// Deep dark navy — main background.
+  static const bg = Color(0xFF0F0F17);
 
-  // Backgrounds
-  static const Color bg = Color(0xFF080810);
-  static const Color surface = Color(0xFF0F0F1E);
-  static const Color surfaceLight = Color(0xFF1A1A2E);
+  /// Slightly lighter dark — surface / card background.
+  static const surface = Color(0xFF1A1A2E);
 
-  // Text
-  static const Color textPrimary = Color(0xFFEEEEFF);
-  static const Color textSecondary = Color(0xFF8888A0);
-  static const Color textMuted = Color(0xFF555572);
+  /// Accent 1 — purple-blue.
+  static const accent1 = Color(0xFF6C63FF);
 
-  // Accent
-  static const Color accent1 = Color(0xFF7C3AED);
+  /// Accent 2 — pink / rose.
+  static const accent2 = Color(0xFFFF6B9D);
 
-  // Status
-  static const Color success = Color(0xFF22C55E);
-  static const Color error = Color(0xFFEF4444);
-  static const Color warning = Color(0xFFF59E0B);
+  /// Glass overlay white — 10 % opacity.
+  static const glassWhite = Color(0x1AFFFFFF);
+
+  /// Glass border — 20 % opacity white.
+  static const glassBorder = Color(0x33FFFFFF);
+
+  /// Primary text colour.
+  static const text = Color(0xFFFFFFFF);
+
+  /// Secondary / subdued text colour.
+  static const textSecondary = Color(0xFF9CA3AF);
+
+  /// Primary gradient: accent1 (top-left) → accent2 (bottom-right).
+  static const gradientPrimary = LinearGradient(
+    colors: [accent1, accent2],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 }
 
-/// WsTheme — reusable decoration helpers.
-class WsTheme {
-  WsTheme._();
+/// Design tokens for the workspace UI.
+abstract class WsTheme {
+  /// Default corner radius for cards and containers.
+  static const double radius = 12.0;
 
+  /// Small corner radius (grid thumbnails, chips).
   static const double radiusSm = 8.0;
-  static const double radiusMd = 12.0;
-  static const double radiusLg = 16.0;
 
-  /// Glass-morphism card decoration used by JobHistoryItem and similar cards.
-  static BoxDecoration get cardDecoration => BoxDecoration(
-        color: WsColors.surface,
-        borderRadius: BorderRadius.circular(radiusMd),
-        border: Border.all(
-          color: WsColors.textMuted.withValues(alpha: 0.2),
-          width: 0.5,
-        ),
-      );
+  /// Large corner radius (sheets, bottom panels).
+  static const double radiusLg = 20.0;
+
+  /// Glassmorphism container decoration.
+  /// MUST be used inside a [Stack] over a blurrable (non-opaque) background,
+  /// combined with [BackdropFilter].
+  static final glassDecoration = BoxDecoration(
+    color: WsColors.glassWhite,
+    borderRadius: BorderRadius.circular(radius),
+    border: Border.all(color: WsColors.glassBorder, width: 0.5),
+  );
+
+  /// Glassmorphism decoration with smaller radius (for compact elements).
+  static final glassDecorationSm = BoxDecoration(
+    color: WsColors.glassWhite,
+    borderRadius: BorderRadius.circular(radiusSm),
+    border: Border.all(color: WsColors.glassBorder, width: 0.5),
+  );
 }
