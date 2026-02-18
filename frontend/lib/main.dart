@@ -1,30 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
-import 'core/router/app_router.dart';
+import 'app.dart';
+import 'core/api/api_client.dart';
+import 'core/api/s3_api_client.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+
   runApp(
-    const ProviderScope(
-      child: S3App(),
+    ProviderScope(
+      overrides: [
+        apiClientProvider.overrideWithValue(S3ApiClient()),
+      ],
+      child: const App(),
     ),
   );
-}
-
-class S3App extends ConsumerWidget {
-  const S3App({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final router = ref.watch(routerProvider);
-
-    return MaterialApp.router(
-      title: 'S3 - Domain Palette Engine',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
-      routerConfig: router,
-    );
-  }
 }

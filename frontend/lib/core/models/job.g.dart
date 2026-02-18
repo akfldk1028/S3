@@ -14,6 +14,7 @@ _Job _$JobFromJson(Map<String, dynamic> json) => _Job(
   outputsReady: (json['outputs_ready'] as List<dynamic>)
       .map((e) => JobItem.fromJson(e as Map<String, dynamic>))
       .toList(),
+  createdAt: json['created_at'] as String? ?? '',
 );
 
 Map<String, dynamic> _$JobToJson(_Job instance) => <String, dynamic>{
@@ -22,4 +23,5 @@ Map<String, dynamic> _$JobToJson(_Job instance) => <String, dynamic>{
   'preset': instance.preset,
   'progress': instance.progress,
   'outputs_ready': instance.outputsReady,
+  'created_at': instance.createdAt,
 };

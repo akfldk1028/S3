@@ -15,8 +15,7 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$Job {
 
-@JsonKey(name: 'job_id') String get jobId; String get status;// 'created' | 'uploaded' | 'queued' | 'running' | 'done' | 'failed' | 'canceled'
- String get preset; JobProgress get progress;@JsonKey(name: 'outputs_ready') List<JobItem> get outputsReady;
+@JsonKey(name: 'job_id') String get jobId; String get status; String get preset; JobProgress get progress;@JsonKey(name: 'outputs_ready') List<JobItem> get outputsReady;@JsonKey(name: 'created_at') String get createdAt;
 /// Create a copy of Job
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -29,16 +28,16 @@ $JobCopyWith<Job> get copyWith => _$JobCopyWithImpl<Job>(this as Job, _$identity
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Job&&(identical(other.jobId, jobId) || other.jobId == jobId)&&(identical(other.status, status) || other.status == status)&&(identical(other.preset, preset) || other.preset == preset)&&(identical(other.progress, progress) || other.progress == progress)&&const DeepCollectionEquality().equals(other.outputsReady, outputsReady));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Job&&(identical(other.jobId, jobId) || other.jobId == jobId)&&(identical(other.status, status) || other.status == status)&&(identical(other.preset, preset) || other.preset == preset)&&(identical(other.progress, progress) || other.progress == progress)&&const DeepCollectionEquality().equals(other.outputsReady, outputsReady)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,jobId,status,preset,progress,const DeepCollectionEquality().hash(outputsReady));
+int get hashCode => Object.hash(runtimeType,jobId,status,preset,progress,const DeepCollectionEquality().hash(outputsReady),createdAt);
 
 @override
 String toString() {
-  return 'Job(jobId: $jobId, status: $status, preset: $preset, progress: $progress, outputsReady: $outputsReady)';
+  return 'Job(jobId: $jobId, status: $status, preset: $preset, progress: $progress, outputsReady: $outputsReady, createdAt: $createdAt)';
 }
 
 
@@ -49,7 +48,7 @@ abstract mixin class $JobCopyWith<$Res>  {
   factory $JobCopyWith(Job value, $Res Function(Job) _then) = _$JobCopyWithImpl;
 @useResult
 $Res call({
-@JsonKey(name: 'job_id') String jobId, String status, String preset, JobProgress progress,@JsonKey(name: 'outputs_ready') List<JobItem> outputsReady
+@JsonKey(name: 'job_id') String jobId, String status, String preset, JobProgress progress,@JsonKey(name: 'outputs_ready') List<JobItem> outputsReady,@JsonKey(name: 'created_at') String createdAt
 });
 
 
@@ -66,14 +65,15 @@ class _$JobCopyWithImpl<$Res>
 
 /// Create a copy of Job
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? jobId = null,Object? status = null,Object? preset = null,Object? progress = null,Object? outputsReady = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? jobId = null,Object? status = null,Object? preset = null,Object? progress = null,Object? outputsReady = null,Object? createdAt = null,}) {
   return _then(_self.copyWith(
 jobId: null == jobId ? _self.jobId : jobId // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,preset: null == preset ? _self.preset : preset // ignore: cast_nullable_to_non_nullable
 as String,progress: null == progress ? _self.progress : progress // ignore: cast_nullable_to_non_nullable
 as JobProgress,outputsReady: null == outputsReady ? _self.outputsReady : outputsReady // ignore: cast_nullable_to_non_nullable
-as List<JobItem>,
+as List<JobItem>,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 /// Create a copy of Job
@@ -167,10 +167,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'job_id')  String jobId,  String status,  String preset,  JobProgress progress, @JsonKey(name: 'outputs_ready')  List<JobItem> outputsReady)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function(@JsonKey(name: 'job_id')  String jobId,  String status,  String preset,  JobProgress progress, @JsonKey(name: 'outputs_ready')  List<JobItem> outputsReady, @JsonKey(name: 'created_at')  String createdAt)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Job() when $default != null:
-return $default(_that.jobId,_that.status,_that.preset,_that.progress,_that.outputsReady);case _:
+return $default(_that.jobId,_that.status,_that.preset,_that.progress,_that.outputsReady,_that.createdAt);case _:
   return orElse();
 
 }
@@ -188,10 +188,10 @@ return $default(_that.jobId,_that.status,_that.preset,_that.progress,_that.outpu
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'job_id')  String jobId,  String status,  String preset,  JobProgress progress, @JsonKey(name: 'outputs_ready')  List<JobItem> outputsReady)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function(@JsonKey(name: 'job_id')  String jobId,  String status,  String preset,  JobProgress progress, @JsonKey(name: 'outputs_ready')  List<JobItem> outputsReady, @JsonKey(name: 'created_at')  String createdAt)  $default,) {final _that = this;
 switch (_that) {
 case _Job():
-return $default(_that.jobId,_that.status,_that.preset,_that.progress,_that.outputsReady);case _:
+return $default(_that.jobId,_that.status,_that.preset,_that.progress,_that.outputsReady,_that.createdAt);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -208,10 +208,10 @@ return $default(_that.jobId,_that.status,_that.preset,_that.progress,_that.outpu
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'job_id')  String jobId,  String status,  String preset,  JobProgress progress, @JsonKey(name: 'outputs_ready')  List<JobItem> outputsReady)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function(@JsonKey(name: 'job_id')  String jobId,  String status,  String preset,  JobProgress progress, @JsonKey(name: 'outputs_ready')  List<JobItem> outputsReady, @JsonKey(name: 'created_at')  String createdAt)?  $default,) {final _that = this;
 switch (_that) {
 case _Job() when $default != null:
-return $default(_that.jobId,_that.status,_that.preset,_that.progress,_that.outputsReady);case _:
+return $default(_that.jobId,_that.status,_that.preset,_that.progress,_that.outputsReady,_that.createdAt);case _:
   return null;
 
 }
@@ -223,12 +223,11 @@ return $default(_that.jobId,_that.status,_that.preset,_that.progress,_that.outpu
 @JsonSerializable()
 
 class _Job implements Job {
-  const _Job({@JsonKey(name: 'job_id') required this.jobId, required this.status, required this.preset, required this.progress, @JsonKey(name: 'outputs_ready') required final  List<JobItem> outputsReady}): _outputsReady = outputsReady;
+  const _Job({@JsonKey(name: 'job_id') required this.jobId, required this.status, required this.preset, required this.progress, @JsonKey(name: 'outputs_ready') required final  List<JobItem> outputsReady, @JsonKey(name: 'created_at') this.createdAt = ''}): _outputsReady = outputsReady;
   factory _Job.fromJson(Map<String, dynamic> json) => _$JobFromJson(json);
 
 @override@JsonKey(name: 'job_id') final  String jobId;
 @override final  String status;
-// 'created' | 'uploaded' | 'queued' | 'running' | 'done' | 'failed' | 'canceled'
 @override final  String preset;
 @override final  JobProgress progress;
  final  List<JobItem> _outputsReady;
@@ -238,6 +237,7 @@ class _Job implements Job {
   return EqualUnmodifiableListView(_outputsReady);
 }
 
+@override@JsonKey(name: 'created_at') final  String createdAt;
 
 /// Create a copy of Job
 /// with the given fields replaced by the non-null parameter values.
@@ -252,16 +252,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Job&&(identical(other.jobId, jobId) || other.jobId == jobId)&&(identical(other.status, status) || other.status == status)&&(identical(other.preset, preset) || other.preset == preset)&&(identical(other.progress, progress) || other.progress == progress)&&const DeepCollectionEquality().equals(other._outputsReady, _outputsReady));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Job&&(identical(other.jobId, jobId) || other.jobId == jobId)&&(identical(other.status, status) || other.status == status)&&(identical(other.preset, preset) || other.preset == preset)&&(identical(other.progress, progress) || other.progress == progress)&&const DeepCollectionEquality().equals(other._outputsReady, _outputsReady)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,jobId,status,preset,progress,const DeepCollectionEquality().hash(_outputsReady));
+int get hashCode => Object.hash(runtimeType,jobId,status,preset,progress,const DeepCollectionEquality().hash(_outputsReady),createdAt);
 
 @override
 String toString() {
-  return 'Job(jobId: $jobId, status: $status, preset: $preset, progress: $progress, outputsReady: $outputsReady)';
+  return 'Job(jobId: $jobId, status: $status, preset: $preset, progress: $progress, outputsReady: $outputsReady, createdAt: $createdAt)';
 }
 
 
@@ -272,7 +272,7 @@ abstract mixin class _$JobCopyWith<$Res> implements $JobCopyWith<$Res> {
   factory _$JobCopyWith(_Job value, $Res Function(_Job) _then) = __$JobCopyWithImpl;
 @override @useResult
 $Res call({
-@JsonKey(name: 'job_id') String jobId, String status, String preset, JobProgress progress,@JsonKey(name: 'outputs_ready') List<JobItem> outputsReady
+@JsonKey(name: 'job_id') String jobId, String status, String preset, JobProgress progress,@JsonKey(name: 'outputs_ready') List<JobItem> outputsReady,@JsonKey(name: 'created_at') String createdAt
 });
 
 
@@ -289,14 +289,15 @@ class __$JobCopyWithImpl<$Res>
 
 /// Create a copy of Job
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? jobId = null,Object? status = null,Object? preset = null,Object? progress = null,Object? outputsReady = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? jobId = null,Object? status = null,Object? preset = null,Object? progress = null,Object? outputsReady = null,Object? createdAt = null,}) {
   return _then(_Job(
 jobId: null == jobId ? _self.jobId : jobId // ignore: cast_nullable_to_non_nullable
 as String,status: null == status ? _self.status : status // ignore: cast_nullable_to_non_nullable
 as String,preset: null == preset ? _self.preset : preset // ignore: cast_nullable_to_non_nullable
 as String,progress: null == progress ? _self.progress : progress // ignore: cast_nullable_to_non_nullable
 as JobProgress,outputsReady: null == outputsReady ? _self._outputsReady : outputsReady // ignore: cast_nullable_to_non_nullable
-as List<JobItem>,
+as List<JobItem>,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: cast_nullable_to_non_nullable
+as String,
   ));
 }
 
