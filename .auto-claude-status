@@ -1,25 +1,25 @@
 {
   "active": true,
-  "spec": "014-pricingscreen-free-pro-\ud06c\ub808\ub527",
+  "spec": "017-onboarding-tutorial-\ud50c\ub85c\uc6b0-pageview",
   "state": "building",
   "subtasks": {
-    "completed": 9,
+    "completed": 10,
     "total": 11,
     "in_progress": 1,
     "failed": 0
   },
   "phase": {
-    "current": "Full Project Verification",
+    "current": "Final Verification",
     "id": null,
-    "total": 3
+    "total": 2
   },
   "workers": {
     "active": 0,
     "max": 1
   },
   "session": {
-    "number": 2,
-    "started_at": "2026-02-18T03:26:31.477348"
+    "number": 11,
+    "started_at": "2026-02-17T22:30:59.804673"
   },
-  "last_update": "2026-02-18T03:33:24.794493"
+  "last_update": "2026-02-17T23:01:01.583448"
 }
