@@ -1,46 +1,50 @@
-import 'package:riverpod_annotation/riverpod_annotation.dart';
-import '../models/user.dart' as models;
-import '../api/api_client_provider.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-part 'user_provider.g.dart';
+import '../../constants/api_endpoints.dart';
+import '../models/user.dart';
 
-/// Riverpod provider for user data from GET /me API endpoint.
-///
-/// Provides user information including plan, credits, and rule slots.
-///
-/// State: AsyncValue of User containing current user data.
+/// Fetches and caches the authenticated user from GET /me.
 ///
 /// Usage:
 /// ```dart
-/// // Watch user state
 /// final userAsync = ref.watch(userProvider);
 /// userAsync.when(
-///   data: (user) => Text('Plan: ${user.plan}'),
-///   loading: () => CircularProgressIndicator(),
-///   error: (err, stack) => Text('Error: $err'),
+///   loading: () => ...,
+///   error: (e, st) => ...,
+///   data: (user) => ...,
 /// );
-///
-/// // Refresh user data
-/// await ref.read(userProvider.notifier).refresh();
 /// ```
-@riverpod
-class User extends _$User {
+///
+/// To refresh: `ref.invalidate(userProvider)`
+final userProvider = AsyncNotifierProvider<UserNotifier, User>(
+  UserNotifier.new,
+);
+
+class UserNotifier extends AsyncNotifier<User> {
+  static const _storage = FlutterSecureStorage();
+
   @override
-  FutureOr<models.User> build() async {
-    // Initialize: fetch user data from API
-    final apiClient = ref.watch(apiClientProvider);
-    return await apiClient.getMe();
+  Future<User> build() async {
+    final token = await _storage.read(key: 'accessToken');
+    final dio = Dio(
+      BaseOptions(
+        baseUrl: ApiEndpoints.baseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 10),
+        headers: token != null
+            ? {'Authorization': 'Bearer $token'}
+            : null,
+      ),
+    );
+    final response = await dio.get(ApiEndpoints.me);
+    return User.fromJson(response.data as Map<String, dynamic>);
   }
 
-  /// Refreshes user data from GET /me API endpoint.
-  ///
-  /// This method can be called manually to refresh user information
-  /// after operations that might change user state (e.g., creating rules).
+  /// Force-refresh the user data from the server.
   Future<void> refresh() async {
-    state = const AsyncValue.loading();
-    state = await AsyncValue.guard(() async {
-      final apiClient = ref.read(apiClientProvider);
-      return await apiClient.getMe();
-    });
+    ref.invalidateSelf();
+    await future;
   }
 }
