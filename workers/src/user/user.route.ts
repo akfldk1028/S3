@@ -1,34 +1,41 @@
 /**
  * User Route — GET /me
  *
- * - UserLimiterDO.getUserState() → { userId, plan, credits, activeJobs, usedRuleSlots, maxRuleSlots }
+ * - UserLimiterDO.getUserState() → { userId, plan, credits, activeJobs, maxConcurrency, usedRuleSlots, maxRuleSlots }
  */
 
 import { Hono } from 'hono';
-import type { Env, AuthUser, UserLimiterState } from '../_shared/types';
-import { ok, error as apiError } from '../_shared/response';
-import { getUserLimiterStub } from '../do/do.helpers';
+import type { Env, AuthUser } from '../_shared/types';
+import { ok, error } from '../_shared/response';
+import { ERR } from '../_shared/errors';
+import type { UserLimiterDO } from '../do/UserLimiterDO';
 
 const app = new Hono<{ Bindings: Env; Variables: { user: AuthUser } }>();
 
-// GET /me — returns { success: true, data: {...}, error: null, meta: { request_id, timestamp } }
+// ─── GET /me ─────────────────────────────────────────────────────────────────
+// 인증된 유저 상태 조회 (크레딧, 플랜, 동시성, 룰 슬롯)
+
 app.get('/', async (c) => {
-  const user = c.var.user;
+  const user = c.get('user');
 
   try {
-    const stub = getUserLimiterStub(c.env, user.userId);
-    const state = await (stub as unknown as { getUserState(): Promise<UserLimiterState> }).getUserState();
+    const limiterNs = c.env.USER_LIMITER as unknown as DurableObjectNamespace<UserLimiterDO>;
+    const limiterStub = limiterNs.get(limiterNs.idFromName(user.userId));
+    const state = await limiterStub.getUserState();
 
-    return c.json(ok({
-      userId: state.userId,
-      plan: state.plan,
-      credits: state.credits,
-      activeJobs: state.activeJobs,
-      usedRuleSlots: state.ruleSlots,
-      maxRuleSlots: state.maxRuleSlots,
-    }));
-  } catch (err) {
-    return c.json(apiError('INTERNAL_ERROR', 'Failed to retrieve user state'), 500);
+    return c.json(
+      ok({
+        userId: state.userId,
+        plan: state.plan,
+        credits: state.credits,
+        activeJobs: state.activeJobs,
+        maxConcurrency: state.maxConcurrency,
+        usedRuleSlots: state.ruleSlots,
+        maxRuleSlots: state.maxRuleSlots,
+      }),
+    );
+  } catch (e) {
+    return c.json(error(ERR.INTERNAL_ERROR, String(e)), 500);
   }
 });
 

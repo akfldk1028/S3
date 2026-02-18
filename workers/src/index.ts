@@ -29,8 +29,28 @@ import userRoute from './user/user.route';
 
 const app = new Hono<{ Bindings: Env; Variables: { user: AuthUser } }>();
 
+<<<<<<< HEAD
 // Global middleware
 app.use('*', cors());
+=======
+// ─── CORS Allowlist ──────────────────────────────────────
+// 명시적 origin 허용 목록 — 와일드카드(*) 사용 금지
+// credentials: true (JWT Authorization 헤더) 사용 시 * 불가 (브라우저 보안 요구사항)
+const ALLOWED_ORIGINS = [
+  'http://localhost:8080',                          // Flutter web dev
+  'http://localhost:3000',                          // 로컬 Workers dev (self)
+  'https://s3-workers.clickaround8.workers.dev',   // CF Workers prod
+  // 프로덕션 Flutter Web 도메인이 생기면 여기 추가
+];
+
+// Global middleware
+app.use('*', cors({
+  origin: ALLOWED_ORIGINS,
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
+>>>>>>> auto-claude/025-workers-cors-일관성-cors
 app.use('*', logger());
 app.use('*', authMiddleware);
 
