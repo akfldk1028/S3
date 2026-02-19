@@ -143,7 +143,9 @@
       "Bash(export TOKEN:*)",
       "Bash(export JOB_ID=\"947717b2-df46-4966-ba7a-4266221b642f\")",
       "Bash(echo:*)",
-      "Bash(git -C \"C:/DK/S3\" status --short)"
+      "Bash(git -C \"C:/DK/S3\" status --short)",
+      "Bash(flutter run:*)",
+      "Bash(ls:*)"
     ]
   }
 }

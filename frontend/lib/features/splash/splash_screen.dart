@@ -11,7 +11,7 @@ import '../workspace/theme.dart';
 ///
 /// Displays a full-screen gradient background ([WsColors.gradientPrimary])
 /// with the S3 logo/text that fades in and scales up over 800 ms.
-/// After a total of 2 seconds, navigates to /domain-select if an
+/// After a total of 2 seconds, navigates to / (camera home) if an
 /// auth token is present, or to /auth otherwise.
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -53,7 +53,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     _navTimer = Timer(const Duration(seconds: 2), _attemptNavigation);
   }
 
-  /// Navigates to '/domain-select' or '/auth' based on current auth state.
+  /// Navigates to '/' (camera home) or '/auth' based on current auth state.
   void _attemptNavigation() {
     if (!mounted) return;
 
@@ -62,7 +62,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
       data: (token) {
         _navPending = false;
         if (mounted) {
-          context.go(token != null ? '/domain-select' : '/auth');
+          context.go(token != null ? '/' : '/auth');
         }
       },
       loading: () {

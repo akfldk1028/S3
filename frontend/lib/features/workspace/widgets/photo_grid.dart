@@ -1,6 +1,9 @@
+import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../camera/camera_screen.dart';
 import '../theme.dart';
 import '../workspace_provider.dart';
 import '../workspace_state.dart';
@@ -16,11 +19,12 @@ class PhotoGrid extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ws = ref.watch(workspaceProvider);
-    final notifier = ref.read(workspaceProvider.notifier);
     final images = ws.selectedImages;
 
     if (images.isEmpty) {
-      return _EmptyState(onAddPhotos: notifier.addPhotos);
+      return _EmptyState(
+        onAddPhotos: () => _openAddPhotos(context, ref),
+      );
     }
 
     return GridView.builder(
@@ -33,10 +37,108 @@ class PhotoGrid extends ConsumerWidget {
       itemCount: images.length + 1, // +1 for add button
       itemBuilder: (context, index) {
         if (index == images.length) {
-          return _AddMoreTile(onTap: notifier.addPhotos);
+          return _AddMoreTile(
+            onTap: () => _openAddPhotos(context, ref),
+          );
         }
         return _PhotoTile(image: images[index]);
       },
+    );
+  }
+
+  /// 카메라/갤러리 선택 — 웹이면 갤러리만, 모바일이면 카메라/갤러리 BottomSheet
+  static Future<void> _openAddPhotos(
+    BuildContext context,
+    WidgetRef ref,
+  ) async {
+    if (kIsWeb) {
+      // 웹: 갤러리만 지원
+      ref.read(workspaceProvider.notifier).addPhotos();
+      return;
+    }
+
+    // 모바일: 카메라/갤러리 선택 BottomSheet
+    final choice = await showModalBottomSheet<_AddPhotoChoice>(
+      context: context,
+      backgroundColor: WsColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: WsColors.glassBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _BottomSheetTile(
+                icon: Icons.camera_alt_rounded,
+                label: 'Take Photo',
+                onTap: () => Navigator.pop(ctx, _AddPhotoChoice.camera),
+              ),
+              _BottomSheetTile(
+                icon: Icons.photo_library_rounded,
+                label: 'Choose from Gallery',
+                onTap: () => Navigator.pop(ctx, _AddPhotoChoice.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (choice == null || !context.mounted) return;
+
+    switch (choice) {
+      case _AddPhotoChoice.camera:
+        final photos = await Navigator.push<List<XFile>>(
+          context,
+          MaterialPageRoute(builder: (_) => const CameraScreen()),
+        );
+        if (photos != null && photos.isNotEmpty) {
+          ref.read(workspaceProvider.notifier).addPhotosFromFiles(photos);
+        }
+      case _AddPhotoChoice.gallery:
+        ref.read(workspaceProvider.notifier).addPhotos();
+    }
+  }
+}
+
+enum _AddPhotoChoice { camera, gallery }
+
+/// BottomSheet 타일
+class _BottomSheetTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _BottomSheetTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: WsColors.accent1, size: 24),
+      title: Text(
+        label,
+        style: const TextStyle(
+          color: WsColors.textPrimary,
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      onTap: onTap,
     );
   }
 }

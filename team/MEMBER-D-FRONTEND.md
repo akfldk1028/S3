@@ -1,412 +1,318 @@
-# 팀원 D: Frontend — Flutter UI + 상태관리 + Mock API 연동
+# 팀원 D: Frontend — Flutter UI + API + Camera
 
-> **담당**: Flutter 앱 전체 (Auth UI, 팔레트, 업로드, 진행률, 결과, 세트)
-> **브랜치**: `feat/frontend-core`
-> **동시 작업**: Mock API로 UI 먼저 구현 → Workers 완성 후 실 API 연결
-
----
-
-## 프로젝트 컨텍스트 (필독)
-
-S3는 "도메인 팔레트 엔진 기반 세트 생산 앱"이다.
-- **5단 파이프라인**: Palette → Instances → Protect → Rules → Output Sets
-- **Frontend = Workers API만 호출**: GPU Worker 직접 호출 절대 금지
-- **SSoT**: `workflow.md` — 섹션 4(데이터 흐름), 섹션 6(API 스키마)
-- **Tech Stack**: Flutter 3.38.9, Riverpod 3, Freezed 3, GoRouter, ShadcnUI
-
-### 기존 코드 주의사항
-
-> **기존 `frontend/` 코드의 일부는 Supabase 기반(v2.0)으로 작성되어 있습니다.**
-> - `api_endpoints.dart`는 v3.0으로 재작성 완료
-> - 하지만 `auth/`, `providers/` 등에 Supabase SDK 참조가 남아있을 수 있음
-> - **Supabase SDK 참조를 발견하면 무시하고 새로 작성하세요**
-> - v3.0에서는 모든 통신이 Workers REST API (`Dio` HTTP)를 통해 이루어집니다
-> - `supabase_flutter` 패키지 사용 금지 → `dio` + JWT 토큰 사용
+> **담당**: Flutter 앱 전체 (Auth, 워크스페이스, 카메라, Jobs 연동)
+> **상태**: UI + API 연결 완료 ✅, 카메라 홈 통합 ✅ (도메인 사이드바 + 컨셉 칩), **Jobs 실연동 필요**
+> **브랜치**: master
 
 ---
 
-## Cloudflare MCP 활용 (필수)
+## 현재 상태 (2026-02-19)
 
-> Frontend 팀이라도 Cloudflare MCP가 필수입니다. Workers API 연동 시 에러 디버깅에 씁니다.
+### ✅ 완료된 작업
 
-### API 연동 실패 시: Workers 로그 확인
+| 항목 | 상태 | 파일 |
+|------|------|------|
+| Auth (anon JWT) | ✅ 완료 | `core/auth/auth_provider.dart` |
+| User model | ✅ 완료 | `features/auth/models/user_model.dart` |
+| API Client interface | ✅ 완료 | `core/api/api_client.dart` |
+| S3ApiClient (Dio) | ✅ 완료 | `core/api/s3_api_client.dart` |
+| API provider | ✅ 완료 | `core/api/api_client_provider.dart` |
+| GoRouter (8 라우트) | ✅ 완료 | `routing/app_router.dart` |
+| Auth guard | ✅ 완료 | `routing/app_router.dart` |
+| Splash screen | ✅ 완료 | `features/splash/splash_screen.dart` |
+| Domain select | ✅ 완료 | `features/domain_select/domain_select_screen.dart` |
+| Workspace (메인) | ✅ 완료 | `features/workspace/workspace_screen.dart` |
+| Photo grid | ✅ 완료 | `features/workspace/widgets/photo_grid.dart` |
+| Concepts section | ✅ 완료 | `features/workspace/widgets/concepts_section.dart` |
+| Protect section | ✅ 완료 | `features/workspace/widgets/protect_section.dart` |
+| Rules section | ✅ 완료 | `features/workspace/widgets/rules_section.dart` |
+| Action bar | ✅ 완료 | `features/workspace/widgets/action_bar.dart` |
+| Progress overlay | ✅ 완료 | `features/workspace/widgets/progress_overlay.dart` |
+| Results overlay | ✅ 완료 | `features/workspace/widgets/results_overlay.dart` |
+| Side panel (데스크톱) | ✅ 완료 | `features/workspace/widgets/side_panel.dart` |
+| Mobile bottom sheet | ✅ 완료 | `features/workspace/widgets/mobile_bottom_sheet.dart` |
+| WsColors/WsTheme | ✅ 완료 | `features/workspace/theme.dart` |
+| Image service | ✅ 완료 | `core/services/image_service.dart` |
+| Camera screen | ✅ 완료 | `features/camera/camera_screen.dart` |
+| addPhotosFromFiles | ✅ 완료 | `features/workspace/workspace_provider.dart` |
+| **카메라 홈 도메인 사이드바** | ✅ 완료 | `features/camera/widgets/domain_drawer.dart` |
+| **카메라 홈 컨셉 칩 바** | ✅ 완료 | `features/camera/widgets/concept_chips_bar.dart` |
+| **선택 도메인 provider** | ✅ 완료 | `features/domain_select/selected_preset_provider.dart` |
+| **카메라 홈 통합** | ✅ 완료 | `features/camera/camera_home_screen.dart` (drawer+chips+proceed) |
+| flutter analyze 0 errors | ✅ 완료 | — |
 
-```
-"s3-api Workers에서 /auth/anon 관련 에러 보여줘"
-→ cloudflare-observability: query_worker_observability
+### ❌ 남은 작업
 
-"Workers에서 400 에러가 나는데 원인 알려줘"
-→ query_worker_observability → 에러 로그 분석
-```
-
-### Flutter/Riverpod 문서 조회
-
-```
-"Riverpod 3에서 @riverpod annotation 사용법"
-→ context7: resolve-library-id → query-docs
-
-"Dio interceptor에서 401 에러 처리 방법"
-→ context7: query-docs
-```
-
-### API 계약 확인
-
-```
-"workflow.md에서 POST /jobs의 request/response 형식 알려줘"
-→ 로컬 파일 읽기 (MCP 불필요)
-```
-
-> **팁**: Workers가 반환하는 에러 코드는 `workflow.md` 섹션 6.6 에러 카탈로그 참조
-
----
-
-## 병렬 작업 전략: UI First → API Later
-
-```
-Phase 1 (Week 1): UI + Mock API
-───────────────────────────────────
-화면 레이아웃 → 상태관리(Riverpod) → Mock API Client
-팔레트 UI → 업로드 UI → 진행률 UI → 결과 UI
-
-Phase 2 (Week 2): 실 API 연결
-───────────────────────────────────
-Mock → 실 API 교체 (base URL만 변경)
-Auth anon → Presets → Rules CRUD → Jobs → Polling
-```
+| 항목 | 우선순위 | 설명 |
+|------|---------|------|
+| 카메라 실기기 테스트 | P1 | Android/iOS에서 카메라 동작 확인 |
+| Jobs UI 실연동 | P1 | Workers Jobs API 호출 연결 |
+| R2 presigned 업로드 | P1 | 실제 R2에 이미지 PUT |
+| Polling 진행률 | P2 | GET /jobs/:id 3초 polling |
+| 결과 이미지 표시 | P2 | R2 presigned download URL 사용 |
+| 에러/오프라인 처리 | P3 | 카메라 권한 거부, 네트워크 에러 |
 
 ---
 
-## 담당 디렉토리 구조
+## 즉시 해야 할 일 (순서대로)
+
+### Step 1: 카메라 홈 + 도메인 사이드바 테스트 (P1)
+
+카메라 홈에 도메인 사이드바 + 컨셉 칩이 통합됨. 실기기 + 웹에서 확인 필요.
+
+```bash
+cd frontend
+flutter run -d <device>     # 모바일
+flutter run -d chrome        # 웹
+```
+
+**테스트 항목:**
+1. 앱 실행 → `/` (카메라 홈) 진입
+2. ☰ 햄버거 → 사이드바 열림 → 도메인 목록 (건축/인테리어, 쇼핑/셀러) 표시
+3. 도메인 선택 → 사이드바 닫힘 → 컨셉 칩 바 나타남
+4. 컨셉 칩 탭 → accent1 하이라이트 토글
+5. 다른 도메인 선택 → 컨셉 칩 초기화 (리셋)
+6. 카메라 프리뷰 정상 표시
+7. 셔터 버튼 → 사진 촬영 → 카운터 표시
+8. 갤러리 버튼 → 갤러리에서 사진 선택
+9. 다음 버튼 (도메인 선택됨): `/upload?presetId=...` 이동
+10. 다음 버튼 (도메인 미선택): `/domain-select` 이동
+11. 웹(Chrome): 갤러리 전용 UI + 햄버거 + 컨셉 칩 동작 확인
+12. 사이드바 하단: "My Rules" → `/rules`, "Settings" → `/settings`
+
+**확인할 파일:**
+- `frontend/lib/features/camera/camera_home_screen.dart` — 메인 카메라 홈
+- `frontend/lib/features/camera/widgets/domain_drawer.dart` — 도메인 사이드바
+- `frontend/lib/features/camera/widgets/concept_chips_bar.dart` — 컨셉 칩 바
+- `frontend/lib/features/domain_select/selected_preset_provider.dart` — 도메인 선택 상태
+- `frontend/lib/features/palette/palette_provider.dart` — 컨셉 토글 상태
+
+**플랫폼 권한 (이미 설정됨):**
+- **Android**: `AndroidManifest.xml` → `CAMERA` permission
+- **iOS**: `Info.plist` → `NSCameraUsageDescription`, `NSMicrophoneUsageDescription`
+
+### Step 2: Jobs UI 실연동 (P1)
+
+Workers Jobs 7개 엔드포인트가 구현 완료됨. Frontend에서 호출 연결.
+
+**흐름:**
+```
+1. User가 워크스페이스에서 사진 추가 + concept 선택 + rule 설정
+2. "Apply" 버튼 → POST /jobs { preset, item_count }
+   → 응답: { job_id, upload_urls: [...] }
+3. 각 이미지를 presigned URL로 R2 직접 PUT
+4. POST /jobs/:id/confirm-upload
+5. POST /jobs/:id/execute { concepts, protect, rule_id? }
+6. GET /jobs/:id (3초 polling) → 진행률 표시
+7. status == "done" → 결과 이미지 URL 표시
+```
+
+**수정할 파일:**
+
+1. **`features/workspace/widgets/action_bar.dart`**
+   - "Apply" 버튼 onTap → Jobs API 호출 시작
+   - `workspaceProvider.notifier`에 Job 실행 메서드 추가 필요
+
+2. **`features/workspace/workspace_provider.dart`**
+   - `executeJob()` 메서드 추가:
+     ```dart
+     Future<void> executeJob({
+       required String presetId,
+       required Map<String, dynamic> concepts,
+       required List<String> protect,
+       String? ruleId,
+     }) async {
+       // 1. POST /jobs → job_id + presigned URLs
+       // 2. uploadAndProcess(presignedUrls) — 이미 구현됨
+       // 3. POST /confirm-upload
+       // 4. POST /execute
+       // 5. state.copyWith(phase: processing, activeJob: ...)
+     }
+     ```
+
+3. **`features/workspace/widgets/progress_overlay.dart`**
+   - Polling 로직: `Timer.periodic(3초)` → `GET /jobs/:id`
+   - 진행률 표시: `done / total`
+
+4. **`features/workspace/widgets/results_overlay.dart`**
+   - 완료 시 결과 이미지 URL 표시
+   - presigned download URL로 이미지 로드
+
+**참고할 API 스키마:**
+- `workflow.md` 섹션 6.5 (Jobs API)
+- `frontend/lib/core/api/api_client.dart` — 14개 메서드 인터페이스
+- `frontend/lib/core/api/s3_api_client.dart` — Dio 구현
+
+### Step 3: R2 Presigned URL 업로드 (P1)
+
+```dart
+// workspace_provider.dart의 _uploadOne() 이미 구현되어 있음
+// presigned URL을 Workers에서 받아서 전달하면 됨
+//
+// 흐름:
+// POST /jobs 응답의 upload_urls → presigned PUT URLs
+// _uploadChunked(presignedUrls) 호출
+```
+
+**확인할 파일:**
+- `features/workspace/workspace_provider.dart` L92~163 — uploadAndProcess(), _uploadChunked(), _uploadOne()
+- `core/api/s3_api_client.dart` — createJob(), confirmUpload(), executeJob() 메서드
+
+### Step 4: Polling 진행률 (P2)
+
+```dart
+// GET /jobs/:id → 3초마다 호출
+// status: created → uploaded → queued → running → done/failed/canceled
+
+// Timer.periodic 사용 (workspace_provider.dart에 추가)
+Timer? _pollingTimer;
+
+void startPolling(String jobId) {
+  _pollingTimer = Timer.periodic(Duration(seconds: 3), (_) async {
+    final job = await ref.read(apiClientProvider).getJob(jobId);
+    state = state.copyWith(
+      // 진행률 업데이트
+    );
+    if (job.status == 'done' || job.status == 'failed') {
+      _pollingTimer?.cancel();
+    }
+  });
+}
+```
+
+### Step 5: 에러/오프라인 처리 (P3)
+
+- 카메라 권한 거부 → 갤러리 fallback 또는 설정 안내
+- 네트워크 에러 → 재시도 스낵바
+- Job 실패 → 에러 메시지 + 재시도 버튼
+
+---
+
+## 프로젝트 구조 (현재)
 
 ```
 frontend/lib/
+├── main.dart
+├── app.dart
+├── routing/app_router.dart               # 8 라우트 + auth guard
+├── constants/api_endpoints.dart           # Workers base URL
 ├── core/
 │   ├── api/
-│   │   ├── api_client.dart       ← [구현] Dio + JWT interceptor
-│   │   └── mock_api_client.dart  ← [구현] Phase 1용 Mock
+│   │   ├── api_client.dart               # abstract (14 methods)
+│   │   ├── s3_api_client.dart            # Dio 구현
+│   │   ├── mock_api_client.dart          # 테스트용
+│   │   └── api_client_provider.dart      # Riverpod provider
 │   ├── auth/
-│   │   ├── auth_provider.dart    ← [구현] Riverpod Auth state
-│   │   └── auth_service.dart     ← [구현] POST /auth/anon
-│   ├── models/
-│   │   ├── user.dart             ← [구현] Freezed User model
-│   │   ├── preset.dart           ← [구현] Freezed Preset model
-│   │   ├── rule.dart             ← [구현] Freezed Rule model
-│   │   └── job.dart              ← [구현] Freezed Job model
-│   ├── router/
-│   │   └── app_router.dart       ← [구현] GoRouter + auth guard
-│   └── constants.dart            ← [구현] base URL, config
+│   │   ├── auth_provider.dart            # JWT 관리
+│   │   ├── user_provider.dart            # GET /me
+│   │   └── secure_storage_service.dart
+│   ├── models/                           # Freezed
+│   │   ├── preset.dart
+│   │   ├── rule.dart
+│   │   ├── job.dart
+│   │   ├── job_progress.dart
+│   │   └── job_item.dart
+│   └── services/image_service.dart       # 압축 + 썸네일
 ├── features/
-│   ├── auth/                     ← [구현] 인증 (anon auto-login)
-│   │   ├── auth_screen.dart
-│   │   └── onboarding_screen.dart
-│   ├── domain_select/            ← [구현] 도메인 선택 (건축/셀러)
-│   │   └── domain_select_screen.dart
-│   ├── palette/                  ← [구현] 팔레트 + 인스턴스 + 보호
-│   │   ├── palette_screen.dart
-│   │   ├── concept_chip.dart
-│   │   ├── instance_card.dart
-│   │   └── protect_toggle.dart
-│   ├── upload/                   ← [구현] 이미지 선택 + R2 업로드
-│   │   └── upload_screen.dart
-│   ├── rules/                    ← [구현] 룰 설정 + 저장/불러오기
-│   │   ├── rule_editor_screen.dart
-│   │   └── rule_list_screen.dart
-│   ├── jobs/                     ← [구현] Job 실행 + 진행률 polling
-│   │   ├── job_progress_screen.dart
-│   │   └── job_provider.dart
-│   ├── results/                  ← [구현] 결과 표시 + Before/After
-│   │   └── result_screen.dart
-│   └── export/                   ← [구현] 세트 내보내기
-│       └── export_screen.dart
-└── shared/                       ← [구현] 공통 위젯
-    ├── widgets/
-    │   ├── s3_button.dart
-    │   ├── s3_card.dart
-    │   └── loading_indicator.dart
-    └── theme/
-        └── app_theme.dart
+│   ├── splash/splash_screen.dart
+│   ├── auth/auth_screen.dart
+│   ├── camera/                           # ← 메인 진입점 (SNOW-style)
+│   │   ├── camera_home_screen.dart       #   카메라 홈 (☰사이드바 + 컨셉칩 + 셔터)
+│   │   ├── camera_screen.dart            #   독립 카메라 (workspace push용)
+│   │   └── widgets/
+│   │       ├── domain_drawer.dart        #   도메인 사이드바 (프리셋 목록)
+│   │       └── concept_chips_bar.dart    #   수평 컨셉 칩 바
+│   ├── domain_select/
+│   │   ├── domain_select_screen.dart     #   별도 페이지 (fallback)
+│   │   ├── presets_provider.dart          #   GET /presets
+│   │   └── selected_preset_provider.dart #   선택된 도메인 ID 추적
+│   ├── palette/
+│   │   ├── palette_provider.dart          #   컨셉 토글 (카메라 홈에서도 사용)
+│   │   └── palette_state.dart
+│   ├── workspace/                        # 메인 작업 영역
+│   │   ├── workspace_screen.dart
+│   │   ├── workspace_provider.dart       # addPhotosFromFiles()
+│   │   ├── workspace_state.dart
+│   │   └── widgets/
+│   │       ├── photo_grid.dart
+│   │       ├── action_bar.dart           # ← TODO: Jobs API 연결
+│   │       ├── progress_overlay.dart     # ← TODO: polling 연결
+│   │       └── results_overlay.dart      # ← TODO: 결과 표시
+│   ├── rules/
+│   ├── jobs/
+│   └── ...
+└── shared/
 ```
 
 ---
 
-## 구현 순서
-
-### Step 1: 프로젝트 기반 (Freezed 모델 + API Client)
-
-#### Freezed 모델 정의
-
-```dart
-// core/models/job.dart
-import 'package:freezed_annotation/freezed_annotation.dart';
-part 'job.freezed.dart';
-part 'job.g.dart';
-
-@freezed
-class Job with _$Job {
-  const factory Job({
-    required String jobId,
-    required String status,    // created|uploaded|queued|running|done|failed|canceled
-    required String preset,
-    required JobProgress progress,
-    @Default([]) List<JobOutput> outputsReady,
-  }) = _Job;
-  factory Job.fromJson(Map<String, dynamic> json) => _$JobFromJson(json);
-}
-
-@freezed
-class JobProgress with _$JobProgress {
-  const factory JobProgress({
-    required int done,
-    required int failed,
-    required int total,
-  }) = _JobProgress;
-  factory JobProgress.fromJson(Map<String, dynamic> json) => _$JobProgressFromJson(json);
-}
-
-// 유사하게: User, Preset, Rule 모델도 정의
-```
-
-#### Mock API Client (Phase 1)
-
-```dart
-// core/api/mock_api_client.dart
-class MockApiClient implements ApiClient {
-  @override
-  Future<AuthResponse> authAnon() async {
-    await Future.delayed(Duration(milliseconds: 300));
-    return AuthResponse(userId: 'u_mock123', token: 'mock-jwt-token');
-  }
-
-  @override
-  Future<List<Preset>> getPresets() async {
-    return [
-      Preset(id: 'interior', name: '건축/인테리어', conceptCount: 12),
-      Preset(id: 'seller', name: '쇼핑/셀러', conceptCount: 6),
-    ];
-  }
-
-  @override
-  Future<Job> getJob(String jobId) async {
-    // 진행률 시뮬레이션
-    return Job(
-      jobId: jobId, status: 'running', preset: 'interior',
-      progress: JobProgress(done: 17, failed: 0, total: 30),
-    );
-  }
-
-  // ... 나머지 Mock 구현
-}
-```
-
-#### 실제 API Client (Phase 2)
-
-```dart
-// core/api/api_client.dart
-class S3ApiClient implements ApiClient {
-  final Dio _dio;
-
-  S3ApiClient({required String baseUrl, String? token})
-    : _dio = Dio(BaseOptions(baseUrl: baseUrl)) {
-    if (token != null) {
-      _dio.options.headers['Authorization'] = 'Bearer $token';
-    }
-  }
-
-  @override
-  Future<AuthResponse> authAnon() async {
-    final res = await _dio.post('/auth/anon');
-    return AuthResponse.fromJson(res.data['data']);
-  }
-
-  // ... 14개 API 엔드포인트 매핑
-}
-```
-
-### Step 2: Auth + 온보딩
-
-```dart
-// features/auth/auth_screen.dart
-// 앱 최초 실행 → 자동으로 POST /auth/anon
-// JWT를 flutter_secure_storage에 저장
-// 성공 → 도메인 선택 화면으로 이동
-// 실패 → 재시도 버튼
-```
-
-### Step 3: 도메인 선택 + 팔레트 UI
-
-```dart
-// features/domain_select/domain_select_screen.dart
-// GET /presets → 도메인 카드 2개 (건축/셀러)
-// 선택 → GET /presets/:id → 상세 로드
-// → palette_screen.dart로 이동
-
-// features/palette/palette_screen.dart
-// concept_chip.dart: 각 concept 버튼 (Wall, Floor, Tile...)
-// instance_card.dart: 인스턴스 #1~#N 카드
-// protect_toggle.dart: 보호 on/off 토글
-//
-// 이 화면은 로컬 상태만 관리 (서버에 보내지 않음)
-// "적용" 버튼 누를 때 POST /jobs/:id/execute로 전송
-```
-
-### Step 4: 이미지 업로드
-
-```dart
-// features/upload/upload_screen.dart
-// 1. 사진 선택 (image_picker 또는 file_picker)
-// 2. POST /jobs { preset, item_count } → presigned URLs
-// 3. 각 이미지를 presigned URL로 R2 직접 PUT (http 패키지)
-// 4. POST /jobs/:id/confirm-upload
-//
-// 진행률 표시: N/total 업로드 완료
-```
-
-### Step 5: 룰 설정 + 저장/불러오기
-
-```dart
-// features/rules/rule_editor_screen.dart
-// concept별 action 선택 (recolor, tone, texture, remove)
-// value 선택 (색상 팔레트, 슬라이더 등)
-// 저장: POST /rules
-// 불러오기: GET /rules → 목록 → 선택 → rule_id로 적용
-
-// features/rules/rule_list_screen.dart
-// 내 룰 목록 (GET /rules)
-// 삭제: DELETE /rules/:id
-```
-
-### Step 6: Job 실행 + 진행률 (Polling)
-
-```dart
-// features/jobs/job_provider.dart (Riverpod)
-@riverpod
-class JobNotifier extends _$JobNotifier {
-  Timer? _timer;
-
-  @override
-  AsyncValue<Job> build(String jobId) {
-    _startPolling(jobId);
-    return const AsyncLoading();
-  }
-
-  void _startPolling(String jobId) {
-    _timer = Timer.periodic(Duration(seconds: 3), (_) async {
-      final job = await ref.read(apiClientProvider).getJob(jobId);
-      state = AsyncData(job);
-      if (job.status == 'done' || job.status == 'failed') {
-        _timer?.cancel();
-      }
-    });
-  }
-}
-
-// features/jobs/job_progress_screen.dart
-// 진행바: done / total
-// 완료된 이미지 미리보기 (결과 URL)
-// 실패 시 에러 메시지
-```
-
-### Step 7: 결과 + 세트 내보내기
-
-```dart
-// features/results/result_screen.dart
-// Before/After 비교 슬라이더
-// 갤러리 그리드
-// 다운로드 버튼
-
-// features/export/export_screen.dart
-// 템플릿 선택 (시안3안팩, 전후비교, 상품팩 등)
-// 로컬에서 이미지 조합 → 저장/공유
-```
-
----
-
-## 화면 Flow (GoRouter)
-
-```
-/                      → AuthScreen (자동 anon login)
-/onboarding            → OnboardingScreen (최초 1회)
-/domains               → DomainSelectScreen
-/palette/:presetId     → PaletteScreen (concept + protect)
-/upload/:jobId         → UploadScreen
-/rules                 → RuleListScreen
-/rules/edit            → RuleEditorScreen
-/jobs/:jobId/progress  → JobProgressScreen
-/jobs/:jobId/results   → ResultScreen
-/export/:jobId         → ExportScreen
-```
-
----
-
-## 환경 설정
+## 개발 명령어
 
 ```bash
-cd frontend/
+cd frontend
+
+# 의존성 설치
 flutter pub get
+
+# 코드 생성 (Freezed/Riverpod)
 dart run build_runner build --delete-conflicting-outputs
 
-# Phase 1: Mock API
-# constants.dart에서 useMock = true
+# 분석
+flutter analyze
 
-# Phase 2: 실 API
-# constants.dart에서 baseUrl = 'http://localhost:8787' (Workers 로컬)
-# 또는 배포된 Workers URL
+# 실행
+flutter run -d chrome          # 웹
+flutter run -d <device_id>     # 모바일
 
-flutter run -d chrome
+# 테스트
+flutter test
 ```
 
 ---
 
-## API 스키마 참고 (workflow.md 섹션 6)
+## API 엔드포인트 (전부 구현됨, 연동 필요)
 
-| Method | Path | 용도 |
-|--------|------|------|
-| POST | /auth/anon | JWT 획득 |
-| GET | /me | 유저 상태 |
-| GET | /presets | 도메인 목록 |
-| GET | /presets/:id | 프리셋 상세 |
-| POST | /rules | 룰 저장 |
-| GET | /rules | 내 룰 목록 |
-| PUT | /rules/:id | 룰 수정 |
-| DELETE | /rules/:id | 룰 삭제 |
-| POST | /jobs | Job 생성 + presigned URLs |
-| POST | /jobs/:id/confirm-upload | 업로드 확인 |
-| POST | /jobs/:id/execute | 룰 적용 실행 |
-| GET | /jobs/:id | 상태/진행률 |
-| POST | /jobs/:id/cancel | 취소 |
+| Method | Path | Frontend 연동 | 파일 |
+|--------|------|-------------|------|
+| POST | /auth/anon | ✅ 연동됨 | `auth_provider.dart` |
+| GET | /me | ✅ 연동됨 | `user_provider.dart` |
+| GET | /presets | ✅ 연동됨 | `presets_provider.dart` |
+| GET | /presets/:id | ✅ 연동됨 | `preset_detail_provider.dart` |
+| POST | /rules | ✅ 연동됨 | `rules_screen.dart` |
+| GET | /rules | ✅ 연동됨 | `rules_screen.dart` |
+| PUT | /rules/:id | ✅ 연동됨 | `rules_screen.dart` |
+| DELETE | /rules/:id | ✅ 연동됨 | `rules_screen.dart` |
+| POST | /jobs | ❌ **TODO** | `workspace_provider.dart` |
+| POST | /jobs/:id/confirm-upload | ❌ **TODO** | `workspace_provider.dart` |
+| POST | /jobs/:id/execute | ❌ **TODO** | `workspace_provider.dart` |
+| GET | /jobs/:id | ❌ **TODO** | `workspace_provider.dart` |
+| GET | /jobs | ❌ **TODO** | `history_provider.dart` |
+| POST | /jobs/:id/cancel | ❌ **TODO** | `workspace_provider.dart` |
 
 > Response envelope: `{ success: bool, data: T, error: string?, meta: { request_id, timestamp } }`
-
----
-
-## 코딩 규칙
-
-1. **Feature-First 구조**: 각 feature = 독립 폴더 (screen + provider + widgets)
-2. **Riverpod 3**: `@riverpod` annotation 사용 (code generation)
-3. **Freezed 3**: 모든 데이터 모델은 Freezed로 정의
-4. **GoRouter**: 라우팅 + auth guard
-5. **ShadcnUI**: 디자인 시스템 위젯 사용
-6. **API는 interface로 추상화**: `ApiClient` interface → `MockApiClient` / `S3ApiClient`
-7. **로컬 상태와 서버 상태 분리**: palette 설정 = 로컬, job 상태 = 서버
+> S3ApiClient의 interceptor에서 자동으로 `data` 필드 추출.
 
 ---
 
 ## 완료 기준
 
-**Phase 1 (Mock API):**
-- [ ] Auth: 자동 anon 로그인 동작
-- [ ] Domain: 도메인 선택 화면 (건축/셀러)
-- [ ] Palette: concept 선택 + protect 토글 UI
-- [ ] Upload: 이미지 선택 + 업로드 진행률 UI
-- [ ] Rules: 룰 편집 + 목록 UI
-- [ ] Jobs: 진행률 바 + polling 시뮬레이션
-- [ ] Results: Before/After 비교 UI
-- [ ] Export: 템플릿 선택 UI
-- [ ] Mock API 전체 연동
-- [ ] `flutter analyze` 에러 없음
+### Phase 1 (UI + 기존 API) ✅
+- [x] Auth: 자동 anon 로그인
+- [x] Domain: 도메인 선택 화면
+- [x] Workspace: 반응형 (데스크톱+모바일)
+- [x] Photo grid: 이미지 선택 + 그리드
+- [x] Concepts/Protect/Rules: 설정 UI
+- [x] API 연결: S3ApiClient + JWT + envelope
+- [x] Camera: SNOW-style 카메라 화면
+- [x] Camera 홈 통합: 도메인 사이드바 + 컨셉 칩 바
+- [x] flutter analyze: 0 errors
 
-**Phase 2 (실 API):**
-- [ ] Mock → S3ApiClient 교체
-- [ ] R2 presigned URL 업로드 동작
-- [ ] Polling으로 실제 진행률 갱신
-- [ ] 결과 이미지 표시
+### Phase 2 (Jobs 실연동) ❌
+- [ ] **카메라 실기기 테스트 (Android/iOS)**
+- [ ] **POST /jobs → presigned URLs**
+- [ ] **R2 presigned URL 업로드**
+- [ ] **POST /confirm-upload + /execute**
+- [ ] **GET /jobs/:id polling (3초)**
+- [ ] **결과 이미지 표시**
+- [ ] **Job 취소 (POST /cancel)**
+- [ ] **에러 처리 (네트워크, 권한)**

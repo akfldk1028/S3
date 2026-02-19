@@ -4,10 +4,12 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../core/auth/auth_provider.dart';
 import '../features/auth/auth_screen.dart';
+import '../features/camera/camera_home_screen.dart';
 import '../features/domain_select/domain_select_screen.dart';
 import '../features/jobs/job_progress_screen.dart';
 import '../features/palette/palette_screen.dart';
 import '../features/rules/rules_screen.dart';
+import '../features/settings/settings_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../features/upload/upload_screen.dart';
 
@@ -18,6 +20,7 @@ part 'app_router.g.dart';
 /// Routes:
 /// - /splash : Animated splash (initial)
 /// - /auth : Auto anonymous login
+/// - / : Camera home (SNOW-style main screen)
 /// - /domain-select : Domain/preset selection
 /// - /palette : Concept chips, instance selection
 /// - /upload : Image picker, R2 upload
@@ -27,7 +30,7 @@ part 'app_router.g.dart';
 /// Auth Guard:
 /// - /splash is always allowed (no redirect)
 /// - Unauthenticated → /auth
-/// - Authenticated on /auth → /domain-select
+/// - Authenticated on /auth → / (camera home)
 @riverpod
 GoRouter appRouter(Ref ref) {
   final authState = ref.watch(authProvider);
@@ -51,9 +54,9 @@ GoRouter appRouter(Ref ref) {
         return '/auth';
       }
 
-      // Authenticated on /auth → /domain-select
+      // Authenticated on /auth → / (camera home)
       if (isAuthenticated && isAuthRoute) {
-        return '/domain-select';
+        return '/';
       }
 
       return null;
@@ -66,7 +69,7 @@ GoRouter appRouter(Ref ref) {
       ),
       GoRoute(
         path: '/',
-        redirect: (context, state) => '/domain-select',
+        builder: (context, state) => const CameraHomeScreen(),
       ),
       GoRoute(
         path: '/auth',
@@ -109,6 +112,10 @@ GoRouter appRouter(Ref ref) {
           final jobId = state.pathParameters['id']!;
           return JobProgressScreen(jobId: jobId);
         },
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const SettingsScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

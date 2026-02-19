@@ -78,6 +78,47 @@ class Workspace extends _$Workspace {
     );
   }
 
+  /// 카메라/갤러리에서 받은 XFile 리스트를 워크스페이스에 추가
+  ///
+  /// [CameraScreen]에서 촬영한 사진 또는 갤러리에서 선택한 사진을
+  /// [SelectedImage]로 변환하여 state에 추가한다.
+  /// 썸네일 생성 로직은 [addPhotos]와 동일.
+  Future<void> addPhotosFromFiles(List<XFile> files) async {
+    if (files.isEmpty) return;
+
+    if (files.length >= _largeBatchThreshold) {
+      state = state.copyWith(showLargeBatchWarning: true);
+    }
+
+    final selected = <SelectedImage>[];
+    for (final img in files) {
+      try {
+        final bytes = await img.readAsBytes();
+        final thumbnail = await ImageService.generateThumbnail(bytes);
+        selected.add(SelectedImage(
+          file: img,
+          thumbnail: thumbnail,
+          name: img.name,
+        ));
+      } catch (_) {
+        selected.add(SelectedImage(
+          file: img,
+          thumbnail: Uint8List(0),
+          name: img.name,
+        ));
+      }
+    }
+
+    final totalCount = state.selectedImages.length + selected.length;
+
+    state = state.copyWith(
+      selectedImages: [...state.selectedImages, ...selected],
+      phase: WorkspacePhase.photosSelected,
+      showLargeBatchWarning: totalCount >= _largeBatchThreshold,
+      errorMessage: null,
+    );
+  }
+
   // ─────────────────────────────────────────────
   // 업로드 & 처리
   // ─────────────────────────────────────────────

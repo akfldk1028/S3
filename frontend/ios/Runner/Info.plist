@@ -45,6 +45,10 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>S3 needs camera access to take photos for processing</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>S3 does not use the microphone but camera plugin requires this permission</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>This app needs permission to save photos to your photo library.</string>
 	<key>NSPhotoLibraryUsageDescription</key>

@@ -1,56 +1,187 @@
 # 팀원 C: GPU Worker — SAM3 Engine + Pipeline + Adapters
 
 > **담당**: GPU Worker 전체 (SAM3 추론, 룰 적용, R2 I/O, 콜백, Docker)
-> **브랜치**: `feat/gpu-engine`
-> **완전 독립**: Workers/Frontend와 무관하게 작업 가능
+> **상태**: 코드 완성 ✅, **Runpod 배포 필요 ❌**
+> **브랜치**: master (머지 완료)
 
 ---
 
-## 프로젝트 컨텍스트 (필독)
+## 현재 상태 (2026-02-19)
 
-S3는 "도메인 팔레트 엔진 기반 세트 생산 앱"이다.
-- **GPU Worker = "근육"**: SAM3 segment + rule apply 2단계 추론
-- **입력**: Queue 메시지 (JSON) → R2에서 이미지 다운로드
-- **출력**: 결과 이미지 R2 업로드 → Workers callback (HTTP POST)
-- **플랫폼**: Runpod Serverless (MVP), adapter 패턴으로 교체 가능
-- **SSoT**: `workflow.md` — 섹션 7(Queue 메시지), 섹션 8(GPU Worker)
+### ✅ 완료된 작업
+
+| 항목 | 상태 | 파일 |
+|------|------|------|
+| R2 I/O (boto3) | ✅ 완료 | `gpu-worker/engine/r2_io.py` |
+| Callback (httpx) | ✅ 완료 | `gpu-worker/engine/callback.py` |
+| SAM3 Segmenter | ✅ 완료 | `gpu-worker/engine/segmenter.py` |
+| Rule Applier | ✅ 완료 | `gpu-worker/engine/applier.py` |
+| Postprocessor | ✅ 완료 | `gpu-worker/engine/postprocess.py` |
+| Pipeline Orchestrator | ✅ 완료 | `gpu-worker/engine/pipeline.py` |
+| Runpod Adapter | ✅ 완료 | `gpu-worker/adapters/runpod_serverless.py` |
+| Interior Preset | ✅ 완료 | `gpu-worker/presets/interior.py` |
+| Seller Preset | ✅ 완료 | `gpu-worker/presets/seller.py` |
+| Dockerfile | ✅ 완료 | `gpu-worker/Dockerfile` |
+| Tests (133개) | ✅ 완료 | `gpu-worker/tests/` |
+| Entry point | ✅ 완료 | `gpu-worker/main.py` |
+
+### ❌ 미완료 작업
+
+| 항목 | 상태 | 설명 |
+|------|------|------|
+| Docker build 검증 | ❌ 미확인 | 로컬에서 `docker build` 성공 확인 필요 |
+| Runpod 배포 | ❌ 미배포 | Serverless endpoint 생성 필요 |
+| SAM3 모델 다운로드 | ❌ 미확인 | HuggingFace에서 3.4GB 다운로드 테스트 |
+| E2E 연동 | ❌ 미확인 | Workers Queue → GPU → R2 → Callback |
 
 ---
 
-## 담당 파일 (전체 gpu-worker/)
+## 즉시 해야 할 일 (순서대로)
+
+### Step 1: Docker Build 확인
+
+```bash
+cd gpu-worker
+docker build -t s3-gpu .
+```
+
+**확인할 파일:**
+- `gpu-worker/Dockerfile` — CUDA 12.6 + Python 3.12 기반
+- `gpu-worker/requirements.txt` — 의존성 (runpod, httpx, torch, transformers, boto3, Pillow)
+- `gpu-worker/.dockerignore` — 불필요 파일 제외
+
+**트러블슈팅:**
+- CUDA 버전 불일치 → Dockerfile의 FROM 이미지 확인
+- pip install 실패 → requirements.txt 버전 핀 확인
+- 이미지 크기 (~8GB) — `.dockerignore`로 test, docs 제외
+
+### Step 2: Docker Registry에 Push
+
+```bash
+# Docker Hub
+docker tag s3-gpu <username>/s3-gpu:latest
+docker push <username>/s3-gpu:latest
+
+# 또는 GHCR
+docker tag s3-gpu ghcr.io/<org>/s3-gpu:latest
+docker push ghcr.io/<org>/s3-gpu:latest
+```
+
+### Step 3: Runpod Serverless Endpoint 생성
+
+**방법 1: Runpod MCP 도구 사용 (권장)**
 
 ```
-gpu-worker/
-├── main.py                   ← [구현] 어댑터 선택 진입점
-├── engine/
-│   ├── __init__.py            ← [완성]
-│   ├── pipeline.py            ← [구현] 전체 파이프라인 오케스트레이션
-│   ├── segmenter.py           ← [구현] SAM3 모델 로드 + 추론
-│   ├── applier.py             ← [구현] 마스크 기반 룰 적용
-│   ├── postprocess.py         ← [구현] PNG/JPEG 변환, 썸네일
-│   ├── r2_io.py               ← [구현] R2 업/다운로드 (boto3)
-│   └── callback.py            ← [구현] Workers POST 콜백 + 재시도
-├── adapters/
-│   ├── __init__.py            ← [완성]
-│   ├── runpod_serverless.py   ← [구현] Runpod handler (MVP)
-│   └── queue_pull.py          ← [나중] v2 폴링 어댑터
-├── presets/
-│   ├── __init__.py            ← [완성]
-│   ├── interior.py            ← [완성] 인테리어 concept 매핑
-│   └── seller.py              ← [완성] 셀러 concept 매핑
-├── tests/
-│   ├── test_pipeline.py       ← [구현] 파이프라인 테스트
-│   └── test_segmenter.py      ← [구현] Segmenter 테스트
-├── Dockerfile                 ← [완성] CUDA 12.6 + Python 3.12
-├── requirements.txt           ← [완성] 의존성 목록
-└── .env.example               ← [완성] 환경변수 템플릿
+1. MCP runpod → list-templates → 기존 템플릿 확인
+2. MCP runpod → create-template:
+   - name: "s3-gpu-worker"
+   - dockerImage: "<registry>/s3-gpu:latest"
+   - containerDiskInGb: 20
+   - volumeInGb: 50  (모델 캐시용)
+   - env:
+     STORAGE_S3_ENDPOINT=<R2 endpoint>
+     STORAGE_ACCESS_KEY=<R2 API Token>
+     STORAGE_SECRET_KEY=<R2 Secret>
+     STORAGE_BUCKET=s3-images
+     GPU_CALLBACK_SECRET=<Workers와 동일>
+     HF_TOKEN=<HuggingFace token>
+     MODEL_CACHE_DIR=/models
+     ADAPTER=runpod
+
+3. MCP runpod → create-endpoint:
+   - name: "s3-gpu-endpoint"
+   - templateId: <위에서 만든 template ID>
+   - gpuIds: ["NVIDIA RTX 4090"]  (또는 A100, H100)
+   - workersMin: 0
+   - workersMax: 3
+   - idleTimeout: 5  (초, 유휴 시 스케일 다운)
 ```
+
+**방법 2: Runpod Dashboard 수동 생성**
+
+1. https://www.runpod.io/console/serverless → Create Endpoint
+2. Docker image URL 입력
+3. GPU 선택 (RTX 4090+, 16GB VRAM 이상)
+4. 환경변수 설정 (위와 동일)
+
+### Step 4: 환경변수 확인
+
+**리드에게 받아야 하는 값:**
+
+| 변수 | 출처 | 설명 |
+|------|------|------|
+| `STORAGE_S3_ENDPOINT` | CF Dashboard → R2 | R2 endpoint URL |
+| `STORAGE_ACCESS_KEY` | CF Dashboard → R2 API Token | 리드가 생성 |
+| `STORAGE_SECRET_KEY` | CF Dashboard → R2 API Token | 리드가 생성 |
+| `GPU_CALLBACK_SECRET` | Workers .dev.vars | 리드에게 확인 |
+
+**직접 준비하는 값:**
+
+| 변수 | 설명 |
+|------|------|
+| `HF_TOKEN` | HuggingFace access token (SAM3 모델 다운로드) |
+| `STORAGE_BUCKET` | `s3-images` (고정) |
+| `MODEL_CACHE_DIR` | `/models` (볼륨 마운트) |
+| `ADAPTER` | `runpod` (고정) |
+| `BATCH_CONCURRENCY` | `4` (기본) |
+| `LOG_LEVEL` | `info` |
+
+**확인할 파일:**
+- `gpu-worker/.env.example` — 전체 환경변수 목록
+- `docs/cloudflare-resources.md` — R2 endpoint, bucket 정보
+
+### Step 5: SAM3 모델 다운로드 테스트
+
+```bash
+# Runpod 배포 후 pod에 접속하여 확인
+python -c "
+from huggingface_hub import hf_hub_download
+import os
+os.environ['HF_TOKEN'] = '<your_token>'
+path = hf_hub_download(
+    repo_id='facebook/sam2.1-hiera-large',  # 실제 SAM3 repo 확인 필요
+    filename='sam2.1_hiera_large.pt',
+    cache_dir='/models'
+)
+print(f'Model downloaded to: {path}')
+"
+```
+
+**확인할 파일:**
+- `gpu-worker/engine/segmenter.py` — 모델 로드 로직
+- `gpu-worker/requirements.txt` — huggingface_hub 포함 확인
+
+### Step 6: E2E 연동 테스트
+
+Workers가 Queue에 push한 메시지를 GPU Worker가 수신하는지 확인.
+
+```
+1. Workers에서 테스트 Job 생성:
+   POST /jobs → presigned URLs
+   POST /jobs/:id/confirm-upload
+   POST /jobs/:id/execute → Queue push
+
+2. Runpod endpoint 로그 확인:
+   MCP runpod → Endpoint 로그 조회
+   또는 Dashboard → Endpoint → Logs
+
+3. Workers callback 수신 확인:
+   MCP cloudflare-observability → query_worker_observability
+   "s3-workers에서 callback 관련 로그 보여줘"
+```
+
+**확인할 파일:**
+- `workers/src/jobs/jobs.route.ts` — Queue push 로직 (POST /execute)
+- `workers/src/index.ts` — Queue consumer (메시지 형식)
+- `gpu-worker/adapters/runpod_serverless.py` — Runpod handler
+- `gpu-worker/engine/pipeline.py` — process_job() 전체 흐름
+- `gpu-worker/engine/callback.py` — Workers 콜백 전송
 
 ---
 
 ## Queue 메시지 계약 (Workers → GPU Worker)
 
-> 이 JSON이 GPU Worker의 유일한 입력이다. `workflow.md` 섹션 7 참조.
+> 이 JSON이 GPU Worker의 유일한 입력. `workflow.md` 섹션 7 참조.
 
 ```json
 {
@@ -61,7 +192,7 @@ gpu-worker/
     "Floor": { "action": "recolor", "value": "oak_a" },
     "Wall": { "action": "recolor", "value": "offwhite_b" }
   },
-  "protect": ["Grout", "Frame_Molding", "Glass_highlight"],
+  "protect": ["Grout", "Frame_Molding"],
   "items": [
     {
       "idx": 0,
@@ -70,7 +201,7 @@ gpu-worker/
       "preview_key": "previews/u_abc/job_123/0_thumb.jpg"
     }
   ],
-  "callback_url": "https://s3-api.example.workers.dev/jobs/job_123/callback",
+  "callback_url": "https://s3-workers.clickaround8.workers.dev/jobs/job_123/callback",
   "idempotency_prefix": "job_123",
   "batch_concurrency": 4
 }
@@ -78,408 +209,32 @@ gpu-worker/
 
 ---
 
-## Cloudflare MCP 활용 (필수)
-
-> GPU Worker는 Cloudflare 위에서 안 돌지만, **결과를 R2에 올리고 Workers로 콜백**합니다.
-> 콜백 실패 시 Cloudflare MCP로 Workers 쪽 로그를 확인할 수 있습니다.
-
-### 콜백 에러 디버깅
-
-```
-"s3-api Workers에서 callback 관련 에러 로그 보여줘"
-→ cloudflare-observability: query_worker_observability
-
-"R2 presigned URL 만료 시간 문서 찾아줘"
-→ cloudflare-observability: search_cloudflare_documentation
-```
-
-### SAM3 관련 문서
-
-```
-"PyTorch 2.7 CUDA 호환성 알려줘"
-→ context7: resolve-library-id → query-docs
-```
-
----
-
 ## 콜백 인증 (GPU Worker → Workers)
-
-> **중요**: 콜백 시 `GPU_CALLBACK_SECRET`을 Bearer 토큰으로 전송해야 합니다.
 
 ```python
 # callback.py — 필수 헤더
 headers = {"Authorization": f"Bearer {os.environ['GPU_CALLBACK_SECRET']}"}
 ```
 
-Workers 쪽에서 이 secret을 검증합니다. `.env`의 `GPU_CALLBACK_SECRET` 값이
-Workers `.dev.vars`의 `GPU_CALLBACK_SECRET`과 **반드시 동일**해야 합니다.
-
-## SAM3 모델 다운로드
-
-```python
-# huggingface_hub로 다운로드 (requirements.txt에 추가됨)
-from huggingface_hub import hf_hub_download
-
-model_path = hf_hub_download(
-    repo_id="facebook/sam3",  # 실제 repo_id 확인 필요
-    filename="sam3_model.pth",
-    cache_dir="/models"
-)
-```
-
-> 모델 가중치는 Docker 이미지에 넣지 않음 → `/models` 볼륨 마운트 or 런타임 다운로드
-
----
-
-## 구현 순서
-
-### Step 1: R2 I/O (r2_io.py) — 스토리지 연결
-
-```python
-# boto3로 S3 호환 API 사용 (R2 = S3 compatible)
-
-import boto3
-from botocore.config import Config
-
-class R2Client:
-    def __init__(self):
-        self.client = boto3.client(
-            's3',
-            endpoint_url=os.environ['STORAGE_S3_ENDPOINT'],
-            aws_access_key_id=os.environ['STORAGE_ACCESS_KEY'],
-            aws_secret_access_key=os.environ['STORAGE_SECRET_KEY'],
-            region_name='auto',
-        )
-        self.bucket = os.environ['STORAGE_BUCKET']
-
-    def download(self, key: str, local_path: str) -> None:
-        self.client.download_file(self.bucket, key, local_path)
-
-    def upload(self, local_path: str, key: str, content_type: str = 'image/png') -> None:
-        self.client.upload_file(local_path, self.bucket, key,
-            ExtraArgs={'ContentType': content_type})
-
-    def download_bytes(self, key: str) -> bytes:
-        response = self.client.get_object(Bucket=self.bucket, Key=key)
-        return response['Body'].read()
-
-    def upload_bytes(self, data: bytes, key: str, content_type: str = 'image/png') -> None:
-        self.client.put_object(Bucket=self.bucket, Key=key,
-            Body=data, ContentType=content_type)
-```
-
-### Step 2: Callback (callback.py)
-
-```python
-import httpx
-
-async def report_item_result(
-    callback_url: str,
-    idx: int,
-    status: str,  # "done" | "failed"
-    output_key: str | None,
-    preview_key: str | None,
-    error: str | None,
-    idempotency_key: str,
-    secret: str,
-    max_retries: int = 3,
-) -> None:
-    payload = {
-        "idx": idx,
-        "status": status,
-        "output_key": output_key,
-        "preview_key": preview_key,
-        "error": error,
-        "idempotency_key": idempotency_key,
-    }
-    headers = {"Authorization": f"Bearer {secret}"}
-
-    for attempt in range(max_retries):
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.post(callback_url, json=payload, headers=headers)
-                if resp.status_code < 500:
-                    return  # 성공 또는 4xx (영구 실패)
-        except httpx.RequestError:
-            pass
-        # 지수 백오프: 5s, 30s, 300s
-        await asyncio.sleep(5 * (6 ** attempt))
-```
-
-### Step 3: Segmenter (segmenter.py) — SAM3 핵심
-
-```python
-import torch
-from PIL import Image
-import numpy as np
-
-class SAM3Segmenter:
-    def __init__(self, model_dir: str = "/models"):
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model = self._load_model(model_dir)
-
-    def _load_model(self, model_dir: str):
-        # SAM3 모델 로드
-        # TODO: SAM3 공식 API에 맞게 구현
-        # from sam3 import SAM3Model  (또는 실제 패키지)
-        pass
-
-    def segment(
-        self,
-        image: np.ndarray,       # H×W×3 RGB
-        concepts: dict,          # {"Floor": {"action":...}, "Wall": {...}}
-        protect: list[str],      # ["Grout", "Frame_Molding"]
-        preset_mapping: dict,    # interior.py의 CONCEPTS
-    ) -> dict:
-        """
-        Returns:
-        {
-            "masks": {"Floor": ndarray, "Wall": ndarray},  # H×W binary
-            "instances": {
-                "Floor": [{"id": 0, "mask": ndarray, "bbox": [...], "area": int}]
-            },
-            "protect_mask": ndarray,  # 합산 보호 마스크 H×W binary
-        }
-        """
-        result = {"masks": {}, "instances": {}, "protect_mask": None}
-
-        # 1. 각 concept에 대해 SAM3 text-prompted segmentation
-        for concept_name in concepts:
-            if concept_name not in preset_mapping:
-                continue
-            prompt = preset_mapping[concept_name]["sam3_prompt"]
-            # mask = self.model.predict(image, text_prompt=prompt)
-            # result["masks"][concept_name] = mask
-
-        # 2. protect concepts에 대해 마스크 생성 + 합산
-        protect_combined = np.zeros(image.shape[:2], dtype=bool)
-        for p in protect:
-            if p in preset_mapping:
-                prompt = preset_mapping[p]["sam3_prompt"]
-                # p_mask = self.model.predict(image, text_prompt=prompt)
-                # protect_combined |= p_mask
-        result["protect_mask"] = protect_combined
-
-        return result
-```
-
-### Step 4: Applier (applier.py) — 룰 적용
-
-```python
-import numpy as np
-from PIL import Image
-
-def apply_rules(
-    image: np.ndarray,          # H×W×3 원본
-    segment_result: dict,       # segmenter 출력
-    concepts: dict,             # {"Floor": {"action": "recolor", "value": "oak_a"}}
-) -> np.ndarray:
-    """마스크 영역에 룰을 적용하고, protect 영역은 보호."""
-    result = image.copy()
-    protect_mask = segment_result["protect_mask"]
-
-    for concept_name, rule in concepts.items():
-        if concept_name not in segment_result["masks"]:
-            continue
-        mask = segment_result["masks"][concept_name]
-        # protect 영역 제외
-        effective_mask = mask & ~protect_mask
-
-        if rule["action"] == "recolor":
-            result = _recolor(result, effective_mask, rule["value"])
-        elif rule["action"] == "tone":
-            result = _adjust_tone(result, effective_mask, rule["value"])
-        elif rule["action"] == "remove":
-            result = _inpaint(result, effective_mask)
-        # ... 추가 룰
-
-    return result
-
-def _recolor(image: np.ndarray, mask: np.ndarray, color_id: str) -> np.ndarray:
-    # MVP: 간단한 색상 블렌딩
-    # color_id → RGB 매핑 필요 (presets에서?)
-    # mask 영역을 target color로 블렌딩
-    pass
-
-def _adjust_tone(image: np.ndarray, mask: np.ndarray, value: str) -> np.ndarray:
-    # 밝기/채도 조절
-    pass
-
-def _inpaint(image: np.ndarray, mask: np.ndarray) -> np.ndarray:
-    # 영역 제거 (인페인팅)
-    pass
-```
-
-### Step 5: Postprocess (postprocess.py)
-
-```python
-from PIL import Image
-import numpy as np
-
-def finalize(
-    result_image: np.ndarray,  # H×W×3
-    max_size: int = 4096,
-) -> tuple[bytes, bytes]:
-    """결과 PNG + 썸네일 JPEG 반환"""
-    img = Image.fromarray(result_image)
-
-    # 결과 PNG
-    if max(img.size) > max_size:
-        img.thumbnail((max_size, max_size), Image.LANCZOS)
-    png_buffer = io.BytesIO()
-    img.save(png_buffer, format='PNG', optimize=True)
-
-    # 썸네일 JPEG (300px)
-    thumb = img.copy()
-    thumb.thumbnail((300, 300), Image.LANCZOS)
-    jpg_buffer = io.BytesIO()
-    thumb.save(jpg_buffer, format='JPEG', quality=85)
-
-    return png_buffer.getvalue(), jpg_buffer.getvalue()
-```
-
-### Step 6: Pipeline (pipeline.py) — 전체 오케스트레이션
-
-```python
-import asyncio
-from engine.segmenter import SAM3Segmenter
-from engine.applier import apply_rules
-from engine.postprocess import finalize
-from engine.r2_io import R2Client
-from engine.callback import report_item_result
-from presets import get_preset_mapping
-
-segmenter = None  # 글로벌 (모델 1회 로드)
-
-async def process_job(message: dict) -> None:
-    global segmenter
-    if segmenter is None:
-        segmenter = SAM3Segmenter()
-
-    r2 = R2Client()
-    preset_mapping = get_preset_mapping(message["preset"])
-    concurrency = message.get("batch_concurrency", 4)
-
-    sem = asyncio.Semaphore(concurrency)
-
-    async def process_item(item: dict):
-        async with sem:
-            idx = item["idx"]
-            idem_key = f"{message['idempotency_prefix']}:{idx}:0"
-            try:
-                # 1. R2에서 이미지 다운로드
-                img_bytes = r2.download_bytes(item["input_key"])
-                image = np.array(Image.open(io.BytesIO(img_bytes)).convert("RGB"))
-
-                # 2. SAM3 Segment
-                seg_result = segmenter.segment(
-                    image, message["concepts"], message["protect"], preset_mapping
-                )
-
-                # 3. Rule Apply
-                result = apply_rules(image, seg_result, message["concepts"])
-
-                # 4. Postprocess
-                png_bytes, jpg_bytes = finalize(result)
-
-                # 5. R2 Upload
-                r2.upload_bytes(png_bytes, item["output_key"], "image/png")
-                r2.upload_bytes(jpg_bytes, item["preview_key"], "image/jpeg")
-
-                # 6. Callback (성공)
-                await report_item_result(
-                    message["callback_url"], idx, "done",
-                    item["output_key"], item["preview_key"], None,
-                    idem_key, os.environ.get("GPU_CALLBACK_SECRET", "")
-                )
-            except Exception as e:
-                # Callback (실패)
-                await report_item_result(
-                    message["callback_url"], idx, "failed",
-                    None, None, str(e),
-                    idem_key, os.environ.get("GPU_CALLBACK_SECRET", "")
-                )
-
-    # 모든 item 병렬 처리 (semaphore로 동시성 제한)
-    tasks = [process_item(item) for item in message["items"]]
-    await asyncio.gather(*tasks)
-```
-
-### Step 7: Runpod Adapter (runpod_serverless.py)
-
-```python
-import runpod
-from engine.pipeline import process_job
-
-def handler(event: dict) -> dict:
-    """Runpod Serverless handler"""
-    message = event.get("input", {})
-    import asyncio
-    asyncio.run(process_job(message))
-    return {"status": "completed", "job_id": message.get("job_id")}
-
-def start():
-    runpod.serverless.start({"handler": handler})
-```
-
----
-
-## 프리셋 매핑 (이미 완성됨)
-
-`presets/interior.py` 예시:
-```python
-INTERIOR_CONCEPTS = {
-    "Wall": {"sam3_prompt": "wall surface", "multi_instance": False},
-    "Floor": {"sam3_prompt": "floor surface", "multi_instance": False},
-    "Tile": {"sam3_prompt": "individual tile", "multi_instance": True},
-    "Grout": {"sam3_prompt": "grout lines between tiles", "multi_instance": False},
-    # ... 12개 concept
-}
-```
-
----
-
-## 환경 설정
-
-```bash
-cd gpu-worker/
-python -m venv .venv
-.venv\Scripts\activate   # Windows
-
-pip install -r requirements.txt
-
-cp .env.example .env
-# STORAGE_S3_ENDPOINT=https://xxx.r2.cloudflarestorage.com
-# STORAGE_ACCESS_KEY=xxx
-# STORAGE_SECRET_KEY=xxx
-# STORAGE_BUCKET=s3-images
-
-# 로컬 테스트 (GPU 없어도 가능 — mock mode)
-pytest
-
-# Docker 빌드
-docker build -t s3-gpu .
-```
-
----
-
-## 테스트 전략
-
-1. **GPU 없는 환경**: segmenter를 mock으로 교체 → pipeline 흐름만 검증
-2. **GPU 있는 환경**: SAM3 모델 다운로드 → 실제 추론 테스트
-3. **R2 테스트**: 로컬 MinIO 또는 실제 R2 dev bucket 사용
-4. **Callback 테스트**: 로컬 HTTP 서버로 POST 수신 확인
+Workers에서 이 secret을 검증. `.env`의 `GPU_CALLBACK_SECRET` 값이
+Workers `.dev.vars`의 `GPU_CALLBACK_SECRET`과 **반드시 동일**해야 함.
 
 ---
 
 ## 완료 기준
 
-- [ ] R2 download/upload 동작 (boto3)
-- [ ] Callback POST 동작 + 재시도 (3회)
-- [ ] SAM3 모델 로드 + segment 동작 (또는 mock)
-- [ ] Rule apply: recolor 최소 1개 동작
-- [ ] Pipeline: 전체 흐름 (다운 → segment → apply → 업로드 → callback)
-- [ ] Runpod handler: event → process_job 호출
-- [ ] Postprocess: PNG + 썸네일 JPEG 생성
-- [ ] `pytest` 통과
-- [ ] `docker build` 성공
+- [x] R2 download/upload 동작 (boto3)
+- [x] Callback POST 동작 + 재시도 (3회)
+- [x] SAM3 모델 wrapper
+- [x] Rule apply: recolor/tone/texture/remove
+- [x] Pipeline: 전체 흐름
+- [x] Runpod handler
+- [x] Postprocess: PNG + 썸네일 JPEG
+- [x] `pytest` 133개 통과 (mocked)
+- [x] Dockerfile 작성
+- [ ] **Docker build 성공 확인**
+- [ ] **Docker registry push**
+- [ ] **Runpod Serverless endpoint 생성**
+- [ ] **환경변수 설정 (R2 + callback secret + HF_TOKEN)**
+- [ ] **SAM3 모델 다운로드 테스트**
+- [ ] **E2E: Workers → Queue → GPU → R2 → Callback 전체 흐름**

@@ -1,145 +1,155 @@
 # S3 MVP — TODO (Sequential Execution Plan)
 
-> 최종 목표: 4개 spec 코딩+QA → 머지 → 배포 → E2E 연결 확인
-> 작성일: 2026-02-14
-> 상태: Phase A 진행 중
+> 최종 목표: Workers + GPU + Frontend E2E 연결 → 프로덕션 배포
+> 작성일: 2026-02-14 | **최종 업데이트: 2026-02-19**
+> 상태: **Phase A~C 부분 완료, Phase D 진입 준비**
 
 ---
 
-## Phase A: Auto-Build (코딩 + QA) ← 현재 진행 중
+## Phase A: 코딩 ✅ 완료
 
-daemon이 각 spec 브랜치에서 코딩 → QA를 자동 수행.
-
-### A-1. Spec 002: Workers Foundation (Auth, Presets, Rules)
+### A-1. Spec 002: Workers Foundation (Auth, Presets, Rules) ✅
 - [x] Phase 1: Foundation (hono, JWT, auth middleware, wrangler) — 4/4
 - [x] Phase 2: Auth API (POST /auth/anon, GET /me) — 2/2
 - [x] Phase 3: Presets API (GET /presets, GET /presets/:id) — 2/2
 - [x] Phase 4: Rules CRUD (POST/GET/PUT/DELETE /rules) — 5/5
 - [x] Phase 5: Integration + D1 migration + E2E verify — 3/3
-- [x] 코딩 완료 → **QA 리뷰 진행 중** (status: ai_review)
-- [ ] QA 통과 → 자동 머지 대기
-- Branch: `auto-claude/002-workers-foundation-schema-auth`
+- [x] QA 통과 + master 머지 완료
 
-### A-2. Spec 003: Workers Advanced DO (UserLimiter, JobCoordinator, Jobs API)
+### A-2. Spec 003: Workers Advanced DO (UserLimiter, JobCoordinator, Jobs API) ✅
 - [x] Phase 1: Dependencies (AWS SDK, wrangler bindings) — 2/2
 - [x] Phase 2: UserLimiterDO (schema, credits, concurrency, getUserState) — 4/4
-- [ ] Phase 3: JobCoordinatorDO (schema, FSM, items, idempotency, D1 flush, RPC) — 5/6
-- [ ] Phase 4: R2 Presigned URLs — 0/2
-- [ ] Phase 5: Jobs API (6 routes) — 0/6
-- [ ] Phase 6: GET /me route — 0/1
-- [ ] Phase 7: Integration + route mount — 0/2
-- [ ] QA 리뷰
-- [ ] QA 통과 → 자동 머지 대기
-- Branch: `auto-claude/003-workers-advanced-userlimiterdo-jobcoordinatordo`
+- [x] Phase 3: JobCoordinatorDO (schema, FSM, items, idempotency, D1 flush, RPC) — 6/6
+- [x] Phase 4: R2 Presigned URLs — 2/2
+- [x] Phase 5: Jobs API (7 routes) — 7/7
+- [x] Phase 6: GET /me route — 1/1
+- [x] Phase 7: Integration + route mount — 2/2
+- [x] QA 통과 + master 머지 완료
 
-### A-3. Spec 006: GPU Worker SAM3 ⚠️ **daemon 실행 실패 (Exit code 1, 3회)**
-- [ ] **원인 조사 필요**: run.py가 Exit code 1로 즉시 종료
-- [ ] 수동 디버깅: `python run.py --spec 006-gpu-worker-sam3-segmenter --project-dir C:\DK\S3`
-- [ ] Phase 1: R2 Storage Layer — 0/4
-- [ ] Phase 2: SAM3 Segmenter — 0/4
-- [ ] Phase 3: Rule Applier — 0/4
-- [ ] Phase 4: Callback Integration — 0/4
-- [ ] Phase 5: Pipeline Orchestrator — 0/5
-- [ ] Phase 6: Runpod Adapter — 0/4
-- [ ] Phase 7: Presets & Config — 0/4
-- [ ] Phase 8: Docker & Docs — 0/5
-- [ ] Phase 9: QA & Security — 0/5
-- [ ] QA 통과
-- Plan: 9 phases, 39 subtasks
+### A-3. Spec 006: GPU Worker SAM3 ✅ (코드 완성)
+- [x] Phase 1: R2 Storage Layer — 4/4
+- [x] Phase 2: SAM3 Segmenter — 4/4
+- [x] Phase 3: Rule Applier — 4/4
+- [x] Phase 4: Callback Integration — 4/4
+- [x] Phase 5: Pipeline Orchestrator — 5/5
+- [x] Phase 6: Runpod Adapter — 4/4
+- [x] Phase 7: Presets & Config — 4/4
+- [x] Phase 8: Docker & Docs — 5/5
+- [x] Phase 9: Tests (133개 mocked) — 5/5
+- [x] master 머지 완료
 
-### A-4. Spec 007: Frontend Flutter (Auth, Palette, Jobs, Gallery)
-- [ ] Spec 생성 완료 대기 (planner 진행 중)
-- [ ] Daemon pickup (touch implementation_plan.json)
-- [ ] 코딩 (subtask count TBD)
-- [ ] QA 통과
-- Branch: TBD
-
----
-
-## Phase B: 브랜치 머지 + 충돌 해결
-
-각 spec 브랜치를 master에 순차 머지. 충돌 발생 시 수동 해결.
-
-### B-1. Spec 002 브랜치 머지 (Workers Foundation)
-- [ ] `git merge auto-claude/002-workers-foundation-schema-auth` → master
-- [ ] 충돌 확인 (index.ts, wrangler.toml 주의)
-- [ ] `npx tsc --noEmit` 컴파일 확인
-
-### B-2. Spec 003 브랜치 머지 (Workers Advanced DO)
-- [ ] `git merge auto-claude/003-workers-advanced-userlimiterdo-jobcoordinatordo` → master
-- [ ] 충돌 해결 (index.ts route mount 통합, wrangler.toml DO/Queue 바인딩)
-- [ ] `npx tsc --noEmit` 컴파일 확인
-- [ ] D1 마이그레이션 스키마 통합 확인
-
-### B-3. Spec 006 브랜치 머지 (GPU Worker)
-- [ ] `git merge auto-claude/006-gpu-worker-sam3-segmenter` → master
-- [ ] 충돌 없을 것 (독립 디렉토리: gpu-worker/)
-- [ ] `python -m py_compile gpu-worker/main.py` 확인
-
-### B-4. Spec 007 브랜치 머지 (Frontend Flutter)
-- [ ] `git merge auto-claude/007-frontend-flutter-freezed-models` → master
-- [ ] 충돌 없을 것 (독립 디렉토리: frontend/)
-- [ ] `flutter analyze` 확인
-
-### B-5. 통합 컴파일 확인
-- [ ] Workers: `cd workers && npx tsc --noEmit`
-- [ ] GPU Worker: `cd gpu-worker && python -m py_compile main.py`
-- [ ] Frontend: `cd frontend && flutter analyze`
+### A-4. Frontend Flutter ✅ (UI + API 연결 + 카메라 홈 통합 완료)
+- [x] Auth (anon JWT + SecureStorage)
+- [x] GoRouter 8 라우트 + auth guard
+- [x] S3ApiClient (Dio + JWT + envelope unwrap)
+- [x] Workspace 반응형 UI (데스크톱+모바일)
+- [x] Photo grid + concepts + protect + rules sections
+- [x] SNOW-style 카메라 화면 (`camera` 패키지)
+- [x] Android/iOS 카메라 권한 설정
+- [x] 카메라 홈 도메인 사이드바 (☰ → DomainDrawer)
+- [x] 카메라 홈 컨셉 칩 바 (ConceptChipsBar)
+- [x] selectedPresetProvider (도메인 선택 → 컨셉 자동 로드)
+- [x] proceed 로직: 도메인 선택됨 → /upload 직행, 미선택 → /domain-select
+- [x] flutter analyze: 0 errors
 
 ---
 
-## Phase C: 배포 준비 (Cloudflare MCP 활용 시작)
+## Phase B: 브랜치 머지 ✅ 완료
 
-> 여기서부터 `cloudflare-observability` + `cloudflare-workers` MCP 적극 활용
+- [x] Spec 002 머지 → master
+- [x] Spec 003 머지 → master (index.ts 충돌 해결)
+- [x] Spec 006 머지 → master
+- [x] Frontend 통합 → master
+- [x] 레거시 삭제: `cf-backend/`, `ai-backend/`
+- [x] Workers: `npx tsc --noEmit` — 0 errors
+- [x] Frontend: `flutter analyze` — 0 errors
 
-### C-1. Cloudflare Workers 배포
-- [ ] D1 데이터베이스 생성: `wrangler d1 create s3-db`
-- [ ] D1 마이그레이션 실행: `wrangler d1 execute s3-db --file=migrations/0001_schema.sql`
-- [ ] R2 버킷 생성: `wrangler r2 bucket create s3-images`
-- [ ] Secrets 설정:
-  - [ ] `wrangler secret put JWT_SECRET`
-  - [ ] `wrangler secret put GPU_CALLBACK_SECRET`
-- [ ] Workers 배포: `cd workers && npx wrangler deploy`
-- [ ] MCP 확인: `cloudflare-observability` → workers_list, query_worker_observability
-- [ ] Health check: `curl https://s3-api.{domain}.workers.dev/health`
+---
 
-### C-2. GPU Worker 배포 (Runpod)
-- [ ] Docker 이미지 빌드: `docker build -t s3-gpu-worker gpu-worker/`
-- [ ] Docker Hub 또는 GHCR에 push
-- [ ] Runpod Template 생성 (MCP runpod 도구 활용 가능)
+## Phase C: 배포 — 부분 완료
+
+### C-1. Cloudflare Workers 배포 ✅
+- [x] D1 데이터베이스 생성: `s3-db` (ID: `9e2d53af-ba37-4128-9ef8-0476ace30efa`)
+- [x] D1 마이그레이션 실행: 5 tables + 4 indexes
+- [x] R2 버킷 생성: `s3-images`
+- [x] Queue 생성: `gpu-jobs` + `gpu-jobs-dlq`
+- [x] Secrets: JWT_SECRET, GPU_CALLBACK_SECRET
+- [x] Workers 배포: `https://s3-workers.clickaround8.workers.dev`
+- [x] DO 자동 생성: UserLimiterDO, JobCoordinatorDO
+- [x] 14/14 엔드포인트 동작 확인
+
+### C-2. R2 API Token ❌ — P0 블로커
+- [ ] **CF Dashboard → R2 → Manage R2 API Tokens → Create**
+- [ ] Permission: Object Read & Write, Bucket: s3-images
+- [ ] `wrangler secret put R2_ACCESS_KEY_ID`
+- [ ] `wrangler secret put R2_SECRET_ACCESS_KEY`
+- [ ] 재배포: `cd workers && npx wrangler deploy`
+- [ ] presigned URL 동작 확인
+
+> ⚠️ **이것 없으면 presigned URL 전부 실패 → Jobs 업로드 불가**
+
+### C-3. GPU Worker 배포 (Runpod) ❌ — P1
+- [ ] Docker build: `cd gpu-worker && docker build -t s3-gpu .`
+- [ ] Docker registry push (GHCR or Docker Hub)
+- [ ] Runpod Template 생성 (GPU: RTX 4090+)
 - [ ] Runpod Serverless Endpoint 생성
 - [ ] 환경변수 설정:
-  - [ ] R2 credentials (STORAGE_S3_ENDPOINT, ACCESS_KEY, SECRET_KEY)
-  - [ ] CALLBACK_URL (Workers endpoint)
-  - [ ] GPU_CALLBACK_SECRET
-  - [ ] HF_TOKEN (HuggingFace, SAM3 모델 다운로드용)
-- [ ] SAM3 모델 다운로드 확인 (3.4GB)
+  - [ ] STORAGE_S3_ENDPOINT (R2 endpoint)
+  - [ ] STORAGE_ACCESS_KEY (R2 Token)
+  - [ ] STORAGE_SECRET_KEY (R2 Token)
+  - [ ] STORAGE_BUCKET=s3-images
+  - [ ] GPU_CALLBACK_SECRET (Workers와 동일)
+  - [ ] HF_TOKEN (HuggingFace)
+  - [ ] ADAPTER=runpod
+- [ ] SAM3 모델 다운로드 테스트 (3.4GB)
+- [ ] Queue 수신 확인
 
-### C-3. Frontend 빌드
-- [ ] API base URL 설정: `frontend/lib/core/constants.dart`
-- [ ] `flutter build apk --release` 또는 `flutter build web`
+### C-4. Frontend Jobs UI 연동 ❌ — P1
+- [ ] POST /jobs → presigned URLs 수신
+- [ ] R2 presigned PUT 업로드 (`workspace_provider.dart`의 `_uploadOne` 활용)
+- [ ] POST /jobs/:id/confirm-upload
+- [ ] POST /jobs/:id/execute { concepts, protect, rule_id }
+- [ ] GET /jobs/:id polling (3초) → 진행률
+- [ ] 결과 이미지 표시 (presigned GET URL)
+- [ ] Job 취소 (POST /cancel)
+
+### C-5. Frontend 카메라 홈 실기기 테스트 ❌ — P1
+- [ ] Android: 카메라 프리뷰 + 촬영 + 갤러리
+- [ ] iOS: 카메라 프리뷰 + 촬영 + 갤러리
+- [ ] 플래시 토글 (OFF/AUTO/ON)
+- [ ] 전면/후면 카메라 전환
+- [ ] ☰ 사이드바: 도메인 목록 표시 + 선택
+- [ ] 컨셉 칩: 도메인 선택 후 concepts 표시 + 토글
+- [ ] 도메인 변경 시 컨셉 초기화 확인
+- [ ] proceed: 도메인 선택됨 → /upload, 미선택 → /domain-select
+- [ ] 웹: 갤러리 + 사이드바 + 컨셉 칩 동작 확인
+
+### C-6. Frontend 빌드 ⏳ (E2E 후)
+- [ ] API base URL 확인: `frontend/lib/constants/api_endpoints.dart`
+- [ ] `flutter build apk --release`
+- [ ] `flutter build web`
 - [ ] 빌드 산출물 확인
 
 ---
 
-## Phase D: E2E 연결 + 통합 테스트
+## Phase D: E2E 연결 + 통합 테스트 ❌ — 미시작
 
-> 모든 계층이 실제로 연결되는지 확인하는 핵심 단계
+> **전제조건**: C-2 (R2 Token) + C-3 (GPU 배포) + C-4 (Jobs UI) 완료 필요
 
 ### D-1. Auth 흐름 검증
-- [ ] Flutter → POST /auth/anon → JWT 수신 확인
-- [ ] JWT로 GET /me 호출 → 유저 상태 반환 확인
+- [x] Flutter → POST /auth/anon → JWT 수신 ✅ (P0에서 확인)
+- [x] JWT로 GET /me 호출 → 유저 상태 반환 ✅
 - [ ] 인증 없이 보호 API 호출 → 401 거부 확인
 
 ### D-2. Presets + Rules 흐름 검증
-- [ ] GET /presets → interior, seller 도메인 반환 확인
-- [ ] GET /presets/interior → concepts, protect_defaults 확인
-- [ ] POST /rules → 룰 저장 확인
-- [ ] GET /rules → 내 룰 목록 확인
-- [ ] PUT /rules/:id → 수정 확인
-- [ ] DELETE /rules/:id → 삭제 + 슬롯 반환 확인
+- [x] GET /presets → interior, seller 도메인 반환 ✅
+- [x] GET /presets/interior → concepts, protect_defaults ✅
+- [ ] POST /rules → 룰 저장 확인 (Flutter에서)
+- [ ] GET /rules → 내 룰 목록 확인 (Flutter에서)
+- [ ] PUT /rules/:id → 수정 확인 (Flutter에서)
+- [ ] DELETE /rules/:id → 삭제 + 슬롯 반환 확인 (Flutter에서)
 
-### D-3. Jobs 전체 흐름 (핵심!)
+### D-3. Jobs 전체 흐름 (핵심!) ❌
 - [ ] POST /jobs → job_id + presigned URLs 반환
 - [ ] R2 직접 업로드 (presigned URL 사용)
 - [ ] POST /jobs/:id/confirm-upload → uploaded 상태 전환
@@ -158,16 +168,18 @@ daemon이 각 spec 브랜치에서 코딩 → QA를 자동 수행.
 - [ ] Callback 중복 방지 (idempotency key) 확인
 
 ### D-5. Flutter UI 전체 흐름
-- [ ] 앱 최초 실행 → 자동 anon 로그인
-- [ ] 도메인 선택 (인테리어/셀러)
-- [ ] 팔레트 UI: concept 버튼, 인스턴스 카드
-- [ ] 이미지 업로드 → 보호 토글 → 룰 구성
-- [ ] "적용" 클릭 → 진행률 표시 → 결과 갤러리
+- [ ] 앱 최초 실행 → 자동 anon 로그인 → 카메라 홈
+- [ ] ☰ 사이드바에서 도메인 선택 (인테리어/셀러)
+- [ ] 컨셉 칩 바에서 concept 선택
+- [ ] 카메라 촬영 또는 갤러리 선택
+- [ ] proceed → /upload?presetId=... (도메인 선택 페이지 스킵)
+- [ ] 룰 구성 + 저장
+- [ ] "적용" 클릭 → 업로드 → 진행률 표시 → 결과 갤러리
 - [ ] 세트 내보내기
 
 ---
 
-## Phase E: 런칭 전 최종 확인
+## Phase E: 런칭 전 최종 확인 ❌ — 미시작
 
 ### E-1. 보안 점검
 - [ ] JWT_SECRET 강도 확인 (32+ chars random)
@@ -182,40 +194,54 @@ daemon이 각 spec 브랜치에서 코딩 → QA를 자동 수행.
 - [ ] 에러 알림 설정 (선택)
 
 ### E-3. 프로덕션 배포
-- [ ] Workers production 배포
+- [ ] Workers production 배포 (이미 완료, 재확인)
 - [ ] Runpod production endpoint
-- [ ] Flutter release build 배포
+- [ ] Flutter release build (APK/Web)
+- [ ] 앱스토어 제출 준비 (선택)
 
 ---
 
-## 현재 상태 요약 (2026-02-14 17:35)
+## 현재 상태 요약 (2026-02-19)
 
-| Spec | 단계 | 진행률 | 상태 |
-|------|------|--------|------|
-| 002 Workers Foundation | Phase A | 16/16 ✅ | **QA 통과, 머지 대기** |
-| 003 Workers Advanced DO | Phase A | 23/23 ✅ | **QA 통과, 머지 대기** |
-| 006 GPU Worker | Phase A | 0/21 | **daemon 코딩 중** (PID 24012) |
-| 007 Frontend Flutter | Phase A | ~4/28 | **daemon 코딩 중** (PID 24012) |
+| 영역 | Phase A (코딩) | Phase B (머지) | Phase C (배포) | Phase D (E2E) |
+|------|:-:|:-:|:-:|:-:|
+| Workers (A+B) | ✅ 14/14 | ✅ | ✅ 배포됨 | ⏳ |
+| GPU Worker (C) | ✅ 23파일 | ✅ | ❌ Runpod 미배포 | ❌ |
+| Frontend (D) | ✅ UI+API | ✅ | ❌ Jobs 미연동 | ❌ |
+
+### 의존성 체인 (블로커 순서)
+
+```
+C-2. R2 Token 생성 ←── P0 (모든 것의 전제)
+  │
+  ├── C-3. GPU Runpod 배포 ←── P1 (R2 Token 필요)
+  │     │
+  │     └── D-3. Jobs E2E (Queue → GPU → Callback)
+  │
+  ├── C-4. Jobs UI 연동 ←── P1 (presigned URL 필요)
+  │     │
+  │     └── D-5. Flutter 전체 흐름
+  │
+  └── C-5. 카메라 실기기 테스트 ←── P1 (독립)
+        │
+        └── D-5. Flutter 전체 흐름
+```
+
+---
 
 ## 해결된 이슈
 
-1. ~~Spec 006 daemon 실패~~ ✅ **해결**
-   - 원인: Windows `nul` 예약 디바이스 파일이 `shutil.copytree`에서 충돌
-   - 수정: `setup.py`에 `_ignore_win_reserved` 필터 추가
-   - 추가: Python `.pyc` 캐시 삭제, plan 재생성 (0 bytes → 25KB)
-   - 추가: `_load_plan`에 `UnicodeDecodeError` 예외 처리 추가
-
-2. ~~Dual daemon 프로세스~~ ✅ **해결**
-   - 두 프로세스 모두 종료 후 단일 daemon으로 재시작 (PID 24012)
-
-3. ~~Sleep 방지~~ ✅ **해결**
-   - `prevent-sleep.ps1` 실행: 덮개 닫아도 절전 안 됨
+1. ~~Spec 006 daemon 실패~~ ✅ — Windows `nul` 예약 파일 → `_ignore_win_reserved` 필터
+2. ~~Dual daemon 프로세스~~ ✅ — 단일 daemon 재시작
+3. ~~Sleep 방지~~ ✅ — `prevent-sleep.ps1`
+4. ~~Workers index.ts 머지 충돌~~ ✅ — 수동 해결 완료
+5. ~~Frontend ↔ Workers 연결~~ ✅ — P0 수리 (2026-02-18)
+6. ~~DO init() 누락 버그~~ ✅ — rules/user route 수정
+7. ~~레거시 폴더 삭제~~ ✅ — cf-backend/, ai-backend/ 삭제 (프롬프트 보존)
 
 ## 남은 이슈
 
-1. **Workers index.ts 머지 충돌 예상**: 002와 003 모두 index.ts를 수정
-   - Phase B에서 수동 해결 필요
-   - 우선 002 머지 → 003 머지 순서로 진행
-
-2. **Cloudflare MCP 미사용 (현재)**: 코딩 단계에서는 context7만 사용
-   - Phase C (배포)부터 cloudflare-observability, cloudflare-workers MCP 활용
+1. **R2 API Token 미생성** — presigned URL 블로커 → Dashboard에서 수동 생성 필요
+2. **GPU Worker Runpod 미배포** — 코드 완성, Docker + 배포 필요
+3. **Jobs UI 미연동** — Frontend에서 POST /jobs ~ polling 미구현
+4. **카메라 홈 실기기 미테스트** — 사이드바+칩 통합 완료, Android/iOS/Web 실행 필요

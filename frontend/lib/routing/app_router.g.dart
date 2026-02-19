@@ -13,6 +13,7 @@ part of 'app_router.dart';
 /// Routes:
 /// - /splash : Animated splash (initial)
 /// - /auth : Auto anonymous login
+/// - / : Camera home (SNOW-style main screen)
 /// - /domain-select : Domain/preset selection
 /// - /palette : Concept chips, instance selection
 /// - /upload : Image picker, R2 upload
@@ -22,7 +23,7 @@ part of 'app_router.dart';
 /// Auth Guard:
 /// - /splash is always allowed (no redirect)
 /// - Unauthenticated → /auth
-/// - Authenticated on /auth → /domain-select
+/// - Authenticated on /auth → / (camera home)
 
 @ProviderFor(appRouter)
 final appRouterProvider = AppRouterProvider._();
@@ -32,6 +33,7 @@ final appRouterProvider = AppRouterProvider._();
 /// Routes:
 /// - /splash : Animated splash (initial)
 /// - /auth : Auto anonymous login
+/// - / : Camera home (SNOW-style main screen)
 /// - /domain-select : Domain/preset selection
 /// - /palette : Concept chips, instance selection
 /// - /upload : Image picker, R2 upload
@@ -41,7 +43,7 @@ final appRouterProvider = AppRouterProvider._();
 /// Auth Guard:
 /// - /splash is always allowed (no redirect)
 /// - Unauthenticated → /auth
-/// - Authenticated on /auth → /domain-select
+/// - Authenticated on /auth → / (camera home)
 
 final class AppRouterProvider
     extends $FunctionalProvider<GoRouter, GoRouter, GoRouter>
@@ -51,6 +53,7 @@ final class AppRouterProvider
   /// Routes:
   /// - /splash : Animated splash (initial)
   /// - /auth : Auto anonymous login
+  /// - / : Camera home (SNOW-style main screen)
   /// - /domain-select : Domain/preset selection
   /// - /palette : Concept chips, instance selection
   /// - /upload : Image picker, R2 upload
@@ -60,7 +63,7 @@ final class AppRouterProvider
   /// Auth Guard:
   /// - /splash is always allowed (no redirect)
   /// - Unauthenticated → /auth
-  /// - Authenticated on /auth → /domain-select
+  /// - Authenticated on /auth → / (camera home)
   AppRouterProvider._()
     : super(
         from: null,
@@ -94,4 +97,4 @@ final class AppRouterProvider
   }
 }
 
-String _$appRouterHash() => r'acdf5fba43273431c1789ff3c14b3a5a52c01513';
+String _$appRouterHash() => r'cc82759d39883d489e48be851cb34892f60148a3';

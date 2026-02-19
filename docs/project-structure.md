@@ -280,6 +280,13 @@ frontend/lib/
 │
 ├── features/                              # ── Feature-First 구조 ──
 │   │
+│   ├── camera/                            #   SNOW-style 카메라 홈 (메인 진입점)
+│   │   ├── camera_home_screen.dart        #     카메라 홈 (☰사이드바 + 컨셉칩 + 셔터)
+│   │   ├── camera_screen.dart             #     독립 카메라 (workspace push용)
+│   │   └── widgets/
+│   │       ├── domain_drawer.dart         #     도메인 사이드바 (프리셋 선택)
+│   │       └── concept_chips_bar.dart     #     수평 스크롤 컨셉 칩 바
+│   │
 │   ├── splash/                            #   스플래시 화면 (애니메이션)
 │   │   └── splash_screen.dart
 │   │
@@ -298,7 +305,8 @@ frontend/lib/
 │   │
 │   ├── domain_select/                     #   도메인 선택 (interior/seller)
 │   │   ├── domain_select_screen.dart
-│   │   └── presets_provider.dart
+│   │   ├── presets_provider.dart
+│   │   └── selected_preset_provider.dart  #     선택된 도메인 ID (카메라 홈용)
 │   │
 │   ├── palette/                           #   팔레트 (concept 칩 선택)
 │   │   ├── palette_screen.dart
@@ -377,14 +385,23 @@ frontend/lib/
 
 **화면 흐름 (GoRouter 8 라우트):**
 ```
-/splash ──▶ /auth ──▶ /domain-select ──▶ /workspace/:presetId
-                                               │
-                                    ┌──────────┼──────────┐
-                                    ▼          ▼          ▼
-                              /upload    /rules    /jobs/:id
+/splash ──▶ /auth ──▶ / (카메라 홈)
+                          │
+                    ┌─────┼────────────────────────────┐
+                    │     │                            │
+              ☰ 사이드바  사진 촬영/갤러리              │
+              (도메인 선택 + 컨셉 칩)                   │
+                    │                                  │
+                    ▼                                  │
+              도메인 선택됨? ──Yes──▶ /upload?presetId= │
+                    │                                  │
+                    No                                 │
+                    ▼                                  │
+              /domain-select ──▶ /palette ──▶ /upload   │
                                                        │
-                                                       ▼
-                                                  결과 표시
+                                    ┌──────────────────┘
+                                    ▼
+                              /rules    /jobs/:id    /settings
 ```
 
 ---

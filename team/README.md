@@ -1,188 +1,233 @@
-# S3 팀 작업 가이드 (v3.1 — 2026-02-18)
+# S3 팀 작업 가이드 (v3.2 — 2026-02-19)
 
 > 리드 + AI 팀원 4명 병렬 개발. Cloudflare-native 아키텍처.
 > **Supabase 제거됨** → D1 + DO로 대체.
 
 ---
 
-## 현재 상태 요약
+## 현재 상태 요약 (2026-02-19)
 
 ```
-Workers: 9/14 엔드포인트 작동 (auth, presets, rules, me + health)
-         6/14 빈 stub (jobs 전체)
-         DO 2개 완전 구현 (호출하는 라우트가 없을 뿐)
-         버그 수정 배포 완료: DO init() 누락, async/await 정리
+Workers: 14/14 엔드포인트 구현 + 배포 완료 ✅
+         DO 2개 완전 구현 + 라우트 연결 완료
+         Jobs 7개 엔드포인트 구현 완료
+         URL: https://s3-workers.clickaround8.workers.dev
 
-Frontend: UI 전부 구현 + Workers API 연결 완료
+Frontend: UI 전부 구현 + Workers API 연결 완료 ✅
           S3ApiClient 사용 (JWT + envelope unwrap)
           8개 라우트 + auth guard 작동
+          SNOW-style 카메라 홈 통합 (도메인 사이드바 + 컨셉 칩)
+          flutter analyze: 0 errors
 
-GPU:     코드 23파일 완성
-         Runpod 미배포
+GPU:     코드 23파일 완성 ✅
+         테스트 133개 (mock)
+         Docker build ready
+         Runpod 미배포 ❌
+
+레거시:  cf-backend/, ai-backend/ 삭제 완료 ✅
 ```
 
 ---
 
-## 역할 분배 (v3)
+## 역할 분배 (v3.2 — 최신)
 
 | 역할 | 담당 범위 | 핵심 파일 | 현재 상태 |
 |------|----------|----------|----------|
-| **리드** | 통합, 코드리뷰, Auto-Claude | `README.md`, `CLAUDE.md` | P0 연결 완료 |
-| **팀원 A** | Workers Auth+Presets+Rules | `workers/src/auth/`, `rules/`, `presets/` | **완료** |
-| **팀원 B** | Workers Jobs+DO+Queue+R2 | `workers/src/jobs/`, `do/`, `_shared/r2.ts` | **Jobs 6개 stub** |
+| **리드** | 통합, 코드리뷰, Auto-Claude, E2E | `README.md`, `CLAUDE.md`, `TODO.md` | **P0 완료, E2E 준비** |
+| **팀원 A** | Workers Auth+Presets+Rules | `workers/src/auth/`, `rules/`, `presets/` | **✅ 완료** |
+| **팀원 B** | Workers Jobs+DO+Queue+R2 | `workers/src/jobs/`, `do/`, `_shared/r2.ts` | **✅ 완료 (14/14)** |
 | **팀원 C** | GPU Worker (SAM3+Docker) | `gpu-worker/` | **코드 완성, 배포 필요** |
-| **팀원 D** | Flutter (UI+API+Auth) | `frontend/lib/` | **API 연결 완료** |
+| **팀원 D** | Flutter (UI+API+Auth+Camera) | `frontend/lib/` | **API 연결 완료, 카메라 홈 통합 (사이드바+칩)** |
 
 ---
 
-## P0 완료 (2026-02-18) — Frontend ↔ Workers 연결
+## 팀원별 즉시 해야 할 일 (2026-02-19)
 
-### 작동하는 것
-
-```
-Flutter App → POST /auth/anon → JWT 획득 → SecureStorage 저장    ✅
-Flutter App → GET /me → { user_id, plan, credits, rule_slots }   ✅
-Flutter App → GET /presets → 도메인 프리셋 목록                    ✅
-Flutter App → GET /rules → 내 룰 목록                             ✅
-Flutter App → POST/PUT/DELETE /rules → 룰 CRUD                   ✅
-GoRouter auth guard → 미인증 /auth, 인증 /domain-select           ✅
-```
-
-### 수정된 파일
-
-| 계층 | 파일 | 변경 |
-|------|------|------|
-| Frontend | `api_endpoints.dart` | baseUrl → production Workers URL |
-| Frontend | `api_client_provider.dart` | MockApiClient → S3ApiClient |
-| Frontend | `auth_provider.dart` | login() → POST /auth/anon + JWT 저장 |
-| Frontend | `user_model.dart` | User/LoginResponse → Workers 응답 형식 |
-| Frontend | `user_provider.dart` | getMeQuery → apiClientProvider.getMe() |
-| Frontend | `app_router.dart` | 4→8 라우트 + auth guard |
-| Frontend | `splash_screen.dart` | authStateProvider → authProvider |
-| Workers | `index.ts` | `/user` → `/me` 마운트 |
-| Workers | `user.route.ts` | 응답 snake_case + DO init 추가 |
-| Workers | `auth.route.ts` | 중복 GET /me 제거 |
-
-### 버그 수정 (2026-02-18, 배포 완료)
-
-| 파일 | 수정 내용 |
-|------|----------|
-| `do/JobCoordinatorDO.ts` | `transitionState()` async → sync (sql.exec은 동기). `confirmUpload()`, `markQueued()` 도 sync로 전환 |
-| `rules/rules.route.ts` | POST /rules, DELETE /rules/:id에서 DO `init()` 누락 → D1 plan 조회 + `init()` 추가 (미호출 시 500 에러) |
-| `auth/auth.route.ts` | 중복 GET /me 핸들러 제거 (이전 수정) |
-
----
-
-## 팀원별 즉시 해야 할 일
-
-### 팀원 B: Workers Jobs 구현 (최우선 — P1)
-
-**DO가 이미 완전 구현되어 있으므로 라우트 핸들러만 작성.**
-
-파일: `workers/src/jobs/jobs.route.ts`
+### 리드: E2E 통합 + R2 Token + 배포 검증
 
 ```
-1. POST /jobs
-   → CreateJobSchema 검증
-   → UserLimiterDO.init(userId, plan) + reserve(jobId, itemCount)
-   → JobCoordinatorDO.create(jobId, userId, preset, totalItems)
-   → r2.ts의 generatePresignedUrl() 호출 (PUT URL 생성)
-   → 응답: { job_id, upload_urls: [...] }
+1. R2 API Token 생성 (Dashboard → R2 → Manage R2 API Tokens)
+   → Workers .dev.vars에 R2_ACCESS_KEY_ID + R2_SECRET_ACCESS_KEY 추가
+   → 재배포: cd workers && npx wrangler deploy
 
-2. POST /jobs/:id/confirm-upload
-   → JobCoordinatorDO.confirmUpload()
+2. E2E curl 테스트 (모든 14 엔드포인트)
+   → workers/VERIFICATION.md 참조
+   → POST /auth/anon → JWT → 나머지 엔드포인트 순회
 
-3. POST /jobs/:id/execute
-   → ExecuteJobSchema 검증
-   → JobCoordinatorDO.markQueued(conceptsJson, protectJson, ruleId)
-   → GPU_QUEUE.send(GpuQueueMessage)
+3. GPU Worker Runpod 배포 지원 (팀원 C 협업)
 
-4. GET /jobs/:id
-   → JobCoordinatorDO.getStatus()
-   → 완료된 item에 presigned download URL 추가
-
-5. POST /jobs/:id/callback
-   → GPU_CALLBACK_SECRET 검증
-   → CallbackSchema 검증
-   → JobCoordinatorDO.onItemResult(payload)
-
-6. POST /jobs/:id/cancel
-   → JobCoordinatorDO.cancel()
+4. TODO.md Phase D (E2E 통합 테스트) 실행
 ```
 
-**주의**: UserLimiterDO는 `init(userId, plan)` 호출 후에만 `getUserState()` 가능. INSERT OR IGNORE라서 반복 호출 안전.
+**확인할 파일/경로:**
+- `workers/VERIFICATION.md` — curl 테스트 가이드
+- `workers/wrangler.toml` — CF 바인딩 현황
+- `docs/cloudflare-resources.md` — D1/R2/DO 리소스 ID
+- `TODO.md` — Phase A~E 진행 상태
 
-**참조 파일:**
-- `workers/src/do/JobCoordinatorDO.ts` — RPC 메서드 시그니처
-- `workers/src/do/UserLimiterDO.ts` — init/reserve/release 메서드
-- `workers/src/_shared/types.ts` — Env, GpuQueueMessage, CallbackPayload 타입
-- `workers/src/_shared/r2.ts` — generatePresignedUrl() 함수
-- `workers/src/jobs/jobs.validator.ts` — Zod 스키마 (이미 정의됨)
-
-### 팀원 C: GPU Worker 배포 (P2)
+### 팀원 A: ✅ 완료 — 유지보수 대기
 
 ```
-1. gpu-worker/ 에서 Docker build
+Workers Auth+Presets+Rules 전부 구현 + 배포 완료.
+새 작업 없음. 버그 리포트 시 대응.
+```
+
+### 팀원 B: ✅ 완료 — 유지보수 대기
+
+```
+Workers Jobs 7개 + DO 2개 + Queue consumer 구현 + 배포 완료.
+새 작업 없음. E2E 테스트에서 버그 발견 시 대응.
+```
+
+### 팀원 C: GPU Worker Runpod 배포 (P1 — 최우선)
+
+```
+1. Docker build 확인
+   cd gpu-worker && docker build -t s3-gpu .
+
 2. Docker image → registry (GHCR or Docker Hub)
-3. Runpod Serverless endpoint 생성
-4. endpoint URL을 Workers 환경변수로 설정
+   docker tag s3-gpu ghcr.io/<org>/s3-gpu:latest
+   docker push ghcr.io/<org>/s3-gpu:latest
+
+3. Runpod MCP로 Serverless endpoint 생성
+   → Template 생성 (GPU: RTX 4090+, Docker image URL)
+   → Endpoint 생성 (min workers: 0, max: 3)
+
+4. 환경변수 설정 (Runpod endpoint에):
+   STORAGE_S3_ENDPOINT=<R2 endpoint>
+   STORAGE_ACCESS_KEY=<R2 API Token>
+   STORAGE_SECRET_KEY=<R2 API Token Secret>
+   STORAGE_BUCKET=s3-images
+   GPU_CALLBACK_SECRET=<Workers와 동일한 값>
+   HF_TOKEN=<HuggingFace access token>
+
+5. SAM3 모델 다운로드 테스트 (3.4GB)
+
+6. E2E: Workers POST /jobs/execute → Queue → GPU Worker 수신 확인
 ```
 
-### 팀원 D: Frontend — Jobs UI 연동 (P1 완료 후)
+**확인할 파일/경로:**
+- `gpu-worker/Dockerfile` — Docker 빌드 설정
+- `gpu-worker/.env.example` — 필요한 환경변수 목록
+- `gpu-worker/main.py` — entry point (ADAPTER 환경변수로 어댑터 선택)
+- `gpu-worker/adapters/runpod_serverless.py` — Runpod handler
+- `gpu-worker/engine/pipeline.py` — 추론 파이프라인
+- `gpu-worker/requirements.txt` — Python 의존성
+- `docs/cloudflare-resources.md` — R2 bucket/endpoint 정보
+- `workers/.dev.vars.example` — GPU_CALLBACK_SECRET 값 확인
+
+### 팀원 D: Frontend UI 고도화 (P2)
 
 ```
-P0 연결 완료 → Jobs 엔드포인트가 구현되면:
-1. POST /jobs → presigned URL 받기
-2. R2 직접 PUT 업로드
-3. POST /confirm-upload
-4. POST /execute
-5. GET /jobs/:id polling (3초)
-6. 결과 이미지 표시
+P0 연결 완료 + 카메라 홈 통합 완료 (도메인 사이드바 + 컨셉 칩). 남은 작업:
+
+1. 카메라 홈 실기기 테스트 (Android/iOS/Web)
+   → ☰ 사이드바 열기 → 도메인 선택 → 컨셉 칩 표시
+   → 컨셉 칩 탭 → accent1 하이라이트 토글
+   → 도메인 변경 → 컨셉 초기화 확인
+   → 사진 촬영 → proceed → /upload?presetId=... 이동
+
+2. Jobs UI 연동 (Workers Jobs 엔드포인트 활용)
+   → POST /jobs → presigned URL 받기
+   → R2 직접 PUT 업로드 (Dio)
+   → POST /confirm-upload
+   → POST /execute
+   → GET /jobs/:id polling (3초)
+   → 결과 이미지 표시
+
+3. workspace_screen.dart → 실제 Job 실행 플로우 연결
+   → action_bar.dart "Apply" 버튼 → Jobs API 호출
+   → progress_overlay.dart → polling 진행률 표시
+   → results_overlay.dart → 결과 이미지 표시
+
+4. 오프라인/에러 처리
+   → 카메라 권한 거부 시 UI 처리
+   → 네트워크 에러 시 재시도 UX
 ```
+
+**확인할 파일/경로:**
+- `frontend/lib/features/camera/camera_home_screen.dart` — 카메라 홈 (메인 진입점)
+- `frontend/lib/features/camera/widgets/domain_drawer.dart` — 도메인 사이드바
+- `frontend/lib/features/camera/widgets/concept_chips_bar.dart` — 컨셉 칩 바
+- `frontend/lib/features/domain_select/selected_preset_provider.dart` — 도메인 선택 상태
+- `frontend/lib/features/workspace/workspace_provider.dart` — addPhotosFromFiles()
+- `frontend/lib/features/workspace/workspace_screen.dart` — 메인 작업 영역
+- `frontend/lib/features/workspace/widgets/action_bar.dart` — Apply 버튼
+- `frontend/lib/features/workspace/widgets/progress_overlay.dart` — 진행률
+- `frontend/lib/features/workspace/widgets/results_overlay.dart` — 결과
+- `frontend/lib/core/api/api_client.dart` — API 인터페이스 (14 methods)
+- `frontend/lib/core/api/s3_api_client.dart` — 실제 Dio 구현
+- `frontend/lib/features/workspace/workspace_state.dart` — Phase machine
 
 ---
 
-## Workers 라우트 구조
+## 완료 체크리스트 (전체)
+
+### Workers (A+B) ✅
+- [x] POST /auth/anon → JWT 발급 + D1 user 생성
+- [x] Auth middleware → JWT 검증
+- [x] GET /presets, GET /presets/:id
+- [x] POST/GET/PUT/DELETE /rules
+- [x] GET /me → UserLimiterDO 상태
+- [x] POST /jobs → presigned URLs
+- [x] POST /jobs/:id/confirm-upload
+- [x] POST /jobs/:id/execute → Queue push
+- [x] GET /jobs/:id → 상태/진행률
+- [x] POST /jobs/:id/callback → GPU 콜백
+- [x] POST /jobs/:id/cancel
+- [x] GET /jobs → 목록
+- [x] TypeScript: 0 errors
+- [x] 배포 완료
+
+### GPU Worker (C) — 코드 완성, 배포 대기
+- [x] R2 download/upload (boto3)
+- [x] Callback POST + 재시도
+- [x] SAM3 모델 wrapper
+- [x] Rule apply (recolor/tone/texture/remove)
+- [x] Pipeline orchestrator
+- [x] Runpod adapter
+- [x] Postprocess (PNG + thumbnail)
+- [x] pytest 133개 (mocked)
+- [x] Dockerfile 작성
+- [ ] **Docker build 성공 확인**
+- [ ] **Runpod 배포**
+- [ ] **E2E: Workers → Queue → GPU → R2 → Callback**
+
+### Frontend (D) — UI + API 연결 + 카메라 홈 통합 완료
+- [x] Auth: 자동 anon 로그인
+- [x] Domain: 도메인 선택 화면
+- [x] Palette: concept 선택 + protect 토글
+- [x] Workspace: 반응형 (데스크톱+모바일)
+- [x] Upload: 이미지 선택 + 그리드 표시
+- [x] Rules: 룰 편집 + 목록
+- [x] API 연결: S3ApiClient + JWT + envelope
+- [x] Router: 8 라우트 + auth guard
+- [x] Camera: SNOW-style 카메라 화면
+- [x] 카메라 홈 통합: 도메인 사이드바 + 컨셉 칩 바
+- [x] flutter analyze: 0 errors
+- [ ] **Jobs UI 연동 (실제 API 호출)**
+- [ ] **R2 presigned URL 업로드**
+- [ ] **Polling 진행률 표시**
+- [ ] **결과 이미지 표시**
+- [ ] **카메라 홈 실기기 테스트 (사이드바+칩 포함)**
+
+### E2E 통합 — 미시작
+- [ ] **R2 API Token 생성**
+- [ ] **Auth → Presets → Rules → Jobs 전체 흐름**
+- [ ] **Workers → Queue → GPU → R2 → Callback**
+- [ ] **Flutter → Workers → GPU → 결과 표시**
+
+---
+
+## Workers 라우트 구조 (14/14 완료)
 
 ```typescript
 // workers/src/index.ts
-app.route('/auth', authRoutes);     // POST /auth/anon
-app.route('/presets', presetsRoutes); // GET /presets, /presets/:id
-app.route('/rules', rulesRoutes);    // POST/GET/PUT/DELETE /rules
-app.route('/jobs', jobsRoutes);      // 6개 stub
-app.route('/me', userRoutes);        // GET /me (UserLimiterDO)
-```
-
-### DO 호출 패턴
-
-```typescript
-// UserLimiterDO — 반드시 init() 먼저 (D1에서 plan 조회 필수)
-const userRow = await c.env.DB
-  .prepare('SELECT plan FROM users WHERE id = ?')
-  .bind(user.userId)
-  .first<{ plan: 'free' | 'pro' }>();
-const plan = userRow?.plan ?? 'free';
-
-const limiterNs = c.env.USER_LIMITER as unknown as DurableObjectNamespace<UserLimiterDO>;
-const limiterStub = limiterNs.get(limiterNs.idFromName(user.userId));
-await limiterStub.init(user.userId, plan);  // INSERT OR IGNORE (반복 호출 안전)
-const state = await limiterStub.getUserState();
-
-// JobCoordinatorDO — confirmUpload(), markQueued()는 sync (await 불필요)
-const coordNs = c.env.JOB_COORDINATOR as unknown as DurableObjectNamespace<JobCoordinatorDO>;
-const coordStub = coordNs.get(coordNs.idFromName(jobId));
-await coordStub.create(jobId, userId, preset, totalItems);
-const result = coordStub.confirmUpload();  // sync — no await needed
-```
-
-> **주의**: DO 메서드 호출 전에 반드시 `init()` 먼저. `user.route.ts`, `rules.route.ts` 모두 이 패턴 적용됨.
-
-### Response Envelope
-
-```typescript
-import { ok, error } from '../_shared/response';
-return c.json(ok({ job_id: '...', upload_urls: [...] }));
-return c.json(error('CREDIT_INSUFFICIENT', 'Not enough credits'), 402);
+app.route('/auth', authRoutes);      // POST /auth/anon              ✅
+app.route('/presets', presetsRoutes); // GET /presets, /presets/:id   ✅
+app.route('/rules', rulesRoutes);     // POST/GET/PUT/DELETE /rules   ✅
+app.route('/jobs', jobsRoutes);       // 7개 엔드포인트              ✅
+app.route('/me', userRoutes);         // GET /me                     ✅
 ```
 
 ---
@@ -203,12 +248,14 @@ Widget → ref.watch(provider) → apiClientProvider → S3ApiClient (Dio)
 ### 상태 관리 (Riverpod)
 
 ```
-authProvider       → AsyncValue<String?>  (JWT token)
-userProvider       → AsyncValue<User>     (credits, plan, rule_slots)
-presetsProvider    → AsyncValue<List<Preset>>
-rulesProvider      → AsyncValue<List<Rule>>
-paletteProvider    → PaletteState (selectedConcepts, protectConcepts)
-workspaceProvider  → WorkspaceState (phase, images, job, results)
+authProvider            → AsyncValue<String?>  (JWT token)
+userProvider            → AsyncValue<User>     (credits, plan, rule_slots)
+presetsProvider         → AsyncValue<List<Preset>>
+selectedPresetProvider  → String? (선택된 도메인 ID — 카메라 홈 사이드바)
+presetDetailProvider    → AsyncValue<Preset> (도메인 상세 — concepts 포함)
+rulesProvider           → AsyncValue<List<Rule>>
+paletteProvider         → PaletteState (selectedConcepts, protectConcepts)
+workspaceProvider       → WorkspaceState (phase, images, job, results)
 ```
 
 ### Router (GoRouter + Auth Guard)
@@ -216,11 +263,13 @@ workspaceProvider  → WorkspaceState (phase, images, job, results)
 ```
 /splash         → SplashScreen (initial, no guard)
 /auth           → AuthScreen (auto anon login)
-/domain-select  → DomainSelectScreen
+/               → CameraHomeScreen (☰사이드바 + 컨셉칩 + 카메라)
+/domain-select  → DomainSelectScreen (fallback — 사이드바 미사용 시)
 /palette        → PaletteScreen (?presetId=)
 /upload         → UploadScreen (?presetId=&concepts=&protect=)
 /rules          → RulesScreen (?jobId=)
 /jobs/:id       → JobProgressScreen
+/settings       → SettingsScreen
 ```
 
 ---
@@ -230,12 +279,17 @@ workspaceProvider  → WorkspaceState (phase, images, job, results)
 | 문서 | 용도 | 읽어야 하는 팀원 |
 |------|------|----------------|
 | `workflow.md` | SSoT — API 스키마, D1 스키마, 전체 설계 | **전원** |
-| `README.md` | 현재 연결 상태, 뭐가 되고 안 되는지 | **전원** |
+| `README.md` (team/) | 현재 연결 상태, 뭐가 되고 안 되는지 | **전원** |
 | `CLAUDE.md` | 코딩 규칙, MCP 도구, 아키텍처 | **전원** |
-| `workers/src/_shared/types.ts` | Env 바인딩, PLAN_LIMITS, 타입 정의 | B |
-| `workers/src/do/*.ts` | DO RPC 메서드 시그니처 | B |
+| `TODO.md` | Phase A~E 실행 계획 + 진행 상태 | **리드** |
+| `docs/cloudflare-resources.md` | CF 리소스 (D1 ID, R2 bucket 등) | **리드, C** |
+| `docs/project-structure.md` | 폴더 구조 전체 맵 | **전원** |
+| `workers/src/_shared/types.ts` | Env 바인딩, 타입 정의 | B (완료) |
+| `workers/src/do/*.ts` | DO RPC 메서드 시그니처 | B (완료) |
 | `frontend/lib/core/api/api_client.dart` | API 인터페이스 | D |
 | `frontend/lib/core/api/s3_api_client.dart` | 실제 API 구현 | D |
+| `gpu-worker/engine/pipeline.py` | 추론 파이프라인 | C |
+| `gpu-worker/.env.example` | GPU Worker 환경변수 | C |
 
 ---
 
