@@ -7,12 +7,12 @@ import 'status_badge.dart';
 /// A single row in the History list representing one past job.
 ///
 /// Displays:
-/// - Placeholder icon (thumbnail not available in current Job model)
+/// - Placeholder icon (thumbnail not available in current JobListItem model)
 /// - Job ID (truncated) + StatusBadge
-/// - Progress info
+/// - Progress info (done/total)
 /// - Chevron right indicator
 class JobHistoryItem extends StatelessWidget {
-  final Job job;
+  final JobListItem job;
   final VoidCallback onTap;
 
   const JobHistoryItem({super.key, required this.job, required this.onTap});
@@ -42,7 +42,7 @@ class JobHistoryItem extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          'Job ${job.id.length > 8 ? job.id.substring(0, 8) : job.id}',
+                          'Job ${job.jobId.length > 8 ? job.jobId.substring(0, 8) : job.jobId}',
                           style: const TextStyle(
                             color: WsColors.textPrimary,
                             fontWeight: FontWeight.w600,
@@ -64,7 +64,7 @@ class JobHistoryItem extends StatelessWidget {
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        job.progress != null ? '${job.progress}%' : 'N/A',
+                        '${job.progress.done}/${job.progress.total}',
                         style: const TextStyle(
                           color: WsColors.textMuted,
                           fontSize: 12,

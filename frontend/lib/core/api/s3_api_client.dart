@@ -106,7 +106,8 @@ class S3ApiClient implements ApiClient {
   @override
   Future<List<Rule>> getRules() async {
     final response = await _dio.get(ApiEndpoints.rules);
-    final list = response.data as List<dynamic>;
+    final data = response.data as Map<String, dynamic>;
+    final list = data['rules'] as List<dynamic>;
     return list.map((e) => Rule.fromJson(e as Map<String, dynamic>)).toList();
   }
 
@@ -123,7 +124,8 @@ class S3ApiClient implements ApiClient {
       'concepts': concepts.map((k, v) => MapEntry(k, {'action': v.action, 'value': v.value})),
       if (protect != null) 'protect': protect,
     });
-    return Rule.fromJson(response.data as Map<String, dynamic>);
+    final data = response.data as Map<String, dynamic>;
+    return Rule.fromJson(data['rule'] as Map<String, dynamic>);
   }
 
   @override
@@ -138,7 +140,8 @@ class S3ApiClient implements ApiClient {
       'concepts': concepts.map((k, v) => MapEntry(k, {'action': v.action, 'value': v.value})),
       if (protect != null) 'protect': protect,
     });
-    return Rule.fromJson(response.data as Map<String, dynamic>);
+    final data = response.data as Map<String, dynamic>;
+    return Rule.fromJson(data['rule'] as Map<String, dynamic>);
   }
 
   @override
@@ -149,9 +152,9 @@ class S3ApiClient implements ApiClient {
   // ── Jobs ─────────────────────────────────────────────────────────────────
 
   @override
-  Future<Job> createJob(Map<String, dynamic> jobData) async {
+  Future<CreateJobResponse> createJob(Map<String, dynamic> jobData) async {
     final response = await _dio.post(ApiEndpoints.jobs, data: jobData);
-    return Job.fromJson(response.data as Map<String, dynamic>);
+    return CreateJobResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   @override
@@ -160,21 +163,31 @@ class S3ApiClient implements ApiClient {
   }
 
   @override
-  Future<void> executeJob(String jobId) async {
-    await _dio.post(ApiEndpoints.execute(jobId));
+  Future<void> executeJob(
+    String jobId, {
+    required Map<String, dynamic> concepts,
+    List<String> protect = const [],
+    String? ruleId,
+  }) async {
+    await _dio.post(ApiEndpoints.execute(jobId), data: {
+      'concepts': concepts,
+      'protect': protect,
+      if (ruleId != null) 'rule_id': ruleId,
+    });
   }
 
   @override
   Future<Job> getJob(String jobId) async {
     final response = await _dio.get(ApiEndpoints.jobById(jobId));
-    return Job.fromJson(response.data as Map<String, dynamic>);
+    final data = response.data as Map<String, dynamic>;
+    return Job.fromJson(data['job'] as Map<String, dynamic>);
   }
 
   @override
-  Future<List<Job>> listJobs() async {
+  Future<List<JobListItem>> listJobs() async {
     final response = await _dio.get(ApiEndpoints.jobs);
     final list = response.data as List<dynamic>;
-    return list.map((e) => Job.fromJson(e as Map<String, dynamic>)).toList();
+    return list.map((e) => JobListItem.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   @override

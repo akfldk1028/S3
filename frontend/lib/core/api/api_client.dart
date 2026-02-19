@@ -49,19 +49,24 @@ abstract class ApiClient {
   Future<void> deleteRule(String id);
 
   /// 10. POST /jobs - Create job + presigned URLs
-  Future<Job> createJob(Map<String, dynamic> jobData);
+  Future<CreateJobResponse> createJob(Map<String, dynamic> jobData);
 
   /// 11. POST /jobs/:id/confirm-upload - Confirm upload complete
   Future<void> confirmUpload(String jobId);
 
   /// 12. POST /jobs/:id/execute - Execute rule application (Queue push)
-  Future<void> executeJob(String jobId);
+  Future<void> executeJob(
+    String jobId, {
+    required Map<String, dynamic> concepts,
+    List<String> protect,
+    String? ruleId,
+  });
 
   /// 13. GET /jobs/:id - Get job status/progress
   Future<Job> getJob(String jobId);
 
   /// 13.5. GET /jobs - List all user jobs ordered by created_at DESC
-  Future<List<Job>> listJobs();
+  Future<List<JobListItem>> listJobs();
 
   /// 14. POST /jobs/:id/cancel - Cancel job + refund credits
   Future<void> cancelJob(String jobId);

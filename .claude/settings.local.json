@@ -124,7 +124,25 @@
       "Bash(ls -la \"C:\\\\DK\\\\S3\\\\.auto-claude\\\\specs\"\" 2>&1 || echo \"Directory not found \")",
       "Bash(git worktree remove:*)",
       "Bash(git merge:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(PYTHON=\"/c/DK/S3/clone/Auto-Claude/apps/backend/.venv/Scripts/python.exe\":*)",
+      "Bash($PYTHON -c:*)",
+      "Bash(npx tsc:*)",
+      "Bash(# Check Flutter agent progress - look for recent file edits cd /c/DK/S3/frontend && git diff --stat HEAD)",
+      "mcp__cloudflare-observability__accounts_list",
+      "mcp__cloudflare-observability__set_active_account",
+      "mcp__cloudflare-observability__workers_list",
+      "mcp__cloudflare-observability__workers_get_worker",
+      "Bash(curl:*)",
+      "Bash(npx wrangler deploy)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YzM0OTQ4Yy1iMWY5LTRiMjMtOWE1MC0wOWRlMzgyMDllNzMiLCJpYXQiOjE3NzE0MTM2OTAsImV4cCI6MTc3NDAwNTY5MH0.EakOQ4RjQSdleZx4wLfRsudLevY0GsHfc2VqluFmrgA\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5M2E3OTJiOS1lMmNkLTRmMzktOTQ3YS02M2VmNGVhMzNjOGEiLCJpYXQiOjE3NzE0MTc1ODMsImV4cCI6MTc3NDAwOTU4M30.GoLTZR-s6a4JNj4nL2YND5XSbrXU7L6L3g12sigJPwc\")",
+      "Bash(wc:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZWY5MmQ0OC1mMDE3LTQyYmMtYWFjNS0xZDkwZGIwMTZlNGYiLCJpYXQiOjE3NzE0NzM2ODgsImV4cCI6MTc3NDA2NTY4OH0.I2Q9Us2mqoySwz7bNMbfC8oXmjE6wD36_navBAQ1YMk\")",
+      "Bash(export TOKEN:*)",
+      "Bash(export JOB_ID=\"947717b2-df46-4966-ba7a-4266221b642f\")",
+      "Bash(echo:*)"
     ]
   }
 }

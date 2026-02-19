@@ -8,7 +8,7 @@ part 'history_provider.g.dart';
 @riverpod
 class History extends _$History {
   @override
-  FutureOr<List<Job>> build() async {
+  FutureOr<List<JobListItem>> build() async {
     final apiClient = ref.watch(apiClientProvider);
     return await apiClient.listJobs();
   }

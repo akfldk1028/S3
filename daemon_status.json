@@ -1,47 +1,23 @@
 {
   "project_dir": "C:\\DK\\S3",
   "running": true,
-  "started_at": "2026-02-14T05:32:18.695685+00:00",
+  "started_at": "2026-02-18T05:31:38.438354+00:00",
   "config": {
     "max_concurrent_tasks": 1,
     "headless_mode": true
   },
   "running_tasks": {
-    "006-gpu-worker-sam3-segmenter": {
-      "spec_id": "006-gpu-worker-sam3-segmenter",
-      "spec_dir": "C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\006-gpu-worker-sam3-segmenter\\.auto-claude\\specs\\006-gpu-worker-sam3-segmenter",
-      "status": "in_progress",
-      "is_running": true,
-      "started_at": "2026-02-14T08:28:11.509746+00:00",
-      "last_update": "2026-02-14T08:28:11.520266+00:00",
-      "task_type": "impl",
-      "current_subtask": "subtask-1-1",
-      "phase": "coding",
-      "session": 1
-    },
-    "007-frontend-flutter-freezed-models": {
-      "spec_id": "007-frontend-flutter-freezed-models",
-      "spec_dir": "C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\007-frontend-flutter-freezed-models\\.auto-claude\\specs\\007-frontend-flutter-freezed-models",
-      "status": "in_progress",
-      "is_running": true,
-      "started_at": "2026-02-14T08:13:11.343412+00:00",
-      "last_update": "2026-02-14T08:33:07.503446+00:00",
-      "task_type": "impl",
-      "current_subtask": "subtask-2-5",
-      "phase": "coding",
-      "session": 8
-    },
     "013-settings-profile-credits-plan": {
       "spec_id": "013-settings-profile-credits-plan",
       "spec_dir": "C:\\DK\\S3\\.auto-claude\\worktrees\\tasks\\013-settings-profile-credits-plan\\.auto-claude\\specs\\013-settings-profile-credits-plan",
       "status": "in_progress",
       "is_running": true,
       "started_at": "2026-02-18T05:31:38.438354+00:00",
-      "last_update": "2026-02-18T07:58:24.118288+00:00",
+      "last_update": "2026-02-19T05:58:31.452991+00:00",
       "task_type": "impl",
       "current_subtask": "subtask-3-3",
       "phase": "coding",
-      "session": 1151
+      "session": 9158
     },
     "028-flutter-camera-plus-album": {
       "spec_id": "028-flutter-camera-plus-album",
@@ -49,18 +25,18 @@
       "status": "in_progress",
       "is_running": true,
       "started_at": "2026-02-18T05:31:32.560836+00:00",
-      "last_update": "2026-02-18T07:58:24.211252+00:00",
+      "last_update": "2026-02-19T05:58:31.456990+00:00",
       "task_type": "impl",
       "current_subtask": "subtask-1-1",
       "phase": "coding",
-      "session": 1153
+      "session": 9232
     }
   },
   "queued_tasks": [],
   "stats": {
-    "running": 4,
+    "running": 2,
     "queued": 0,
-    "completed": 5
+    "completed": 0
   },
-  "timestamp": "2026-02-18T07:58:24.211252+00:00"
+  "timestamp": "2026-02-19T05:58:31.456990+00:00"
 }

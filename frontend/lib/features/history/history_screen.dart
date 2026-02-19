@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/models/job.dart';
 import '../workspace/theme.dart';
 import 'history_provider.dart';
 import 'widgets/history_empty_state.dart';
@@ -48,7 +49,7 @@ class HistoryScreen extends ConsumerWidget {
   Widget _buildJobList(
     BuildContext context,
     WidgetRef ref,
-    List<dynamic> jobs,
+    List<JobListItem> jobs,
   ) {
     return RefreshIndicator(
       onRefresh: () => ref.read(historyProvider.notifier).refresh(),

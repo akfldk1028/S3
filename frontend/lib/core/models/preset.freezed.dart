@@ -215,7 +215,7 @@ return $default(_that.id,_that.name,_that.conceptCount,_that.concepts,_that.prot
 @JsonSerializable()
 
 class _Preset implements Preset {
-  const _Preset({required this.id, required this.name, @JsonKey(name: 'concept_count') required this.conceptCount, final  List<String>? concepts, @JsonKey(name: 'protect_defaults') final  List<String>? protectDefaults, @JsonKey(name: 'output_templates') final  List<OutputTemplate>? outputTemplates}): _concepts = concepts,_protectDefaults = protectDefaults,_outputTemplates = outputTemplates;
+  const _Preset({required this.id, required this.name, @JsonKey(name: 'concept_count') this.conceptCount = 0, final  List<String>? concepts, @JsonKey(name: 'protect_defaults') final  List<String>? protectDefaults, @JsonKey(name: 'output_templates') final  List<OutputTemplate>? outputTemplates}): _concepts = concepts,_protectDefaults = protectDefaults,_outputTemplates = outputTemplates;
   factory _Preset.fromJson(Map<String, dynamic> json) => _$PresetFromJson(json);
 
 @override final  String id;

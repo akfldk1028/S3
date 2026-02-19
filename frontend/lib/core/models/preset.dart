@@ -8,7 +8,7 @@ abstract class Preset with _$Preset {
   const factory Preset({
     required String id,
     required String name,
-    @JsonKey(name: 'concept_count') required int conceptCount,
+    @JsonKey(name: 'concept_count') @Default(0) int conceptCount,
     // Detail view fields (optional for list view)
     List<String>? concepts,
     @JsonKey(name: 'protect_defaults') List<String>? protectDefaults,

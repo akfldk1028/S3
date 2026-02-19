@@ -9,7 +9,7 @@ part of 'preset.dart';
 _Preset _$PresetFromJson(Map<String, dynamic> json) => _Preset(
   id: json['id'] as String,
   name: json['name'] as String,
-  conceptCount: (json['concept_count'] as num).toInt(),
+  conceptCount: (json['concept_count'] as num?)?.toInt() ?? 0,
   concepts: (json['concepts'] as List<dynamic>?)
       ?.map((e) => e as String)
       .toList(),

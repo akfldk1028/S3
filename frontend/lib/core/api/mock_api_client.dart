@@ -12,20 +12,28 @@ class MockApiClient implements ApiClient {
   /// In-memory job store, keyed by jobId.
   final Map<String, Job> _jobs = {
     'job-001': const Job(
-      id: 'job-001',
+      jobId: 'job-001',
       status: 'done',
-      progress: 100,
+      preset: 'interior',
+      totalItems: 3,
+      doneItems: 3,
+      failedItems: 0,
     ),
     'job-002': const Job(
-      id: 'job-002',
+      jobId: 'job-002',
       status: 'running',
-      progress: 50,
+      preset: 'interior',
+      totalItems: 5,
+      doneItems: 2,
+      failedItems: 0,
     ),
     'job-003': const Job(
-      id: 'job-003',
+      jobId: 'job-003',
       status: 'failed',
-      errorMessage: 'GPU timeout',
-      progress: 0,
+      preset: 'seller',
+      totalItems: 1,
+      doneItems: 0,
+      failedItems: 1,
     ),
   };
 
@@ -151,16 +159,32 @@ class MockApiClient implements ApiClient {
   // ── Jobs ─────────────────────────────────────────────────────────────────
 
   @override
-  Future<Job> createJob(Map<String, dynamic> jobData) async {
+  Future<CreateJobResponse> createJob(Map<String, dynamic> jobData) async {
     await _simulateDelay();
     final jobId = 'job-${DateTime.now().millisecondsSinceEpoch}';
-    final newJob = Job(
-      id: jobId,
-      status: 'queued',
-      progress: 0,
+    final itemCount = (jobData['item_count'] as int?) ?? 1;
+    final preset = (jobData['preset'] as String?) ?? 'interior';
+
+    _jobs[jobId] = Job(
+      jobId: jobId,
+      status: 'created',
+      preset: preset,
+      totalItems: itemCount,
+      doneItems: 0,
+      failedItems: 0,
     );
-    _jobs[jobId] = newJob;
-    return newJob;
+
+    return CreateJobResponse(
+      jobId: jobId,
+      presignedUrls: List.generate(
+        itemCount,
+        (i) => PresignedUrl(
+          idx: i,
+          url: 'https://mock-r2.example.com/upload/$jobId/$i.jpg',
+          key: 'inputs/mock-user/$jobId/$i.jpg',
+        ),
+      ),
+    );
   }
 
   @override
@@ -169,7 +193,12 @@ class MockApiClient implements ApiClient {
   }
 
   @override
-  Future<void> executeJob(String jobId) async {
+  Future<void> executeJob(
+    String jobId, {
+    required Map<String, dynamic> concepts,
+    List<String> protect = const [],
+    String? ruleId,
+  }) async {
     await _simulateDelay();
   }
 
@@ -184,9 +213,20 @@ class MockApiClient implements ApiClient {
   }
 
   @override
-  Future<List<Job>> listJobs() async {
+  Future<List<JobListItem>> listJobs() async {
     await _simulateDelay();
-    return _jobs.values.toList();
+    return _jobs.values
+        .map((j) => JobListItem(
+              jobId: j.jobId,
+              status: j.status,
+              preset: j.preset,
+              progress: JobProgress(
+                done: j.doneItems,
+                failed: j.failedItems,
+                total: j.totalItems,
+              ),
+            ))
+        .toList();
   }
 
   @override
@@ -194,7 +234,14 @@ class MockApiClient implements ApiClient {
     await _simulateDelay();
     final job = _jobs[jobId];
     if (job != null) {
-      _jobs[jobId] = job.copyWith(status: 'canceled');
+      _jobs[jobId] = Job(
+        jobId: job.jobId,
+        status: 'canceled',
+        preset: job.preset,
+        totalItems: job.totalItems,
+        doneItems: job.doneItems,
+        failedItems: job.failedItems,
+      );
     }
   }
 
