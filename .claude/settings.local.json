@@ -142,7 +142,8 @@
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJmZWY5MmQ0OC1mMDE3LTQyYmMtYWFjNS0xZDkwZGIwMTZlNGYiLCJpYXQiOjE3NzE0NzM2ODgsImV4cCI6MTc3NDA2NTY4OH0.I2Q9Us2mqoySwz7bNMbfC8oXmjE6wD36_navBAQ1YMk\")",
       "Bash(export TOKEN:*)",
       "Bash(export JOB_ID=\"947717b2-df46-4966-ba7a-4266221b642f\")",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(git -C \"C:/DK/S3\" status --short)"
     ]
   }
 }

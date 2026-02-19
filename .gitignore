@@ -87,6 +87,33 @@ nul
 *.tmp
 *.bak
 
-# Auto Claude data directory
+# ===== Auto-Claude (24/7 자동 빌드 시스템) =====
+# 팀원은 이 섹션 전체를 무시해도 됩니다.
+# Auto-Claude는 로컬 개발자 도구이며, 공유 코드베이스에 포함되지 않습니다.
+
+# Auto-Claude 데이터 + worktrees
 .auto-claude/
-clone
+clone/
+
+# Daemon 상태 파일
+daemon_status.json
+
+# Auto-Claude 헬퍼 스크립트 (루트)
+start-daemon.ps1
+restart-daemon.ps1
+reset-daemon.ps1
+check-daemon.ps1
+check-daemon-pickup.ps1
+debug-daemon.ps1
+run-daemon-debug.ps1
+prevent-sleep.ps1
+start-ui.ps1
+run-design-spec.ps1
+create-specs.ps1
+check-plans.ps1
+check-recent-files.ps1
+regenerate-006-plan.ps1
+test-006-run.ps1
+
+# ===== Claude Code (로컬 설정) =====
+.claude/settings.local.json

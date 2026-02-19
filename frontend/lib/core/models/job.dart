@@ -1,9 +1,9 @@
-/// Job-related models matching Workers API responses.
-///
-/// Workers returns 3 different job shapes:
-/// - POST /jobs       → [CreateJobResponse] (job_id + presigned_urls)
-/// - GET  /jobs/:id   → [Job] (full status, wrapped in `data.job`)
-/// - GET  /jobs       → List<[JobListItem]> (summary with progress)
+// Job-related models matching Workers API responses.
+//
+// Workers returns 3 different job shapes:
+// - POST /jobs       → CreateJobResponse (job_id + presigned_urls)
+// - GET  /jobs/:id   → Job (full status, wrapped in data.job)
+// - GET  /jobs       → List<JobListItem> (summary with progress)
 
 // ─── POST /jobs response ─────────────────────────────────────────────────────
 
