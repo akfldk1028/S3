@@ -105,4 +105,6 @@ daemon_status.json
 # ===== Claude Code (로컬 AI 도구 설정) =====
 # skills/ 는 프로젝트 설정이므로 추적. 로컬 설정만 제외.
 .claude/settings.local.json
+.claude/agents/
 .claudeignore
+team/AGENT-TEAMS.md
