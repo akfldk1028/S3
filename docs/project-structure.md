@@ -413,7 +413,8 @@ docs/
 ├── README.md                              # 문서 인덱스
 ├── #Resource.md                           # 외부 리소스 링크
 ├── cloudflare-resources.md                # CF 리소스 현황 (D1 ID, R2 bucket, DO 등)
-├── wrangler-vs-do.md                      # Workers vs Durable Objects 차이 설명
+├── wrangler-vs-do.md                      # Workers vs Durable Objects 차이 (기술 문서)
+├── DO-쉬운설명.md                          # DO 왜 쓰는지 + 비유 + 공부 가이드 (입문용)
 ├── project-structure.md                   # 이 파일
 ├── contracts/
 │   └── api-contracts.md                   # API 계약 문서
