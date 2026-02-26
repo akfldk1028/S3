@@ -6,19 +6,13 @@ runpod>=1.7.0
 # HTTP client (for callbacks)
 httpx>=0.28.0
 
-# Image processing
-numpy>=2.0.0
+# Image processing (numpy<2 for SAM3 compatibility)
 Pillow>=11.0.0
 
 # Storage (R2 / S3 compatible)
 boto3>=1.35.0
 
-# AI/ML — SAM3 (848M params, 3.4GB)
-torch>=2.7.0
-torchvision>=0.22.0
-transformers>=4.50.0
-
-# Model hub (SAM3 가중치 다운로드)
+# Model hub (SAM3 weight download)
 huggingface_hub>=0.25.0
 
 # Testing
