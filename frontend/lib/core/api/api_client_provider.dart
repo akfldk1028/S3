@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'api_client.dart';
@@ -10,7 +9,7 @@ part 'api_client_provider.g.dart';
 /// true → MockApiClient (오프라인 개발), false → S3ApiClient (실제 API)
 ///
 /// Workers API 배포 완료 후 false로 전환.
-const bool _useMock = kDebugMode;
+const bool _useMock = false;
 
 /// Riverpod provider for ApiClient instance.
 ///

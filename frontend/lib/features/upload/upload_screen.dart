@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -99,13 +100,26 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       });
 
       final jobId = result.jobId;
-      // result.presignedUrls available for real R2 upload (Phase 2)
+      final uploadDio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 30),
+        sendTimeout: const Duration(seconds: 60),
+      ));
 
-      // 2. Mock upload simulation (300ms delay per image)
-      // In Phase 2: Use Dio PUT to presigned URL with uploadUrls
+      // 2. Upload each image to R2 via presigned PUT URL
       for (int i = 0; i < _selectedImages.length; i++) {
-        // Simulate upload delay
-        await Future.delayed(const Duration(milliseconds: 300));
+        final presignedUrl = result.presignedUrls[i];
+        final imageBytes = _selectedImages[i].bytes;
+
+        await uploadDio.put(
+          presignedUrl.url,
+          data: Stream.fromIterable([imageBytes]),
+          options: Options(
+            headers: {
+              'Content-Type': 'image/jpeg',
+              'Content-Length': imageBytes.length,
+            },
+          ),
+        );
 
         setState(() {
           _uploadProgress = (i + 1) / _selectedImages.length;

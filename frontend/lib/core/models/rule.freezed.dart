@@ -215,7 +215,7 @@ return $default(_that.id,_that.name,_that.presetId,_that.createdAt,_that.concept
 @JsonSerializable()
 
 class _Rule implements Rule {
-  const _Rule({required this.id, required this.name, @JsonKey(name: 'preset_id') required this.presetId, @JsonKey(name: 'created_at') required this.createdAt, final  Map<String, ConceptAction>? concepts, final  List<String>? protect}): _concepts = concepts,_protect = protect;
+  const _Rule({required this.id, required this.name, @JsonKey(name: 'preset_id') required this.presetId, @JsonKey(name: 'created_at') this.createdAt = '', final  Map<String, ConceptAction>? concepts, final  List<String>? protect}): _concepts = concepts,_protect = protect;
   factory _Rule.fromJson(Map<String, dynamic> json) => _$RuleFromJson(json);
 
 @override final  String id;
