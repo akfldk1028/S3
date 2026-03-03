@@ -33,6 +33,7 @@ class _CameraHomeScreenState extends ConsumerState<CameraHomeScreen>
   FlashMode _flashMode = FlashMode.off;
   final List<XFile> _capturedPhotos = [];
   bool _isCapturing = false;
+  bool _isProcessing = false;
 
   @override
   void initState() {
@@ -144,19 +145,32 @@ class _CameraHomeScreenState extends ConsumerState<CameraHomeScreen>
   /// 도메인 선택됨 → /upload?presetId=... (domain-select 스킵)
   /// 도메인 미선택 → /domain-select (기존 flow)
   Future<void> _onProceed() async {
-    if (_capturedPhotos.isEmpty) return;
+    if (_capturedPhotos.isEmpty || _isProcessing) return;
 
-    await ref
-        .read(workspaceProvider.notifier)
-        .addPhotosFromFiles(_capturedPhotos);
+    setState(() => _isProcessing = true);
 
-    if (mounted) {
-      final presetId = ref.read(selectedPresetProvider);
-      if (presetId != null) {
-        context.push('/upload?presetId=$presetId');
-      } else {
-        context.push('/domain-select');
+    try {
+      await ref
+          .read(workspaceProvider.notifier)
+          .addPhotosFromFiles(_capturedPhotos);
+
+      if (mounted) {
+        final presetId = ref.read(selectedPresetProvider);
+        if (presetId != null) {
+          context.push('/upload?presetId=$presetId');
+        } else {
+          context.push('/domain-select');
+        }
       }
+    } catch (e) {
+      debugPrint('Proceed error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to process photos: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
 
@@ -472,33 +486,44 @@ class _CameraHomeScreenState extends ConsumerState<CameraHomeScreen>
           _capturedPhotos.isEmpty
               ? const SizedBox(width: 48)
               : GestureDetector(
-                  onTap: _onProceed,
+                  onTap: _isProcessing ? null : _onProceed,
                   child: Container(
                     width: 48,
                     height: 48,
                     decoration: BoxDecoration(
-                      color: WsColors.accent1,
+                      color: _isProcessing
+                          ? WsColors.accent1.withValues(alpha: 0.6)
+                          : WsColors.accent1,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '${_capturedPhotos.length}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
+                      child: _isProcessing
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${_capturedPhotos.length}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.arrow_forward,
+                                  color: Colors.white,
+                                  size: 14,
+                                ),
+                              ],
                             ),
-                          ),
-                          const Icon(
-                            Icons.arrow_forward,
-                            color: Colors.white,
-                            size: 14,
-                          ),
-                        ],
-                      ),
                     ),
                   ),
                 ),
