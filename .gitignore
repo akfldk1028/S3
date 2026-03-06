@@ -54,6 +54,7 @@ dist/
 .env.local
 .env.*.local
 .dev.vars
+.mcp.json
 *.pem
 *.key
 
@@ -81,6 +82,9 @@ logs/
 .ruff_cache/
 htmlcov/
 .coverage
+
+# ===== Team Personal Docs =====
+jina_docs/
 
 # ===== Misc =====
 nul
