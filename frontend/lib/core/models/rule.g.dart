@@ -10,7 +10,7 @@ _Rule _$RuleFromJson(Map<String, dynamic> json) => _Rule(
   id: json['id'] as String,
   name: json['name'] as String,
   presetId: json['preset_id'] as String,
-  createdAt: json['created_at'] as String,
+  createdAt: (json['created_at'] as String?) ?? '',
   concepts: (json['concepts'] as Map<String, dynamic>?)?.map(
     (k, e) => MapEntry(k, ConceptAction.fromJson(e as Map<String, dynamic>)),
   ),

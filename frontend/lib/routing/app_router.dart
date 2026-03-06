@@ -103,7 +103,8 @@ GoRouter appRouter(Ref ref) {
         path: '/rules',
         builder: (context, state) {
           final jobId = state.uri.queryParameters['jobId'];
-          return RulesScreen(jobId: jobId);
+          final presetId = state.uri.queryParameters['presetId'];
+          return RulesScreen(jobId: jobId, presetId: presetId);
         },
       ),
       GoRoute(

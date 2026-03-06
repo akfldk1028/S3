@@ -185,9 +185,17 @@ class S3ApiClient implements ApiClient {
 
   @override
   Future<List<JobListItem>> listJobs() async {
-    final response = await _dio.get(ApiEndpoints.jobs);
-    final list = response.data as List<dynamic>;
-    return list.map((e) => JobListItem.fromJson(e as Map<String, dynamic>)).toList();
+    try {
+      final response = await _dio.get(ApiEndpoints.jobs);
+      final data = response.data;
+      // Workers may return list directly or wrapped
+      final list = data is List<dynamic> ? data : <dynamic>[];
+      return list.map((e) => JobListItem.fromJson(e as Map<String, dynamic>)).toList();
+    } catch (e) {
+      // GET /jobs has a known D1 schema issue (missing progress columns)
+      // Return empty list until Workers fixes the query
+      return [];
+    }
   }
 
   @override

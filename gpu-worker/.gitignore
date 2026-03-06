@@ -1,0 +1,23 @@
+# Model weights (too large for git)
+models/
+*.pt
+*.pth
+*.bin
+*.safetensors
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment
+.env
+.env.local
+
+# Testing
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
