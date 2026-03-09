@@ -38,6 +38,79 @@ class RulesScreen extends ConsumerStatefulWidget {
 }
 
 class _RulesScreenState extends ConsumerState<RulesScreen> {
+  bool _isExecuting = false;
+
+  /// Execute job with selected rule's concepts and protect settings
+  Future<void> _executeWithRule(Rule rule) async {
+    if (widget.jobId == null) return;
+
+    setState(() => _isExecuting = true);
+
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      await apiClient.executeJob(
+        widget.jobId!,
+        concepts: rule.concepts?.map(
+              (k, v) => MapEntry(k, {'action': v.action, 'value': v.value}),
+            ) ??
+            {},
+        protect: rule.protect ?? [],
+        ruleId: rule.id,
+      );
+
+      if (!mounted) return;
+      context.push('/jobs/${widget.jobId}');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Execute failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExecuting = false);
+    }
+  }
+
+  /// Execute job without a saved rule (quick apply with default concepts)
+  Future<void> _executeWithoutRule() async {
+    if (widget.jobId == null || widget.presetId == null) return;
+
+    setState(() => _isExecuting = true);
+
+    try {
+      final apiClient = ref.read(apiClientProvider);
+
+      // Fetch preset to get default concepts
+      final preset = await apiClient.getPresetById(widget.presetId!);
+      final defaultConcepts = <String, dynamic>{};
+      for (final concept in preset.concepts ?? <String>[]) {
+        defaultConcepts[concept] = {'action': 'recolor', 'value': null};
+      }
+
+      await apiClient.executeJob(
+        widget.jobId!,
+        concepts: defaultConcepts,
+      );
+
+      if (!mounted) return;
+      context.push('/jobs/${widget.jobId}');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Execute failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExecuting = false);
+    }
+  }
+
   /// Shows create or edit rule dialog
   Future<void> _showRuleDialog({Rule? rule}) async {
     final result = await showDialog<bool>(
@@ -267,6 +340,9 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
                                   rule: rule,
                                   onEdit: () => _showRuleDialog(rule: rule),
                                   onDelete: () => _confirmDelete(rule),
+                                  onApply: widget.jobId != null && !_isExecuting
+                                      ? () => _executeWithRule(rule)
+                                      : null,
                                 ),
                               )),
                         ],
@@ -294,55 +370,86 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 900),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Continue to jobs button (if jobId provided)
-                    if (widget.jobId != null)
-                      TextButton.icon(
-                        onPressed: () {
-                          context.push('/jobs/${widget.jobId}');
-                        },
-                        icon: const Icon(Icons.arrow_forward),
-                        label: const Text('Continue to Job'),
-                      )
-                    else
-                      const SizedBox.shrink(),
-
-                    // Create Rule button
-                    userAsync.when(
-                      data: (user) {
-                        final quotaReached =
-                            user.ruleSlots >= (user.plan == 'pro' ? 20 : 2);
-                        return ElevatedButton.icon(
-                          onPressed: quotaReached ? null : () => _showRuleDialog(),
-                          icon: const Icon(Icons.add),
-                          label: Text(
-                            quotaReached
-                                ? 'Quota Reached (${(user.plan == 'pro' ? 20 : 2)})'
-                                : 'Create Rule',
-                          ),
+                    // Quick Apply button (when jobId exists, no saved rule needed)
+                    if (widget.jobId != null) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _isExecuting ? null : _executeWithoutRule,
+                          icon: _isExecuting
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.play_arrow),
+                          label: Text(_isExecuting ? 'Executing...' : 'Quick Apply (Default Concepts)'),
                           style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 16,
-                            ),
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
-                        );
-                      },
-                      loading: () => const ElevatedButton(
-                        onPressed: null,
-                        child: SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                       ),
-                      error: (_, __) => ElevatedButton.icon(
-                        onPressed: () => _showRuleDialog(),
-                        icon: const Icon(Icons.add),
-                        label: const Text('Create Rule'),
-                      ),
+                      const SizedBox(height: 12),
+                    ],
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // View job status (if jobId provided)
+                        if (widget.jobId != null)
+                          TextButton.icon(
+                            onPressed: () {
+                              context.push('/jobs/${widget.jobId}');
+                            },
+                            icon: const Icon(Icons.visibility),
+                            label: const Text('View Job Status'),
+                          )
+                        else
+                          const SizedBox.shrink(),
+
+                        // Create Rule button
+                        userAsync.when(
+                          data: (user) {
+                            final quotaReached =
+                                user.ruleSlots >= (user.plan == 'pro' ? 20 : 2);
+                            return ElevatedButton.icon(
+                              onPressed: quotaReached ? null : () => _showRuleDialog(),
+                              icon: const Icon(Icons.add),
+                              label: Text(
+                                quotaReached
+                                    ? 'Quota Reached (${(user.plan == 'pro' ? 20 : 2)})'
+                                    : 'Create Rule',
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 24,
+                                  vertical: 16,
+                                ),
+                              ),
+                            );
+                          },
+                          loading: () => const ElevatedButton(
+                            onPressed: null,
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                          error: (_, __) => ElevatedButton.icon(
+                            onPressed: () => _showRuleDialog(),
+                            icon: const Icon(Icons.add),
+                            label: const Text('Create Rule'),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -360,11 +467,13 @@ class _RuleCard extends StatelessWidget {
   final Rule rule;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback? onApply;
 
   const _RuleCard({
     required this.rule,
     required this.onEdit,
     required this.onDelete,
+    this.onApply,
   });
 
   @override
@@ -451,6 +560,13 @@ class _RuleCard extends StatelessWidget {
                 // Action buttons
                 Column(
                   children: [
+                    if (onApply != null)
+                      IconButton(
+                        onPressed: onApply,
+                        icon: const Icon(Icons.play_arrow),
+                        tooltip: 'Apply Rule',
+                        color: Colors.green,
+                      ),
                     IconButton(
                       onPressed: onEdit,
                       icon: const Icon(Icons.edit),
