@@ -53,14 +53,14 @@ class _CameraHomeScreenState extends ConsumerState<CameraHomeScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    final controller = _controller;
-    if (controller == null || !controller.value.isInitialized) return;
-
     if (state == AppLifecycleState.inactive) {
-      controller.dispose();
+      _controller?.dispose();
       _controller = null;
+      if (mounted) setState(() => _isInitialized = false);
     } else if (state == AppLifecycleState.resumed) {
-      _initCameraController(_cameras[_cameraIndex]);
+      if (_cameras.isNotEmpty) {
+        _initCameraController(_cameras[_cameraIndex]);
+      }
     }
   }
 
@@ -150,20 +150,30 @@ class _CameraHomeScreenState extends ConsumerState<CameraHomeScreen>
     setState(() => _isProcessing = true);
 
     try {
+      debugPrint('[CameraHome] _onProceed: ${_capturedPhotos.length} photos');
+
+      // workspace에 사진 추가 (썸네일 생성 포함 — 시간 걸릴 수 있음)
+      debugPrint('[CameraHome] Adding photos to workspace...');
       await ref
           .read(workspaceProvider.notifier)
           .addPhotosFromFiles(_capturedPhotos);
+      debugPrint('[CameraHome] Photos added to workspace');
 
-      if (mounted) {
-        final presetId = ref.read(selectedPresetProvider);
-        if (presetId != null) {
-          context.push('/upload?presetId=$presetId');
-        } else {
-          context.push('/domain-select');
-        }
+      if (!mounted) return;
+
+      final presetId = ref.read(selectedPresetProvider);
+      debugPrint('[CameraHome] presetId=$presetId');
+
+      if (presetId != null) {
+        debugPrint('[CameraHome] Navigating to /upload?presetId=$presetId');
+        context.push('/upload?presetId=$presetId');
+      } else {
+        debugPrint('[CameraHome] No preset → /domain-select');
+        context.push('/domain-select');
       }
-    } catch (e) {
-      debugPrint('Proceed error: $e');
+    } catch (e, st) {
+      debugPrint('[CameraHome] Proceed error: $e');
+      debugPrint('[CameraHome] Stack: $st');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to process photos: $e')),
@@ -361,7 +371,7 @@ class _CameraHomeScreenState extends ConsumerState<CameraHomeScreen>
                       icon: const Icon(Icons.photo_library_rounded),
                       label: const Text('Choose from Gallery'),
                       style: FilledButton.styleFrom(
-                        backgroundColor: WsColors.accent1,
+                        backgroundColor: DomainColors(ref.watch(selectedPresetProvider)).accent1,
                         padding: const EdgeInsets.symmetric(
                           horizontal: 32,
                           vertical: 16,
@@ -381,8 +391,9 @@ class _CameraHomeScreenState extends ConsumerState<CameraHomeScreen>
 
   Widget _buildPreview() {
     if (!_isInitialized || _controller == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: WsColors.accent1),
+      final dc = DomainColors(ref.watch(selectedPresetProvider));
+      return Center(
+        child: CircularProgressIndicator(color: dc.accent1),
       );
     }
     return SizedBox.expand(
@@ -463,6 +474,7 @@ class _CameraHomeScreenState extends ConsumerState<CameraHomeScreen>
   }
 
   Widget _buildBottomBar() {
+    final dc = DomainColors(ref.watch(selectedPresetProvider));
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 32),
       child: Row(
@@ -480,6 +492,7 @@ class _CameraHomeScreenState extends ConsumerState<CameraHomeScreen>
           _ShutterButton(
             onTap: _onCapture,
             isCapturing: _isCapturing,
+            ringColor: dc.accent1,
           ),
 
           // 다음 버튼 (촬영 수 표시) — 사진 없으면 빈 공간
@@ -492,8 +505,8 @@ class _CameraHomeScreenState extends ConsumerState<CameraHomeScreen>
                     height: 48,
                     decoration: BoxDecoration(
                       color: _isProcessing
-                          ? WsColors.accent1.withValues(alpha: 0.6)
-                          : WsColors.accent1,
+                          ? dc.accent1.withValues(alpha: 0.6)
+                          : dc.accent1,
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: Center(
@@ -566,10 +579,12 @@ class _CircleButton extends StatelessWidget {
 class _ShutterButton extends StatelessWidget {
   final VoidCallback onTap;
   final bool isCapturing;
+  final Color ringColor;
 
   const _ShutterButton({
     required this.onTap,
     required this.isCapturing,
+    this.ringColor = WsColors.accent1,
   });
 
   @override
@@ -581,7 +596,7 @@ class _ShutterButton extends StatelessWidget {
         height: 76,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          border: Border.all(color: WsColors.accent1, width: 4),
+          border: Border.all(color: ringColor, width: 4),
         ),
         padding: const EdgeInsets.all(4),
         child: AnimatedContainer(

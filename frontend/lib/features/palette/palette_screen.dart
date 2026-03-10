@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api/api_client_provider.dart';
 import '../../core/models/preset.dart';
+import '../workspace/theme.dart';
 import 'palette_provider.dart';
 
 /// Palette (concept selection) screen.
@@ -143,6 +144,7 @@ class PaletteScreen extends ConsumerWidget {
           // Data state
           final preset = snapshot.data!;
           final concepts = preset.concepts ?? [];
+          final dc = DomainColors(presetId);
 
           if (concepts.isEmpty) {
             return const Center(
@@ -216,6 +218,7 @@ class PaletteScreen extends ConsumerWidget {
                               return _ConceptChip(
                                 concept: concept,
                                 isSelected: isSelected,
+                                accentColor: dc.accent1,
                                 onTap: () {
                                   ref.read(paletteProvider.notifier).toggleConcept(concept);
                                 },
@@ -245,6 +248,7 @@ class PaletteScreen extends ConsumerWidget {
                                 conceptName: conceptName,
                                 instanceIndex: instanceIndex,
                                 isProtected: isProtected,
+                                accentColor: dc.accent1,
                                 onInstanceChanged: (newIndex) {
                                   ref.read(paletteProvider.notifier).setInstance(conceptName, newIndex);
                                 },
@@ -327,11 +331,13 @@ class _ConceptChip extends StatelessWidget {
   final String concept;
   final bool isSelected;
   final VoidCallback onTap;
+  final Color accentColor;
 
   const _ConceptChip({
     required this.concept,
     required this.isSelected,
     required this.onTap,
+    required this.accentColor,
   });
 
   @override
@@ -346,7 +352,7 @@ class _ConceptChip extends StatelessWidget {
       ),
       selected: isSelected,
       onSelected: (_) => onTap(),
-      selectedColor: Theme.of(context).primaryColor,
+      selectedColor: accentColor,
       checkmarkColor: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     );
@@ -365,6 +371,7 @@ class _ConceptControl extends StatelessWidget {
   final bool isProtected;
   final Function(int) onInstanceChanged;
   final VoidCallback onProtectToggled;
+  final Color accentColor;
 
   // Maximum number of instances available per concept
   static const int maxInstances = 5;
@@ -375,6 +382,7 @@ class _ConceptControl extends StatelessWidget {
     required this.isProtected,
     required this.onInstanceChanged,
     required this.onProtectToggled,
+    this.accentColor = WsColors.accent1,
   });
 
   @override
@@ -394,7 +402,7 @@ class _ConceptControl extends StatelessWidget {
                   Icon(
                     Icons.label_outline,
                     size: 20,
-                    color: Theme.of(context).primaryColor,
+                    color: accentColor,
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -458,7 +466,7 @@ class _ConceptControl extends StatelessWidget {
                   Switch(
                     value: isProtected,
                     onChanged: (_) => onProtectToggled(),
-                    activeTrackColor: Theme.of(context).primaryColor,
+                    activeTrackColor: accentColor,
                   ),
                 ],
               ),

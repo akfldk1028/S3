@@ -16,6 +16,7 @@ class DomainDrawer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final presetsAsync = ref.watch(presetsProvider);
     final selectedId = ref.watch(selectedPresetProvider);
+    final dc = DomainColors(selectedId);
 
     return Drawer(
       backgroundColor: WsColors.surface,
@@ -65,7 +66,17 @@ class DomainDrawer extends ConsumerWidget {
               ),
             ),
 
-            const Divider(color: WsColors.glassBorder, height: 24),
+            dc.isSeller
+                ? Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Container(
+                      height: 1,
+                      decoration: const BoxDecoration(
+                        gradient: SellerColors.gradientPrimary,
+                      ),
+                    ),
+                  )
+                : const Divider(color: WsColors.glassBorder, height: 24),
 
             // ── Domains section ──
             const Padding(
@@ -85,9 +96,11 @@ class DomainDrawer extends ConsumerWidget {
               data: (presets) => Column(
                 children: presets.map((preset) {
                   final isSelected = selectedId == preset.id;
+                  final tileDc = DomainColors(preset.id);
                   return _DomainTile(
                     name: preset.name,
                     isSelected: isSelected,
+                    accentColor: tileDc.accent1,
                     onTap: () {
                       ref
                           .read(selectedPresetProvider.notifier)
@@ -97,15 +110,15 @@ class DomainDrawer extends ConsumerWidget {
                   );
                 }).toList(),
               ),
-              loading: () => const Padding(
-                padding: EdgeInsets.all(20),
+              loading: () => Padding(
+                padding: const EdgeInsets.all(20),
                 child: Center(
                   child: SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: WsColors.accent1,
+                      color: dc.accent1,
                     ),
                   ),
                 ),
@@ -152,20 +165,22 @@ class _DomainTile extends StatelessWidget {
   final String name;
   final bool isSelected;
   final VoidCallback onTap;
+  final Color accentColor;
 
   const _DomainTile({
     required this.name,
     required this.isSelected,
     required this.onTap,
+    this.accentColor = WsColors.accent1,
   });
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: isSelected ? WsColors.accent1.withValues(alpha: 0.15) : Colors.transparent,
+      color: isSelected ? accentColor.withValues(alpha: 0.15) : Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        splashColor: WsColors.accent1.withValues(alpha: 0.1),
+        splashColor: accentColor.withValues(alpha: 0.1),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Row(
@@ -174,7 +189,7 @@ class _DomainTile extends StatelessWidget {
                 isSelected
                     ? Icons.radio_button_checked
                     : Icons.radio_button_off,
-                color: isSelected ? WsColors.accent1 : WsColors.textMuted,
+                color: isSelected ? accentColor : WsColors.textMuted,
                 size: 18,
               ),
               const SizedBox(width: 12),

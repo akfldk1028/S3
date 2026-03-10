@@ -20,7 +20,7 @@ final class WorkspaceProvider
         argument: null,
         retry: null,
         name: r'workspaceProvider',
-        isAutoDispose: true,
+        isAutoDispose: false,
         dependencies: null,
         $allTransitiveDependencies: null,
       );
@@ -41,7 +41,7 @@ final class WorkspaceProvider
   }
 }
 
-String _$workspaceHash() => r'462bc588d216069f08c957f7b6cc8919610ac8a0';
+String _$workspaceHash() => r'e3177010f2be4bb8aaab19a6dce36087d2c89dc2';
 
 abstract class _$Workspace extends $Notifier<WorkspaceState> {
   WorkspaceState build();

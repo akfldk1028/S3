@@ -51,7 +51,7 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
       await apiClient.executeJob(
         widget.jobId!,
         concepts: rule.concepts?.map(
-              (k, v) => MapEntry(k, {'action': v.action, 'value': v.value}),
+              (k, v) => MapEntry(k, {'action': v.action, 'value': v.value ?? ''}),
             ) ??
             {},
         protect: rule.protect ?? [],
@@ -87,7 +87,7 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
       final preset = await apiClient.getPresetById(widget.presetId!);
       final defaultConcepts = <String, dynamic>{};
       for (final concept in preset.concepts ?? <String>[]) {
-        defaultConcepts[concept] = {'action': 'recolor', 'value': null};
+        defaultConcepts[concept] = {'action': 'recolor', 'value': ''};
       }
 
       await apiClient.executeJob(

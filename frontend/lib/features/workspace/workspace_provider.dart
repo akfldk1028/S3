@@ -16,7 +16,7 @@ const int _largeBatchThreshold = 50;
 /// 청크 업로드 크기 (이미지 10개씩 병렬 업로드)
 const int _uploadChunkSize = 10;
 
-@riverpod
+@Riverpod(keepAlive: true)
 class Workspace extends _$Workspace {
   @override
   WorkspaceState build() {
