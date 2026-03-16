@@ -11,20 +11,16 @@ part of 'rule.dart';
 
 // dart format off
 T _$identity<T>(T value) => value;
-
 /// @nodoc
 mixin _$Rule {
 
- String get id; String get name;@JsonKey(name: 'preset_id') String get presetId;@JsonKey(name: 'created_at') String get createdAt;// Detail/create view fields (optional for list view)
- Map<String, ConceptAction>? get concepts; List<String>? get protect;
+ String get id; String get name;@JsonKey(name: 'preset_id') String get presetId;@JsonKey(name: 'created_at') String get createdAt; Map<String, ConceptAction>? get concepts; List<String>? get protect;
 /// Create a copy of Rule
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
 @pragma('vm:prefer-inline')
 $RuleCopyWith<Rule> get copyWith => _$RuleCopyWithImpl<Rule>(this as Rule, _$identity);
 
-  /// Serializes this Rule to a JSON map.
-  Map<String, dynamic> toJson();
 
 
 @override
@@ -32,7 +28,7 @@ bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is Rule&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.presetId, presetId) || other.presetId == presetId)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&const DeepCollectionEquality().equals(other.concepts, concepts)&&const DeepCollectionEquality().equals(other.protect, protect));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
 int get hashCode => Object.hash(runtimeType,id,name,presetId,createdAt,const DeepCollectionEquality().hash(concepts),const DeepCollectionEquality().hash(protect));
 
@@ -212,19 +208,17 @@ return $default(_that.id,_that.name,_that.presetId,_that.createdAt,_that.concept
 }
 
 /// @nodoc
-@JsonSerializable()
+
 
 class _Rule implements Rule {
   const _Rule({required this.id, required this.name, @JsonKey(name: 'preset_id') required this.presetId, @JsonKey(name: 'created_at') this.createdAt = '', final  Map<String, ConceptAction>? concepts, final  List<String>? protect}): _concepts = concepts,_protect = protect;
-  factory _Rule.fromJson(Map<String, dynamic> json) => _$RuleFromJson(json);
+  
 
 @override final  String id;
 @override final  String name;
 @override@JsonKey(name: 'preset_id') final  String presetId;
 @override@JsonKey(name: 'created_at') final  String createdAt;
-// Detail/create view fields (optional for list view)
  final  Map<String, ConceptAction>? _concepts;
-// Detail/create view fields (optional for list view)
 @override Map<String, ConceptAction>? get concepts {
   final value = _concepts;
   if (value == null) return null;
@@ -249,17 +243,14 @@ class _Rule implements Rule {
 @pragma('vm:prefer-inline')
 _$RuleCopyWith<_Rule> get copyWith => __$RuleCopyWithImpl<_Rule>(this, _$identity);
 
-@override
-Map<String, dynamic> toJson() {
-  return _$RuleToJson(this, );
-}
+
 
 @override
 bool operator ==(Object other) {
   return identical(this, other) || (other.runtimeType == runtimeType&&other is _Rule&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.presetId, presetId) || other.presetId == presetId)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&const DeepCollectionEquality().equals(other._concepts, _concepts)&&const DeepCollectionEquality().equals(other._protect, _protect));
 }
 
-@JsonKey(includeFromJson: false, includeToJson: false)
+
 @override
 int get hashCode => Object.hash(runtimeType,id,name,presetId,createdAt,const DeepCollectionEquality().hash(_concepts),const DeepCollectionEquality().hash(_protect));
 

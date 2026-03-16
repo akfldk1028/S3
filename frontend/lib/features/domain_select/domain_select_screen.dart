@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/models/preset.dart';
+import '../workspace/theme.dart';
 import 'presets_provider.dart';
 
 /// Domain selection screen displaying available preset cards.
@@ -207,7 +208,7 @@ class _PresetCard extends StatelessWidget {
               Icon(
                 _getPresetIcon(),
                 size: 48,
-                color: Theme.of(context).primaryColor,
+                color: DomainColors(preset.id).accent1,
               ),
               const SizedBox(height: 16),
               Text(
