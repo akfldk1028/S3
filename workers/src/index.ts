@@ -14,8 +14,8 @@
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger } from 'hono/logger';
-import type { Env, AuthUser, GpuQueueMessage, CallbackPayload } from './_shared/types';
+
+import type { Env, AuthUser, GpuQueueMessage } from './_shared/types';
 import { authMiddleware } from './middleware/auth.middleware';
 import { ok, error } from './_shared/response';
 import { ERR } from './_shared/errors';
@@ -51,7 +51,16 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
-app.use('*', logger());
+// GET polling 로그 제외 — POST/PUT/DELETE만 로깅
+app.use('*', async (c, next) => {
+  if (c.req.method !== 'GET') {
+    console.log(`[API] ${c.req.method} ${c.req.path}`);
+  }
+  await next();
+  if (c.req.method !== 'GET' || c.res.status >= 400) {
+    console.log(`[API] ${c.req.method} ${c.req.path} → ${c.res.status}`);
+  }
+});
 app.use('*', authMiddleware);
 
 // Health check (public, skipped by auth middleware)
@@ -85,6 +94,7 @@ export default {
       try {
         const { items, concepts, job_id } = msg.body;
         const conceptNames = Object.keys(concepts);
+        console.log(`[Queue] Job ${job_id} 시작 — items: ${items.length}, concepts: [${conceptNames}]`);
 
         // DO stub for progress updates
         const coordNs = env.JOB_COORDINATOR as unknown as DurableObjectNamespace<JobCoordinatorDO>;
@@ -96,6 +106,7 @@ export default {
             const imageUrl = await generatePresignedUrl(
               env, env.R2_BUCKET_NAME, item.input_key, 'GET', 3600,
             );
+            console.log(`[Queue] Job ${job_id} item ${item.idx} — R2 URL 생성 완료`);
 
             // 2. Runpod에 비동기 전송
             const runRes = await fetch(
@@ -113,11 +124,14 @@ export default {
             );
             if (!runRes.ok) throw new Error(`Runpod ${runRes.status}`);
             const { id: rpJobId } = await runRes.json() as { id: string };
+            console.log(`[Queue] Job ${job_id} item ${item.idx} — Runpod 전송 완료 (rpId: ${rpJobId})`);
 
-            // 3. Polling — 완료될 때까지 5초 간격으로 확인 (최대 12분)
+            // 3. Polling — 완료될 때까지 15초 간격으로 확인 (최대 10분)
+            //    CF Workers subrequest 제한(50회)에 맞춤
             let gpuResult: any = null;
-            for (let i = 0; i < 144; i++) {
-              await new Promise(resolve => setTimeout(resolve, 5000));
+            const pollStart = Date.now();
+            for (let i = 0; i < 40; i++) {
+              await new Promise(resolve => setTimeout(resolve, 15000));
 
               const sRes = await fetch(
                 `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/status/${rpJobId}`,
@@ -126,17 +140,25 @@ export default {
               const sData = await sRes.json() as any;
 
               if (sData.status === 'COMPLETED') {
+                const elapsed = ((Date.now() - pollStart) / 1000).toFixed(1);
+                console.log(`[Queue] Job ${job_id} item ${item.idx} — GPU 완료 (${elapsed}s, execTime: ${sData.executionTime}ms)`);
                 gpuResult = sData.output;
                 break;
               }
               if (sData.status === 'FAILED') {
+                console.error(`[Queue] Job ${job_id} item ${item.idx} — GPU 실패: ${sData.error}`);
                 throw new Error(sData.error || 'GPU processing failed');
+              }
+              if (i % 6 === 5) {
+                const elapsed = ((Date.now() - pollStart) / 1000).toFixed(0);
+                console.log(`[Queue] Job ${job_id} item ${item.idx} — polling ${elapsed}s... (status: ${sData.status})`);
               }
             }
             if (!gpuResult) throw new Error('GPU processing timed out');
 
             // 4. 결과를 R2에 저장
             await env.R2.put(item.output_key, JSON.stringify(gpuResult));
+            console.log(`[Queue] Job ${job_id} item ${item.idx} — R2 저장 완료 (${item.output_key})`);
 
             // 5. DO에 성공 보고 → progress 업데이트
             await coordStub.onItemResult({
@@ -146,8 +168,9 @@ export default {
               preview_key: item.preview_key,
               idempotency_key: `${job_id}-${item.idx}`,
             });
+            console.log(`[Queue] Job ${job_id} item ${item.idx} — done 보고 완료`);
           } catch (itemErr) {
-            console.error(`[Queue] Item ${item.idx} failed: ${itemErr}`);
+            console.error(`[Queue] Job ${job_id} item ${item.idx} 실패: ${itemErr}`);
             // 개별 item 실패 보고
             await coordStub.onItemResult({
               idx: item.idx,
