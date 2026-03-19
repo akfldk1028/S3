@@ -391,85 +391,94 @@ class _ConceptControl extends StatelessWidget {
       elevation: 1,
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Concept name
-            Expanded(
-              flex: 2,
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.label_outline,
-                    size: 20,
-                    color: accentColor,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
+            // 첫 줄: 컨셉 이름 + Protect 토글 (우측)
+            Row(
+              children: [
+                Icon(Icons.label_outline, size: 18, color: accentColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
                     conceptName,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                ],
-              ),
+                ),
+                // Protect 토글 (인라인 — 48dp 터치 확보)
+                GestureDetector(
+                  onTap: onProtectToggled,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '보호',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isProtected ? accentColor : Colors.grey,
+                        ),
+                      ),
+                      Switch(
+                        value: isProtected,
+                        onChanged: (_) => onProtectToggled(),
+                        activeTrackColor: accentColor,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-
-            // Instance selector
-            Expanded(
-              flex: 2,
-              child: Row(
-                children: [
-                  const Text(
-                    'Instance:',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
+            const SizedBox(height: 8),
+            // 둘째 줄: 인스턴스 선택 (가로 스크롤 칩)
+            Row(
+              children: [
+                Text(
+                  '인스턴스:',
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                ),
+                const SizedBox(width: 8),
+                ...List.generate(maxInstances, (i) {
+                  final num = i + 1;
+                  final selected = instanceIndex == num;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: GestureDetector(
+                      onTap: () => onInstanceChanged(num),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? accentColor
+                              : accentColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: selected
+                                ? accentColor
+                                : accentColor.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '#$num',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: selected ? Colors.white : accentColor,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  DropdownButton<int>(
-                    value: instanceIndex,
-                    underline: Container(),
-                    items: List.generate(maxInstances, (index) {
-                      final instanceNum = index + 1;
-                      return DropdownMenuItem(
-                        value: instanceNum,
-                        child: Text('#$instanceNum'),
-                      );
-                    }),
-                    onChanged: (value) {
-                      if (value != null) {
-                        onInstanceChanged(value);
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-
-            // Protect toggle
-            Expanded(
-              flex: 1,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  const Text(
-                    'Protect',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Switch(
-                    value: isProtected,
-                    onChanged: (_) => onProtectToggled(),
-                    activeTrackColor: accentColor,
-                  ),
-                ],
-              ),
+                  );
+                }),
+              ],
             ),
           ],
         ),
