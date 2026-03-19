@@ -248,6 +248,17 @@ class _CameraHomeScreenState extends ConsumerState<CameraHomeScreen>
               child: _buildFlashButton(),
             ),
 
+            // 셀러 도메인: 상품 촬영 가이드 오버레이
+            if (ref.watch(selectedPresetProvider) == 'seller')
+              Positioned.fill(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 160),
+                  child: Center(
+                    child: _SellerGuideOverlay(),
+                  ),
+                ),
+              ),
+
             // 컨셉 칩 바 (카메라 컨트롤 위)
             const Positioned(
               bottom: 110,
@@ -573,6 +584,96 @@ class _CircleButton extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 셀러 도메인 상품 촬영 가이드 오버레이.
+///
+/// 화면 중앙에 골드 점선 사각형 + 안내 텍스트를 표시한다.
+/// seller 도메인 선택 시에만 카메라 화면에 오버레이된다.
+class _SellerGuideOverlay extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final guideW = size.width * 0.72;
+    final guideH = guideW * 1.1;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        CustomPaint(
+          size: Size(guideW, guideH),
+          painter: _DashedRectPainter(color: SellerColors.accent1),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.black54,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Text(
+            '상품을 이 안에 배치하세요',
+            style: TextStyle(
+              color: SellerColors.accent1,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 점선 사각형 페인터
+class _DashedRectPainter extends CustomPainter {
+  final Color color;
+
+  const _DashedRectPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.8)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    const dashLen = 10.0;
+    const gapLen = 6.0;
+    const r = 12.0;
+
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(0, 0, size.width, size.height),
+          const Radius.circular(r),
+        ),
+      );
+
+    final metric = path.computeMetrics().first;
+    final totalLen = metric.length;
+    double dist = 0;
+    bool draw = true;
+    final dashPath = Path();
+
+    while (dist < totalLen) {
+      final seg = draw ? dashLen : gapLen;
+      if (draw) {
+        dashPath.addPath(
+          metric.extractPath(dist, dist + seg),
+          Offset.zero,
+        );
+      }
+      dist += seg;
+      draw = !draw;
+    }
+
+    canvas.drawPath(dashPath, paint);
+  }
+
+  @override
+  bool shouldRepaint(_DashedRectPainter old) => old.color != color;
 }
 
 /// SNOW-style 셔터 버튼: 바깥 accent 링 + 안쪽 흰 원

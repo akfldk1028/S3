@@ -11,7 +11,9 @@ import '../features/palette/palette_screen.dart';
 import '../features/rules/rules_screen.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/splash/splash_screen.dart';
+import '../features/results/results_screen.dart';
 import '../features/upload/upload_screen.dart';
+import '../features/workspace/workspace_state.dart';
 
 part 'app_router.g.dart';
 
@@ -112,6 +114,18 @@ GoRouter appRouter(Ref ref) {
         builder: (context, state) {
           final jobId = state.pathParameters['id']!;
           return JobProgressScreen(jobId: jobId);
+        },
+      ),
+      GoRoute(
+        path: '/results',
+        builder: (context, state) {
+          final jobResult = state.extra as JobResult?;
+          if (jobResult == null) {
+            return const Scaffold(
+              body: Center(child: Text('No result data')),
+            );
+          }
+          return ResultsScreen(jobId: jobResult.id, job: jobResult);
         },
       ),
       GoRoute(

@@ -136,7 +136,7 @@ class DomainSelectScreen extends ConsumerWidget {
                           crossAxisCount: 2,
                           crossAxisSpacing: 16,
                           mainAxisSpacing: 16,
-                          childAspectRatio: 1.2,
+                          childAspectRatio: 0.95,
                         ),
                         itemCount: presets.length,
                         itemBuilder: (context, index) {
@@ -190,6 +190,18 @@ class _PresetCard extends StatelessWidget {
     }
   }
 
+  /// Get description for preset based on ID
+  String _getPresetDescription() {
+    switch (preset.id) {
+      case 'interior':
+        return '벽·바닥·타일 등 공간 요소를\nSAM3로 분리해 스타일을 변경합니다.';
+      case 'seller':
+        return '상품을 배경에서 분리해\n누끼 스티커로 만들어 드립니다.';
+      default:
+        return 'SAM3로 요소를 분리하고\n룰로 세트를 생성합니다.';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -221,10 +233,21 @@ class _PresetCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                '${preset.conceptCount} concepts',
+                _getPresetDescription(),
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 12,
                   color: Colors.grey,
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${preset.conceptCount} concepts',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: DomainColors(preset.id).accent1.withValues(alpha: 0.8),
+                  fontWeight: FontWeight.w500,
                 ),
                 textAlign: TextAlign.center,
               ),

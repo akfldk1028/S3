@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/api/api_client_provider.dart';
 import '../../core/models/job.dart';
 import '../workspace/theme.dart';
+import '../workspace/workspace_state.dart';
 
 /// Job progress screen with 3-second polling.
 ///
@@ -92,6 +93,20 @@ class _JobProgressScreenState extends ConsumerState<JobProgressScreen> {
           SnackBar(content: Text('Cancel failed: $e')),
         );
       }
+    }
+  }
+
+  String _domainMessage(String preset, String status) {
+    if (status == 'done') return '처리 완료';
+    if (status == 'failed') return '처리 실패 — 다시 시도해주세요';
+    if (status == 'canceled') return '취소됨';
+    switch (preset) {
+      case 'seller':
+        return 'SAM3가 상품을 분리하는 중...';
+      case 'interior':
+        return 'SAM3가 공간 요소를 분석하는 중...';
+      default:
+        return 'SAM3 처리 중...';
     }
   }
 
@@ -222,6 +237,12 @@ class _JobProgressScreenState extends ConsumerState<JobProgressScreen> {
                 'Job: ${job.jobId}',
                 style: const TextStyle(fontSize: 14, color: Colors.grey),
               ),
+              const SizedBox(height: 4),
+              // 도메인별 안내 메시지
+              Text(
+                _domainMessage(job.preset, status),
+                style: const TextStyle(fontSize: 13, color: Colors.grey),
+              ),
               const SizedBox(height: 32),
 
               // Progress bar
@@ -248,20 +269,46 @@ class _JobProgressScreenState extends ConsumerState<JobProgressScreen> {
               const SizedBox(height: 40),
 
               // Action buttons
-              if (isDone)
+              if (isDone) ...[
+                if (job.downloadUrls.isNotEmpty)
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      final jobResult = JobResult(
+                        id: job.jobId,
+                        items: job.downloadUrls
+                            .map((d) => JobResultItem(
+                                  idx: d.idx,
+                                  previewUrl: d.previewUrl ?? d.outputUrl ?? '',
+                                  resultUrl: d.outputUrl ?? d.previewUrl ?? '',
+                                ))
+                            .toList(),
+                      );
+                      context.push('/results', extra: jobResult);
+                    },
+                    icon: const Icon(Icons.photo_library),
+                    label: const Text('View Results'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 32,
+                        vertical: 16,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 12),
                 ElevatedButton.icon(
                   onPressed: () => context.go('/'),
                   icon: const Icon(Icons.home),
                   label: const Text('Back to Home'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 32,
                       vertical: 16,
                     ),
                   ),
                 ),
+              ],
 
               if (isFailed) ...[
                 ElevatedButton.icon(
