@@ -243,7 +243,7 @@ app.get('/:id', authMiddleware, async (c) => {
 
 app.post('/:id/callback', async (c) => {
   // GPU_CALLBACK_SECRET 검증 (NOT JWT)
-  const secret = c.req.header('X-Callback-Secret');
+  const secret = c.req.header('X-GPU-Callback-Secret');
   if (!secret || secret !== c.env.GPU_CALLBACK_SECRET) {
     return c.json(error(ERR.CALLBACK_UNAUTHORIZED, 'Invalid callback secret'), 401);
   }

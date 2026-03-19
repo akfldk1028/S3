@@ -112,7 +112,7 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
 
         await uploadDio.put(
           presignedUrl.url,
-          data: Stream.fromIterable([imageBytes]),
+          data: imageBytes,
           options: Options(
             headers: {
               'Content-Type': 'image/jpeg',

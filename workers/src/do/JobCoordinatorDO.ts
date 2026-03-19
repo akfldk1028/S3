@@ -410,8 +410,8 @@ export class JobCoordinatorDO extends DurableObject<Env> {
     try {
       await this.env.DB.prepare(
         `INSERT OR REPLACE INTO jobs_log
-           (job_id, user_id, status, preset, rule_id, concepts_json, protect_json, finished_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (job_id, user_id, status, preset, rule_id, concepts_json, protect_json, finished_at, progress_done, progress_failed, progress_total)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
         .bind(
           row.job_id,
@@ -422,6 +422,9 @@ export class JobCoordinatorDO extends DurableObject<Env> {
           row.concepts_json,
           row.protect_json,
           now,
+          row.done_items,
+          row.failed_items,
+          row.total_items,
         )
         .run();
 
