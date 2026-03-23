@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+        <filter id="f06glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="8" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="g06top" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#6C63FF"/>
+      <stop offset="100%" stop-color="#b667ce"/>
+    </linearGradient>
+    <linearGradient id="g06bl" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#a766d8"/>
+      <stop offset="100%" stop-color="#FF6B9D"/>
+    </linearGradient>
+    <linearGradient id="g06bc" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#b667ce" stop-opacity="0.7"/>
+      <stop offset="100%" stop-color="#FF6B9D"/>
+    </linearGradient>
+    <linearGradient id="g06br" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#c468c4"/>
+      <stop offset="100%" stop-color="#FF6B9D" stop-opacity="0.85"/>
+    </linearGradient>
+
+  </defs>
+    <rect width="1024" height="1024" rx="225.0" fill="#0F0F17"/>
+
+  <g filter="url(#f06glow)">
+    <!-- Top facet (큰 삼각형) -->
+    <polygon points="512,210 280,500 744,500"
+             fill="url(#g06top)" stroke="#FFFFFF" stroke-opacity="0.1" stroke-width="1"/>
+
+    <!-- Bottom left -->
+    <polygon points="280,500 420,540 512,810"
+             fill="url(#g06bl)" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1"/>
+
+    <!-- Bottom center -->
+    <polygon points="420,540 604,540 512,810"
+             fill="url(#g06bc)" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1"/>
+
+    <!-- Bottom right -->
+    <polygon points="604,540 744,500 512,810"
+             fill="url(#g06br)" stroke="#FFFFFF" stroke-opacity="0.08" stroke-width="1"/>
+
+    <!-- Center highlight band -->
+    <polygon points="280,500 420,540 604,540 744,500"
+             fill="#FFFFFF" opacity="0.06"/>
+  </g>
+
+</svg>

@@ -180,6 +180,16 @@ class SettingsScreen extends ConsumerWidget {
             const _PreferencesCard(),
             const SizedBox(height: 24),
 
+            // ── Dev Tools (임시) ──────────────────────────────────────────
+            const _SectionHeader(title: 'DEV TOOLS'),
+            const SizedBox(height: 12),
+            _DevToolTile(
+              icon: Icons.palette,
+              label: 'Logo 시안 프리뷰',
+              onTap: () => context.push('/logo-preview'),
+            ),
+            const SizedBox(height: 24),
+
             // ── Danger Zone ────────────────────────────────────────────────
             const _SectionHeader(title: 'SIGN OUT'),
             const SizedBox(height: 12),
@@ -679,6 +689,51 @@ class _LogoutTile extends ConsumerWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Dev tool tile — navigates to dev/debug screens (임시, 출시 전 제거).
+class _DevToolTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _DevToolTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: WsTheme.cardDecoration,
+        child: Row(
+          children: [
+            Icon(icon, color: WsColors.accent1, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: WsColors.textPrimary,
+                  fontSize: 15,
+                ),
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              color: WsColors.textSecondary,
+              size: 20,
+            ),
+          ],
         ),
       ),
     );

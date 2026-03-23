@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+        <linearGradient id="g02bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6C63FF"/>
+      <stop offset="100%" stop-color="#FF6B9D"/>
+    </linearGradient>
+
+  </defs>
+    <rect width="1024" height="1024" rx="225.0" fill="#0F0F17"/>
+
+  <!-- Gradient circle background -->
+  <circle cx="512" cy="512" r="310" fill="url(#g02bg)"/>
+
+  <!-- White S on gradient circle -->
+  <path d="M 600 380
+           C 620 310, 400 295, 420 375
+           C 440 455, 590 475, 610 560
+           C 630 650, 410 665, 430 590"
+        fill="none" stroke="#FFFFFF" stroke-width="52"
+        stroke-linecap="round"/>
+
+</svg>

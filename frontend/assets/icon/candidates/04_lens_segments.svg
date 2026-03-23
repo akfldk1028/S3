@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+        <filter id="f04glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="15"/>
+    </filter>
+    <linearGradient id="g04ring" gradientTransform="rotate(90)">
+      <stop offset="0%" stop-color="#6C63FF"/>
+      <stop offset="50%" stop-color="#FF6B9D"/>
+      <stop offset="100%" stop-color="#6C63FF"/>
+    </linearGradient>
+
+  </defs>
+    <rect width="1024" height="1024" rx="225.0" fill="#0F0F17"/>
+
+  <!-- Outer ring glow -->
+  <circle cx="512.0" cy="512.0" r="310" fill="none"
+          stroke="#6C63FF" stroke-width="15" opacity="0.1"
+          filter="url(#f04glow)"/>
+
+  <!-- Outer ring -->
+  <circle cx="512.0" cy="512.0" r="300" fill="none"
+          stroke="url(#g04ring)" stroke-width="10"/>
+
+  <!-- 4 color sectors -->
+  <g>    <path d="M 512.0 512.0 L 512.0 232.0
+             A 280.0 280.0 0 0 1 791.1 489.6 Z"
+          fill="#6C63FF" opacity="0.9"/>
+    <path d="M 512.0 512.0 L 792.0 512.0
+             A 280.0 280.0 0 0 1 534.4 791.1 Z"
+          fill="#FF6B9D" opacity="0.9"/>
+    <path d="M 512.0 512.0 L 512.0 792.0
+             A 280.0 280.0 0 0 1 232.9 534.4 Z"
+          fill="#D4AF37" opacity="0.9"/>
+    <path d="M 512.0 512.0 L 232.0 512.0
+             A 280.0 280.0 0 0 1 489.6 232.9 Z"
+          fill="#E8B4B8" opacity="0.9"/>
+</g>
+
+  <!-- Center lens core -->
+  <circle cx="512.0" cy="512.0" r="80" fill="#0F0F17"/>
+  <circle cx="512.0" cy="512.0" r="60" fill="none"
+          stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="1.5"/>
+
+  <!-- Lens reflection dot -->
+  <circle cx="480" cy="480" r="15" fill="#FFFFFF" opacity="0.25"/>
+
+</svg>
