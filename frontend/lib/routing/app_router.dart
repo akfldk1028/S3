@@ -10,6 +10,7 @@ import '../features/jobs/job_progress_screen.dart';
 import '../features/palette/palette_screen.dart';
 import '../features/rules/rules_screen.dart';
 import '../features/settings/settings_screen.dart';
+import '../features/logo_preview/logo_preview_screen.dart';
 import '../features/splash/splash_screen.dart';
 import '../features/results/results_screen.dart';
 import '../features/upload/upload_screen.dart';
@@ -131,6 +132,11 @@ GoRouter appRouter(Ref ref) {
       GoRoute(
         path: '/settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      // 임시: 로고 시안 프리뷰 (개발 완료 후 제거)
+      GoRoute(
+        path: '/logo-preview',
+        builder: (context, state) => const LogoPreviewScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

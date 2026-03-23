@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+        <radialGradient id="g07ambient" cx="50%" cy="50%">
+      <stop offset="0%" stop-color="#D4AF37" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#D4AF37" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="g07gold" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#F5D060"/>
+      <stop offset="40%" stop-color="#D4AF37"/>
+      <stop offset="70%" stop-color="#B8960C"/>
+      <stop offset="100%" stop-color="#E8B4B8"/>
+    </linearGradient>
+
+  </defs>
+    <rect width="1024" height="1024" rx="225.0" fill="#0A0A12"/>
+
+  <!-- Subtle radial ambient -->
+  <circle cx="512" cy="512" r="400" fill="url(#g07ambient)" opacity="0.3"/>
+
+  <!-- Gold S with emboss effect -->
+  <!-- Shadow layer -->
+  <path d="M 615 320
+           C 640 240, 385 225, 408 340
+           C 431 455, 600 475, 620 600
+           C 640 725, 390 740, 410 660"
+        fill="none" stroke="#1a1a00" stroke-width="58"
+        stroke-linecap="round" opacity="0.5"
+        transform="translate(3,4)"/>
+
+  <!-- Main gold S -->
+  <path d="M 615 320
+           C 640 240, 385 225, 408 340
+           C 431 455, 600 475, 620 600
+           C 640 725, 390 740, 410 660"
+        fill="none" stroke="url(#g07gold)" stroke-width="56"
+        stroke-linecap="round"/>
+
+  <!-- Highlight S (top reflection) -->
+  <path d="M 615 320
+           C 640 240, 385 225, 408 340
+           C 431 455, 600 475, 620 600
+           C 640 725, 390 740, 410 660"
+        fill="none" stroke="#FFFFFF" stroke-width="56"
+        stroke-linecap="round" opacity="0.08"
+        transform="translate(-1,-2)"/>
+
+</svg>

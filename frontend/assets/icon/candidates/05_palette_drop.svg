@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+        <linearGradient id="g05drop" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#6C63FF"/>
+      <stop offset="60%" stop-color="#FF6B9D"/>
+      <stop offset="100%" stop-color="#D4AF37"/>
+    </linearGradient>
+    <filter id="f05glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12"/>
+    </filter>
+
+  </defs>
+    <rect width="1024" height="1024" rx="225.0" fill="#0F0F17"/>
+
+  <!-- Main drop shape with gradient -->
+  <path d="M 512 220
+           C 512 220, 720 420, 720 570
+           A 208 208 0 1 1 304 570
+           C 304 420, 512 220, 512 220 Z"
+        fill="url(#g05drop)"/>
+
+  <!-- Inner cut-out circle (palette hole) -->
+  <circle cx="430" cy="600" r="55" fill="#0F0F17"/>
+
+  <!-- Highlight streak -->
+  <ellipse cx="480" cy="420" rx="40" ry="90"
+           fill="#FFFFFF" opacity="0.1"
+           transform="rotate(-15, 480, 420)"/>
+
+  <!-- Glow -->
+  <path d="M 512 220
+           C 512 220, 720 420, 720 570
+           A 208 208 0 1 1 304 570
+           C 304 420, 512 220, 512 220 Z"
+        fill="none" stroke="#FF6B9D" stroke-width="3" opacity="0.2"
+        filter="url(#f05glow)"/>
+
+</svg>

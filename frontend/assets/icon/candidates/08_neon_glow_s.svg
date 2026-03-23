@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+        <filter id="f08blur1" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="18"/>
+    </filter>
+    <filter id="f08blur2" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="35"/>
+    </filter>
+    <linearGradient id="g08neon" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="#7B68EE"/>
+      <stop offset="50%" stop-color="#FF6B9D"/>
+      <stop offset="100%" stop-color="#FF3CAC"/>
+    </linearGradient>
+
+  </defs>
+    <rect width="1024" height="1024" rx="225.0" fill="#08081A"/>
+
+  <!-- Multi-layer neon glow -->
+  <!-- Outer glow (wide, faint) -->
+  <path d="M 620 310
+           C 648 225, 370 210, 395 335
+           C 420 460, 600 485, 625 620
+           C 650 755, 370 770, 400 685"
+        fill="none" stroke="#FF6B9D" stroke-width="80"
+        stroke-linecap="round" opacity="0.08"
+        filter="url(#f08blur2)"/>
+
+  <!-- Mid glow -->
+  <path d="M 620 310
+           C 648 225, 370 210, 395 335
+           C 420 460, 600 485, 625 620
+           C 650 755, 370 770, 400 685"
+        fill="none" stroke="url(#g08neon)" stroke-width="56"
+        stroke-linecap="round" opacity="0.35"
+        filter="url(#f08blur1)"/>
+
+  <!-- Core neon line -->
+  <path d="M 620 310
+           C 648 225, 370 210, 395 335
+           C 420 460, 600 485, 625 620
+           C 650 755, 370 770, 400 685"
+        fill="none" stroke="url(#g08neon)" stroke-width="38"
+        stroke-linecap="round"/>
+
+  <!-- Bright center core -->
+  <path d="M 620 310
+           C 648 225, 370 210, 395 335
+           C 420 460, 600 485, 625 620
+           C 650 755, 370 770, 400 685"
+        fill="none" stroke="#FFFFFF" stroke-width="10"
+        stroke-linecap="round" opacity="0.5"/>
+
+</svg>
