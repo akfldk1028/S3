@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+        <filter id="f00glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+  </defs>
+    <rect width="1024" height="1024" rx="225.0" fill="#0F0F17"/>
+
+  <g filter="url(#f00glow)">
+    <!-- Top arc segment -->
+    <path d="M 620 280
+             A 140 140 0 0 0 380 260
+             A 140 140 0 0 0 420 380
+             L 480 350
+             A 80 80 0 0 1 400 310
+             A 80 80 0 0 1 580 300 Z"
+          fill="#6C63FF" opacity="0.95"/>
+
+    <!-- Upper-mid segment -->
+    <path d="M 420 380
+             A 120 120 0 0 0 460 420
+             L 530 380
+             A 60 60 0 0 1 480 350 Z"
+          fill="#9d66df" opacity="0.9"/>
+
+    <!-- Middle diagonal segment -->
+    <path d="M 460 420
+             C 500 480, 530 520, 560 580
+             L 620 550
+             C 590 490, 560 450, 530 380 Z"
+          fill="#b667ce" opacity="0.9"/>
+
+    <!-- Lower-mid segment -->
+    <path d="M 560 580
+             A 120 120 0 0 0 540 640
+             L 600 670
+             A 60 60 0 0 1 620 550 Z"
+          fill="#cd68be" opacity="0.9"/>
+
+    <!-- Bottom arc segment -->
+    <path d="M 540 640
+             A 140 140 0 0 0 640 740
+             A 140 140 0 0 0 400 760
+             L 420 690
+             A 80 80 0 0 1 610 700
+             A 80 80 0 0 1 600 670 Z"
+          fill="#FF6B9D" opacity="0.95"/>
+  </g>
+
+</svg>
