@@ -18,6 +18,7 @@ class ConceptChipsBar extends ConsumerWidget {
     final presetId = ref.watch(selectedPresetProvider);
     if (presetId == null) return const SizedBox.shrink();
 
+    final dc = DomainColors(presetId);
     final detailAsync = ref.watch(presetDetailProvider(presetId));
     final paletteState = ref.watch(paletteProvider);
 
@@ -48,14 +49,14 @@ class ConceptChipsBar extends ConsumerWidget {
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? WsColors.accent1
+                        ? dc.accent1
                         : Colors.black54,
                     borderRadius: BorderRadius.circular(20),
                     border: isSelected
                         ? null
                         : Border.all(
-                            color: WsColors.glassBorder,
-                            width: 0.5,
+                            color: dc.glassBorder,
+                            width: dc.isSeller ? 1.0 : 0.5,
                           ),
                   ),
                   child: Center(
@@ -66,6 +67,7 @@ class ConceptChipsBar extends ConsumerWidget {
                         fontSize: 13,
                         fontWeight:
                             isSelected ? FontWeight.w600 : FontWeight.w400,
+                        letterSpacing: dc.isSeller ? 1.0 : 0,
                       ),
                     ),
                   ),
@@ -75,7 +77,7 @@ class ConceptChipsBar extends ConsumerWidget {
           ),
         );
       },
-      loading: () => const SizedBox(
+      loading: () => SizedBox(
         height: 40,
         child: Center(
           child: SizedBox(
@@ -83,7 +85,7 @@ class ConceptChipsBar extends ConsumerWidget {
             height: 16,
             child: CircularProgressIndicator(
               strokeWidth: 1.5,
-              color: WsColors.accent1,
+              color: dc.accent1,
             ),
           ),
         ),

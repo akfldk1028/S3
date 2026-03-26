@@ -83,6 +83,58 @@ abstract class WsColors {
   );
 }
 
+/// Lady Dua Boudoir luxury palette for seller/shopping domain.
+///
+/// Gold + Rose Gold — 다크 배경 위 럭셔리 에디토리얼 느낌.
+abstract class SellerColors {
+  /// Rich gold — primary accent.
+  static const accent1 = Color(0xFFD4AF37);
+
+  /// Rose gold / blush — secondary accent.
+  static const accent2 = Color(0xFFE8B4B8);
+
+  /// Gold glass border (20% gold).
+  static const glassBorderGold = Color(0x33D4AF37);
+
+  /// Gold glass fill (10% gold).
+  static const glassGold = Color(0x1AD4AF37);
+
+  /// Gold → rose gold gradient.
+  static const gradientPrimary = LinearGradient(
+    colors: [accent1, accent2],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
+  /// Diagonal gold gradient.
+  static const LinearGradient gradientDiagonal = LinearGradient(
+    colors: [accent1, accent2],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
+}
+
+/// Resolves domain-specific accent colors based on preset ID.
+///
+/// Usage: `final dc = DomainColors(presetId);`
+/// - seller → gold/rose gold (SellerColors)
+/// - 그 외 → purple-blue/pink (WsColors)
+class DomainColors {
+  final String? presetId;
+  const DomainColors(this.presetId);
+
+  bool get isSeller => presetId == 'seller';
+
+  Color get accent1 => isSeller ? SellerColors.accent1 : WsColors.accent1;
+  Color get accent2 => isSeller ? SellerColors.accent2 : WsColors.accent2;
+  LinearGradient get gradientPrimary =>
+      isSeller ? SellerColors.gradientPrimary : WsColors.gradientPrimary;
+  LinearGradient get gradientDiagonal =>
+      isSeller ? SellerColors.gradientDiagonal : WsColors.gradientDiagonal;
+  Color get glassBorder =>
+      isSeller ? SellerColors.glassBorderGold : WsColors.glassBorder;
+}
+
 /// Design tokens for the workspace UI.
 abstract class WsTheme {
   /// Default corner radius for cards and containers.

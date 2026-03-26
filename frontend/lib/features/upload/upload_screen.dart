@@ -1,9 +1,11 @@
 import 'dart:typed_data';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/api/api_client_provider.dart';
+import '../workspace/workspace_provider.dart';
 
 /// Upload screen with image picker and R2 presigned upload.
 ///
@@ -38,6 +40,31 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   bool _isUploading = false;
   double _uploadProgress = 0.0;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadWorkspacePhotos();
+    });
+  }
+
+  /// Load photos from workspaceProvider if available (e.g., from CameraHome)
+  void _loadWorkspacePhotos() {
+    if (_selectedImages.isNotEmpty) return;
+    final wsImages = ref.read(workspaceProvider).selectedImages;
+    if (wsImages.isEmpty) return;
+
+    setState(() {
+      _selectedImages = wsImages
+          .map((img) => _SelectedImage(
+                file: img.file,
+                bytes: img.thumbnail, // 200px thumbnail for grid display
+                name: img.name,
+              ))
+          .toList();
+    });
+  }
 
   /// Select images using image picker
   Future<void> _selectImages() async {
@@ -99,13 +126,27 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
       });
 
       final jobId = result.jobId;
-      // result.presignedUrls available for real R2 upload (Phase 2)
+      final uploadDio = Dio(BaseOptions(
+        connectTimeout: const Duration(seconds: 30),
+        sendTimeout: const Duration(seconds: 60),
+      ));
 
-      // 2. Mock upload simulation (300ms delay per image)
-      // In Phase 2: Use Dio PUT to presigned URL with uploadUrls
+      // 2. Upload each image to R2 via presigned PUT URL
       for (int i = 0; i < _selectedImages.length; i++) {
-        // Simulate upload delay
-        await Future.delayed(const Duration(milliseconds: 300));
+        final presignedUrl = result.presignedUrls[i];
+        // Always read original bytes from file (not thumbnail bytes)
+        final imageBytes = await _selectedImages[i].file.readAsBytes();
+
+        await uploadDio.put(
+          presignedUrl.url,
+          data: Stream.fromIterable([imageBytes]),
+          options: Options(
+            headers: {
+              'Content-Type': 'image/jpeg',
+              'Content-Length': imageBytes.length,
+            },
+          ),
+        );
 
         setState(() {
           _uploadProgress = (i + 1) / _selectedImages.length;

@@ -1,5 +1,4 @@
-# Model cache (3.4GB - download at runtime)
-models/
+# Model files (sam3.pt is included, others excluded)
 *.pth
 *.bin
 *.safetensors
