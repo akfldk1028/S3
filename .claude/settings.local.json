@@ -145,7 +145,15 @@
       "Bash(echo:*)",
       "Bash(git -C \"C:/DK/S3\" status --short)",
       "Bash(flutter run:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(reg query HKCU\\\\Environment /v RELOC3R_CKPT)",
+      "Bash(reg query HKCU\\\\Environment /v TORCH_HOME)",
+      "Bash(reg query HKCU\\\\Environment /v WILD_RELPOSE)",
+      "Bash(powershell.exe -NoProfile -Command \":*)",
+      "Bash(powershell.exe -NoProfile -Command \"[Environment]::GetEnvironmentVariable\\(''PATH'', ''User''\\)\")",
+      "Bash(tr ';' '\\\\n')",
+      "Bash(# agent_test .env 파일 확인 cat /d/agent_test/agent.exe/.env)",
+      "Bash(winget search Python.Python.3.10)"
     ]
   }
 }

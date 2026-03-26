@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell.exe -NoProfile -Command \"& ''C:\\\\Python310\\\\python.exe'' --version 2>&1\")",
+      "Bash(/d/RL/venv/Scripts/pip.exe install torch torchvision --index-url https://download.pytorch.org/whl/cu126 --no-deps --force-reinstall)"
+    ]
+  }
+}
