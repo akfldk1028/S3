@@ -1,5 +1,40 @@
 # S3 MVP — TODO (Sequential Execution Plan)
+유저 요청 사항
 
+  1. DO 공식문서 — Durable Objects 관련 확인 필요한
+  게 뭔지 좀 더 구체적으로 알려줘. 현재
+  UserLimiterDO, JobCoordinatorDO 둘 다 SQLite DO로
+ sqlit  이거 결국 cf 연동아님 ? 이결국  durable objecgt 완료한거야?  이거             
+  앱베포할껀데 많은사람이해도 잘 돌아가는거맞지  
+  동작 중이고 이상 없음.
+  2. 실제 건축 이미지로 SAM3 테스트 — 지금 보낸
+  테스트 이미지는 단순 컬러 블록임. Worker 초기화
+  완료되면 실제 인테리어 이미지로 다시 테스트해야
+  함. 인터넷에서 인테리어 사진 다운받아서 올릴 수
+  있음.
+  3. R2 폴더 구조 — 현재 R2 키 규칙:
+  inputs/{userId}/{jobId}/{idx}.jpg
+  outputs/{userId}/{jobId}/{idx}_result.png
+  previews/{userId}/{jobId}/{idx}_thumb.jpg
+  3. 유저별 → Job별로 체계적으로 분리됨.
+  도메인(preset)별 분리는 현재 없음 — 필요하면 추가
+  가능.
+
+
+❯ 공식문서보고 DURABLE OBEJCT 하거 일단 예씨이미지  
+넣어서 건축이나 이런거 SAM3 돌아가는지 확인해야되   
+메모리도 업데이트래ㅑ하고                           
+
+● 테스트 이미지를 R2에 업로드합니다.
+
+● Bash(PRESIGNED_URL="https://s3-images.2c1b8299e2d8
+      cec3f82a016fa88368aa.r2.cloudflarestorage.com/
+      inputs/9c9e2e01-2542-4516-ae1e-1e045eaff8ee/45
+      7cc336-5fe0-483f-aae6-c…)
+  ⎿  HTTP 200
+
+❯ CF storage 유저별로 체계적으로 유저 도메인 별로  
+폴더구조로 저장되는지봐야하고 
 > 최종 목표: Workers + GPU + Frontend E2E 연결 → 프로덕션 배포
 > 작성일: 2026-02-14 | **최종 업데이트: 2026-02-19**
 > 상태: **Phase A~C 부분 완료, Phase D 진입 준비**

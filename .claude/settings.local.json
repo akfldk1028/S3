@@ -147,7 +147,17 @@
       "Bash(flutter run:*)",
       "Bash(ls:*)",
       "mcp__cloudflare-workers__accounts_list",
-      "mcp__cloudflare-workers__r2_buckets_list"
+      "mcp__cloudflare-workers__r2_buckets_list",
+      "Bash(git log:*)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_snapshot",
+      "mcp__playwright__browser_click",
+      "mcp__playwright__browser_evaluate",
+      "Bash(node:*)",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YzllMmUwMS0yNTQyLTQ1MTYtYWUxZS0xZTA0NWVhZmY4ZWUiLCJpYXQiOjE3NzQ2OTg4MzcsImV4cCI6MTc3NzI5MDgzN30.iNeTR0NJABZU7KC3-BTEr52UyCVbfmWv6Acxby6bdok\")",
+      "Bash(docker build:*)",
+      "Bash(docker push:*)",
+      "mcp__runpod__list-endpoints"
     ]
   }
 }
