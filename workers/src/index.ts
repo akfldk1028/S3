@@ -14,8 +14,7 @@
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
-import { logger } from 'hono/logger';
-import type { Env, AuthUser } from './_shared/types';
+import type { Env, AuthUser, GpuQueueMessage } from './_shared/types';
 import { authMiddleware } from './middleware/auth.middleware';
 import { ok, error } from './_shared/response';
 import { ERR } from './_shared/errors';
@@ -49,7 +48,16 @@ app.use('*', cors({
   allowHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
-app.use('*', logger());
+// GET polling 로그 제외 — POST/PUT/DELETE만 로깅
+app.use('*', async (c, next) => {
+  if (c.req.method !== 'GET') {
+    console.log(`[API] ${c.req.method} ${c.req.path}`);
+  }
+  await next();
+  if (c.req.method !== 'GET' || c.res.status >= 400) {
+    console.log(`[API] ${c.req.method} ${c.req.path} → ${c.res.status}`);
+  }
+});
 app.use('*', authMiddleware);
 
 // Health check (public, skipped by auth middleware)
@@ -78,8 +86,42 @@ app.onError((err, c) => {
 
 export default {
   fetch: app.fetch,
-  queue: async (batch: MessageBatch, env: Env) => {
-    // TODO: dead-letter or retry logic
+  queue: async (batch: MessageBatch<GpuQueueMessage>, env: Env) => {
+    // GPU Worker가 전체 파이프라인 처리 (segment → apply → R2 upload → callback)
+    // Queue consumer는 Runpod에 job 전달만 하고 즉시 ack
+    for (const msg of batch.messages) {
+      try {
+        const job = msg.body;
+        console.log(`[Queue] Job ${job.job_id} → Runpod 전송 (items: ${job.items.length})`);
+
+        // Runpod Serverless에 전체 job message 전달
+        // GPU Worker의 pipeline.py가 R2 다운 → segment → apply → R2 업로드 → callback POST 수행
+        const runRes = await fetch(
+          `https://api.runpod.ai/v2/${env.RUNPOD_ENDPOINT_ID}/run`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${env.RUNPOD_API_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ input: job }),
+          },
+        );
+
+        if (!runRes.ok) {
+          const errText = await runRes.text();
+          throw new Error(`Runpod ${runRes.status}: ${errText}`);
+        }
+
+        const { id: rpJobId } = await runRes.json() as { id: string };
+        console.log(`[Queue] Job ${job.job_id} → Runpod 전송 완료 (rpId: ${rpJobId})`);
+
+        msg.ack();
+      } catch (e) {
+        console.error(`[Queue] Job 전송 실패: ${e}`);
+        msg.retry();
+      }
+    }
   },
 };
 

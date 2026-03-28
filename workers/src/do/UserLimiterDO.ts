@@ -34,6 +34,14 @@ export class UserLimiterDO extends DurableObject<Env> {
           rule_slots  INTEGER NOT NULL DEFAULT 0
         )
       `);
+      // 기존 DO에 rule_slots 컬럼이 없을 수 있음 — 안전하게 추가
+      try {
+        this.ctx.storage.sql.exec(
+          `ALTER TABLE user_state ADD COLUMN rule_slots INTEGER NOT NULL DEFAULT 0`,
+        );
+      } catch {
+        // 이미 존재하면 무시
+      }
       this.ctx.storage.sql.exec(`
         CREATE TABLE IF NOT EXISTS reserved_jobs (
           job_id      TEXT PRIMARY KEY,

@@ -28,7 +28,7 @@ app.get('/', authMiddleware, async (c) => {
   const user = c.get('user');
 
   const { results } = await c.env.DB.prepare(
-    `SELECT job_id, status, preset, created_at, progress_done, progress_failed, progress_total
+    `SELECT job_id, status, preset, created_at, finished_at, cost_estimate, error
      FROM jobs_log
      WHERE user_id = ?
      ORDER BY created_at DESC
@@ -40,11 +40,9 @@ app.get('/', authMiddleware, async (c) => {
     status: row.status,
     preset: row.preset,
     created_at: row.created_at,
-    progress: {
-      done: row.progress_done ?? 0,
-      failed: row.progress_failed ?? 0,
-      total: row.progress_total ?? 0,
-    },
+    finished_at: row.finished_at,
+    cost_estimate: row.cost_estimate ?? 0,
+    error: row.error,
   }));
 
   return c.json(ok(jobs));

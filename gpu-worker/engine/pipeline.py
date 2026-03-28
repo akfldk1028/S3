@@ -240,11 +240,11 @@ def process_job(job_message: dict) -> dict:
                 r2_client.upload(preview_key, preview_bytes, content_type="image/jpeg")
                 logger.info(f"  → Uploaded preview: {preview_key}")
 
-            # Callback success
+            # Callback success — use "done" to match Workers FSM
             success = report(
                 callback_url=callback_url,
                 idx=idx,
-                status="completed",
+                status="done",
                 output_key=output_key,
                 preview_key=preview_key if preview_key else None,
             )

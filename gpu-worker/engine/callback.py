@@ -51,17 +51,21 @@ def report(
         job_id = _extract_job_id(callback_url)
         idempotency_key = _generate_idempotency_key(job_id, idx, attempt=1)
 
-    # Prepare headers
+    # Prepare headers — Workers checks X-Callback-Secret
     headers = {
-        "X-GPU-Callback-Secret": gpu_callback_secret,
-        "X-Idempotency-Key": idempotency_key,
+        "X-Callback-Secret": gpu_callback_secret,
         "Content-Type": "application/json",
     }
 
-    # Prepare payload
+    # Map internal status to Workers-expected status
+    status_map = {"completed": "done", "done": "done", "failed": "failed"}
+    mapped_status = status_map.get(status, status)
+
+    # Prepare payload — idempotency_key in body (Workers parses from body)
     payload = {
         "idx": idx,
-        "status": status,
+        "status": mapped_status,
+        "idempotency_key": idempotency_key,
     }
 
     # Add optional fields if provided
