@@ -12,8 +12,8 @@ export const CreateJobSchema = z.object({
 export const ExecuteJobSchema = z.object({
   concepts: z.record(
     z.object({
-      action: z.string(),
-      value: z.string(),
+      action: z.enum(['recolor', 'generate']),
+      value: z.string().min(1),
     }),
   ),
   protect: z.array(z.string()).optional().default([]),

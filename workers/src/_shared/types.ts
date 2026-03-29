@@ -82,7 +82,7 @@ export type GpuQueueMessage = {
   job_id: string;
   user_id: string;
   preset: string;
-  concepts: Record<string, { action: string; value: string }>;
+  concepts: Record<string, { action: 'recolor' | 'generate'; value: string }>;
   protect: string[];
   items: Array<{
     idx: number;
