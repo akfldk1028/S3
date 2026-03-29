@@ -1,0 +1,11 @@
+# Production image — 기존 :latest (CUDA+SAM3+모델) 위에 handler/engine 코드 교체
+FROM jonghwan0309/sam3-worker:latest
+
+WORKDIR /app
+
+# 현재 코드로 handler + engine 교체
+COPY handler.py /app/handler.py
+COPY engine/ /app/engine/
+
+# Runpod 공식 패턴
+CMD ["python3", "-u", "handler.py"]
