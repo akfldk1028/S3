@@ -1012,10 +1012,8 @@ class _AddConceptActionDialogState extends State<_AddConceptActionDialog> {
                 border: OutlineInputBorder(),
               ),
               items: const [
-                DropdownMenuItem(value: 'recolor', child: Text('Recolor')),
-                DropdownMenuItem(value: 'tone', child: Text('Tone')),
-                DropdownMenuItem(value: 'texture', child: Text('Texture')),
-                DropdownMenuItem(value: 'remove', child: Text('Remove')),
+                DropdownMenuItem(value: 'recolor', child: Text('색상 변경')),
+                DropdownMenuItem(value: 'generate', child: Text('AI 생성 (질감/패턴)')),
               ],
               onChanged: (value) {
                 setState(() {
@@ -1025,16 +1023,36 @@ class _AddConceptActionDialogState extends State<_AddConceptActionDialog> {
             ),
             const SizedBox(height: 16),
 
-            // Value field (for recolor, tone, texture)
-            if (_selectedAction != 'remove')
-              TextFormField(
-                controller: _valueController,
-                decoration: const InputDecoration(
-                  labelText: 'Value (e.g., oak_a, warm)',
-                  border: OutlineInputBorder(),
-                  hintText: 'Optional',
-                ),
+            // Value field
+            TextFormField(
+              controller: _valueController,
+              decoration: InputDecoration(
+                labelText: _selectedAction == 'generate'
+                    ? '프롬프트 (예: 화이트 대리석 질감)'
+                    : '색상 코드 (예: #FF5733)',
+                border: const OutlineInputBorder(),
+                hintText: _selectedAction == 'generate'
+                    ? '원하는 질감을 설명하세요'
+                    : '#RRGGBB',
               ),
+            ),
+
+            // 추천 프롬프트 칩 (generate일 때만)
+            if (_selectedAction == 'generate') ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: ['화이트 대리석', '원목 헤링본', '콘크리트', '벽돌 패턴', '타일']
+                    .map((p) => ActionChip(
+                          label: Text(p, style: const TextStyle(fontSize: 12)),
+                          onPressed: () {
+                            _valueController.text = p;
+                          },
+                        ))
+                    .toList(),
+              ),
+            ],
           ],
         ),
       ),
