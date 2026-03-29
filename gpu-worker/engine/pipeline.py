@@ -24,6 +24,7 @@ from .segmenter import SAM3Segmenter
 from .applier import apply_rules
 from .r2_io import R2Client
 from .callback import report
+from presets import get_prompt
 
 
 # Configure logging
@@ -87,6 +88,7 @@ def process_job(job_message: dict, segmenter=None) -> dict:
     """
     job_id = job_message.get("job_id", "unknown")
     user_id = job_message.get("user_id", "unknown")
+    preset = job_message.get("preset", "")
     concepts = job_message.get("concepts", {})
     protect = job_message.get("protect", [])
     items = job_message.get("items", [])
@@ -155,8 +157,9 @@ def process_job(job_message: dict, segmenter=None) -> dict:
     # Segment concepts that have rules
     for concept_name in concepts.keys():
         try:
-            logger.info(f"Segmenting concept: {concept_name}")
-            masks, metadata = segmenter.segment(first_image, concept_name)
+            prompt = get_prompt(preset, concept_name)
+            logger.info(f"Segmenting concept: {concept_name} → prompt: '{prompt}'")
+            masks, metadata = segmenter.segment(first_image, prompt)
             all_masks[concept_name] = masks
             all_metadata[concept_name] = metadata
             logger.info(f"  → Found {metadata['instance_count']} instances")
@@ -175,8 +178,9 @@ def process_job(job_message: dict, segmenter=None) -> dict:
         protect_masks_list = []
         for protect_concept in protect:
             try:
-                logger.info(f"Segmenting protect concept: {protect_concept}")
-                masks, metadata = segmenter.segment(first_image, protect_concept)
+                protect_prompt = get_prompt(preset, protect_concept)
+                logger.info(f"Segmenting protect concept: {protect_concept} → prompt: '{protect_prompt}'")
+                masks, metadata = segmenter.segment(first_image, protect_prompt)
                 if len(masks) > 0:
                     # Combine all instances of this protect concept
                     import numpy as np
