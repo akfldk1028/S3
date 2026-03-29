@@ -23,6 +23,7 @@ from PIL import Image
 
 from .segmenter import SAM3Segmenter
 from .applier import apply_rules
+from .generator import generate_inpaint
 from .r2_io import R2Client
 from .callback import report
 from presets import get_prompt
@@ -225,8 +226,41 @@ def process_job(job_message: dict, segmenter=None) -> dict:
             image_bytes = r2_client.download(input_key)
             image = Image.open(io.BytesIO(image_bytes))
 
-            # Apply rules using cached masks
-            result_image = apply_rules(image, all_masks, concepts, protect_mask)
+            # action별 분기
+            result_image = image.copy()
+            gemini_key = os.getenv("GEMINI_API_KEY", "")
+
+            # recolor concepts
+            recolor_concepts = {k: v for k, v in concepts.items() if v.get("action") == "recolor"}
+            # generate concepts
+            generate_concepts = {k: v for k, v in concepts.items() if v.get("action") == "generate"}
+
+            # 1. recolor 일괄 적용
+            if recolor_concepts:
+                result_image = apply_rules(result_image, all_masks, recolor_concepts, protect_mask)
+
+            # 2. generate 순차 적용 (Gemini API)
+            if generate_concepts and gemini_key:
+                for concept_name, rule in generate_concepts.items():
+                    if concept_name not in all_masks or not all_masks[concept_name]:
+                        continue
+                    concept_masks = all_masks[concept_name]
+                    if isinstance(concept_masks, list) and len(concept_masks) > 0:
+                        combined = np.maximum.reduce(concept_masks) if len(concept_masks) > 1 else concept_masks[0]
+                    elif isinstance(concept_masks, np.ndarray):
+                        combined = concept_masks
+                    else:
+                        continue
+                    if protect_mask is not None:
+                        combined = combined * (1 - protect_mask.astype(np.float32))
+                    try:
+                        result_image = generate_inpaint(
+                            result_image, combined, rule["value"], gemini_key
+                        )
+                    except Exception as e:
+                        logger.warning(f"Gemini inpaint failed for {concept_name}: {e}")
+            elif generate_concepts and not gemini_key:
+                logger.warning("GEMINI_API_KEY not set — skipping generate actions")
 
             # Upload output image
             output_buffer = io.BytesIO()
