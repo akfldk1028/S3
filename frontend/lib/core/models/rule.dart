@@ -59,8 +59,8 @@ abstract class Rule with _$Rule {
 @freezed
 abstract class ConceptAction with _$ConceptAction {
   const factory ConceptAction({
-    required String action,  // 'recolor' | 'tone' | 'texture' | 'remove'
-    String? value,           // Optional value for action (e.g., 'oak_a', 'offwhite_b')
+    required String action,  // 'recolor' | 'generate'
+    String? value,           // recolor: '#FF5733', generate: '화이트 대리석 질감'
   }) = _ConceptAction;
 
   factory ConceptAction.fromJson(Map<String, dynamic> json) => _$ConceptActionFromJson(json);

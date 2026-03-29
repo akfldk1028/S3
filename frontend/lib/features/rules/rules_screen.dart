@@ -87,7 +87,7 @@ class _RulesScreenState extends ConsumerState<RulesScreen> {
       final preset = await apiClient.getPresetById(widget.presetId!);
       final defaultConcepts = <String, dynamic>{};
       for (final concept in preset.concepts ?? <String>[]) {
-        defaultConcepts[concept] = {'action': 'recolor', 'value': ''};
+        defaultConcepts[concept] = {'action': 'recolor', 'value': '#CCCCCC'};
       }
 
       await apiClient.executeJob(

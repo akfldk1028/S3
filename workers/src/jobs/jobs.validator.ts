@@ -13,7 +13,7 @@ export const ExecuteJobSchema = z.object({
   concepts: z.record(
     z.object({
       action: z.enum(['recolor', 'generate']),
-      value: z.string().min(1),
+      value: z.string().min(1).max(500),
     }),
   ),
   protect: z.array(z.string()).optional().default([]),
