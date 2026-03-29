@@ -157,7 +157,9 @@
       "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI5YzllMmUwMS0yNTQyLTQ1MTYtYWUxZS0xZTA0NWVhZmY4ZWUiLCJpYXQiOjE3NzQ2OTg4MzcsImV4cCI6MTc3NzI5MDgzN30.iNeTR0NJABZU7KC3-BTEr52UyCVbfmWv6Acxby6bdok\")",
       "Bash(docker build:*)",
       "Bash(docker push:*)",
-      "mcp__runpod__list-endpoints"
+      "mcp__runpod__list-endpoints",
+      "mcp__runpod__create-endpoint",
+      "Bash(npx wrangler:*)"
     ]
   }
 }
