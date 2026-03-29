@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_BATCH_CONCURRENCY = int(os.getenv("BATCH_CONCURRENCY", "4"))
 
 
-def process_job(job_message: dict) -> dict:
+def process_job(job_message: dict, segmenter=None) -> dict:
     """
     Process a single GPU job with 2-stage pipeline.
 
@@ -132,19 +132,21 @@ def process_job(job_message: dict) -> dict:
             result_summary["failed_items"] += 1
         return result_summary
 
-    # Initialize SAM3 segmenter
-    try:
-        segmenter = SAM3Segmenter()
-        logger.info("SAM3 segmenter initialized successfully")
-    except Exception as e:
-        error_msg = f"Failed to initialize SAM3 segmenter: {str(e)}"
-        logger.error(error_msg)
-        result_summary["errors"].append(error_msg)
-        # If segmenter fails, fail all items
-        for item in items:
-            _callback_failure(callback_url, item["idx"], error_msg)
-            result_summary["failed_items"] += 1
-        return result_summary
+    # SAM3 segmenter — 외부에서 주입받거나 새로 생성
+    if segmenter is None:
+        try:
+            segmenter = SAM3Segmenter()
+            logger.info("SAM3 segmenter initialized (fallback)")
+        except Exception as e:
+            error_msg = f"Failed to initialize SAM3 segmenter: {str(e)}"
+            logger.error(error_msg)
+            result_summary["errors"].append(error_msg)
+            for item in items:
+                _callback_failure(callback_url, item["idx"], error_msg)
+                result_summary["failed_items"] += 1
+            return result_summary
+    else:
+        logger.info("SAM3 segmenter reused (preloaded)")
 
     # Segment all concepts
     all_masks = {}
