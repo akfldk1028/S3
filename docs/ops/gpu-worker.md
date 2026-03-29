@@ -8,42 +8,59 @@
 
 ---
 
-## GPU 켜기 (테스트 시작)
+## 성능 (2026-03-29 실측)
 
-### 1. Runpod Endpoint 생성
+| 시나리오 | 시간 | 설명 |
+|---------|------|------|
+| Cold start (첫 요청) | ~3분 | 이미지 pull + SAM3 모델 GPU 로딩 |
+| **Warm (모델 로드 후)** | **~16초** | R2↓ + SAM3 segment + recolor + R2↑ + callback |
+| 프로덕션 (workersMin=1) | **~16초** | cold start 없음 |
+
+---
+
+## GPU 켜기 (전체 명령어)
+
+### Step 1: Runpod Endpoint 생성
 ```
-MCP: mcp__runpod__create-endpoint
+MCP 도구: mcp__runpod__create-endpoint
+
+파라미터:
   name: "s3-gpu"
-  templateId: "k9jc9psfs6"
+  templateId: "z56tvnfupt"
   dataCenterIds: ["EU-CZ-1"]
   gpuTypeIds: ["NVIDIA GeForce RTX 3090", "NVIDIA RTX A4000", "NVIDIA GeForce RTX 4090", "NVIDIA RTX A6000"]
   workersMin: 0
   workersMax: 1
 ```
 
-### 2. Workers에 새 endpoint ID 등록
+### Step 2: Workers에 새 endpoint ID 등록 + 배포
 ```bash
 cd workers
 echo "<새_ENDPOINT_ID>" | npx wrangler secret put RUNPOD_ENDPOINT_ID
 npx wrangler deploy
 ```
 
-### 3. 테스트 (첫 요청에 cold start ~50초, 이후 즉시)
+### Step 3: 테스트 (첫 요청 cold start ~3분, 이후 ~16초)
+```bash
+# Health check
+curl -s https://s3-workers.clickaround8.workers.dev/health
+
+# 전체 E2E 테스트는 docs/ops/e2e-test.md 참조
+```
 
 ---
 
-## GPU 끄기 (테스트 종료)
+## GPU 끄기 (반드시 실행!)
 
-### 반드시 실행:
 ```
-MCP: mcp__runpod__delete-endpoint
-  endpointId: "<ENDPOINT_ID>"
+MCP 도구: mcp__runpod__delete-endpoint
+파라미터: endpointId: "<ENDPOINT_ID>"
 ```
 
-### 확인:
+확인:
 ```
-MCP: mcp__runpod__list-endpoints
-→ 빈 배열 [] 이면 OK
+MCP 도구: mcp__runpod__list-endpoints
+→ 빈 배열 [] 이면 OK (과금 $0)
 ```
 
 ---
@@ -52,12 +69,12 @@ MCP: mcp__runpod__list-endpoints
 
 | 항목 | 값 |
 |------|-----|
-| Template ID | `k9jc9psfs6` |
-| Docker Image | `jonghwan0309/sam3-worker:test` |
+| Template ID | `z56tvnfupt` (containerDisk=30GB) |
+| Docker Image | `jonghwan0309/sam3-worker:v2` |
 | DataCenter | EU-CZ-1 (SECURE 클라우드) |
-| GPU 비용 | RTX 3090: $0.46/hr, RTX 4090: $0.59/hr |
+| Docker Hub 계정 | jonghwan0309 |
 
-## Template 환경변수 (이미 설정됨)
+## Template 환경변수 (이미 설정됨 — 건드리지 말 것)
 
 | 변수 | 설명 |
 |------|------|
@@ -65,24 +82,44 @@ MCP: mcp__runpod__list-endpoints
 | R2_ACCESS_KEY_ID | R2 접근 키 |
 | R2_SECRET_ACCESS_KEY | R2 시크릿 |
 | R2_BUCKET_NAME | s3-images |
-| GPU_CALLBACK_SECRET | Workers callback 인증 시크릿 |
+| GPU_CALLBACK_SECRET | Workers callback 인증 |
 | WORKERS_API_URL | https://s3-workers.clickaround8.workers.dev |
+
+## Docker 이미지
+
+| 태그 | 용도 | 상태 |
+|------|------|------|
+| `v2` | **프로덕션** — SAM3 + 현재 handler | ✅ E2E 성공 |
+| `test` | 파이프라인만 검증 (SAM3 없음) | ✅ 동작 |
+| `latest` | ❌ 구 handler — **사용 금지** | ❌ |
+
+## Docker 이미지 빌드 (코드 수정 시)
+
+```bash
+cd gpu-worker
+
+# 프로덕션 (v2 기반, handler/engine만 교체)
+docker build -f Dockerfile.prod -t jonghwan0309/sam3-worker:v2 .
+docker push jonghwan0309/sam3-worker:v2
+
+# 테스트 (SAM3 없음, 빠른 빌드)
+docker build -f Dockerfile.test -t jonghwan0309/sam3-worker:test .
+docker push jonghwan0309/sam3-worker:test
+
+# Docker Hub 로그인 필요 시 (.env에서 DOCKER_HUB_PAT 확인)
+echo "<DOCKER_HUB_PAT>" | docker login -u jonghwan0309 --password-stdin
+```
 
 ## Dockerfile 주의사항
 
-Runpod serverless에서 handler가 동작하려면:
+Runpod serverless 공식 패턴:
 ```dockerfile
-FROM python:3.11-slim
-WORKDIR /                    # 반드시 / (NOT /app)
-COPY handler.py /handler.py  # 절대경로
-CMD ["python3", "-u", "/handler.py"]  # python3 (NOT python)
+WORKDIR /app              # 또는 /
+CMD ["python3", "-u", "handler.py"]   # python이 아닌 python3
 ```
 
-- `WORKDIR /app` 사용하면 crash loop 발생
-- `python` 대신 `python3` 사용
+## SAM3 세그멘테이션 결과 (실측)
 
-## 현재 상태
-
-- **test 이미지**: 더미 처리 (SAM3 없음). 파이프라인 검증용. E2E 성공 확인됨.
-- **latest 이미지**: CUDA + SAM3 + 모델 가중치. 10.8GB. Dockerfile 패턴 수정 필요.
-- **SAM3 통합 남음**: 가중치 다운로드 → Dockerfile 수정 → 빌드/push
+- **Wall recolor 파란색** → 벽 영역 정확히 인식 + 변환 ✅
+- **Floor recolor** → 러그로 덮인 바닥은 인식 안 됨 (노출된 바닥만 인식)
+- 개념(concept) 이름이 정확해야 SAM3가 잘 잡음
