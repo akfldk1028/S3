@@ -4,6 +4,9 @@ FROM jonghwan0309/sam3-worker:latest
 
 WORKDIR /app
 
+# Gemini API 의존성 추가
+RUN pip install --no-cache-dir google-genai>=1.0.0
+
 # 현재 코드로 handler + engine + presets 교체
 COPY handler.py /app/handler.py
 COPY engine/ /app/engine/
