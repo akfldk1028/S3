@@ -1,11 +1,12 @@
-# Production image — 기존 :latest (CUDA+SAM3+모델) 위에 handler/engine 코드 교체
+# Production image — base layer(CUDA+SAM3+모델) 위에 handler/engine/presets 코드 교체
+# ⚠️ :latest는 base layer 전용. 직접 실행하면 구 handler가 동작하므로 사용 금지.
 FROM jonghwan0309/sam3-worker:latest
 
 WORKDIR /app
 
-# 현재 코드로 handler + engine 교체
+# 현재 코드로 handler + engine + presets 교체
 COPY handler.py /app/handler.py
 COPY engine/ /app/engine/
+COPY presets/ /app/presets/
 
-# Runpod 공식 패턴
 CMD ["python3", "-u", "handler.py"]

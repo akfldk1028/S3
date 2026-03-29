@@ -112,11 +112,14 @@ echo "<DOCKER_HUB_PAT>" | docker login -u jonghwan0309 --password-stdin
 
 ## Dockerfile 주의사항
 
-Runpod serverless 공식 패턴:
+Runpod serverless 패턴:
 ```dockerfile
-WORKDIR /app              # 또는 /
+WORKDIR /app              # 프로덕션 (base :latest가 /app 구조)
+WORKDIR /                 # 테스트 (python:3.11-slim 기반)
 CMD ["python3", "-u", "handler.py"]   # python이 아닌 python3
 ```
+- 프로덕션(Dockerfile.prod): WORKDIR /app (base 이미지와 동일)
+- 테스트(Dockerfile.test): WORKDIR / (경량 이미지)
 
 ## SAM3 세그멘테이션 결과 (실측)
 

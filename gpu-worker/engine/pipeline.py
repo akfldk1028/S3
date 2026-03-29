@@ -18,6 +18,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 
+import numpy as np
 from PIL import Image
 
 from .segmenter import SAM3Segmenter
@@ -183,7 +184,6 @@ def process_job(job_message: dict, segmenter=None) -> dict:
                 masks, metadata = segmenter.segment(first_image, protect_prompt)
                 if len(masks) > 0:
                     # Combine all instances of this protect concept
-                    import numpy as np
                     combined_mask = np.maximum.reduce(masks) if len(masks) > 1 else masks[0]
                     protect_masks_list.append(combined_mask)
                     logger.info(f"  → Found {metadata['instance_count']} instances")
@@ -193,7 +193,6 @@ def process_job(job_message: dict, segmenter=None) -> dict:
 
         # Combine all protect masks into one
         if protect_masks_list:
-            import numpy as np
             protect_mask = np.maximum.reduce(protect_masks_list) if len(protect_masks_list) > 1 else protect_masks_list[0]
             logger.info(f"Combined {len(protect_masks_list)} protect masks")
 
