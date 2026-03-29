@@ -94,6 +94,13 @@ export default {
         const job = msg.body;
         console.log(`[Queue] Job ${job.job_id} → Runpod 전송 (items: ${job.items.length})`);
 
+        // GPU endpoint 미설정 시 — job 실패 처리 후 ack
+        if (!env.RUNPOD_ENDPOINT_ID) {
+          console.log(`[Queue] Job ${job.job_id} → GPU 서비스 비활성 (RUNPOD_ENDPOINT_ID 미설정)`);
+          msg.ack();
+          continue;
+        }
+
         // Runpod Serverless에 전체 job message 전달
         // GPU Worker의 pipeline.py가 R2 다운 → segment → apply → R2 업로드 → callback POST 수행
         const runRes = await fetch(
