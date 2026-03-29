@@ -1,0 +1,5 @@
+FROM python:3.11-slim
+WORKDIR /
+RUN pip install --no-cache-dir runpod
+COPY handler_minimal.py /handler.py
+CMD ["python3", "-u", "/handler.py"]

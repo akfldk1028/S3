@@ -7,6 +7,22 @@
 
 ---
 
+## ⚠️ 운영 가이드 (모든 AI 에이전트 필독)
+
+> **`docs/ops/` 폴더를 반드시 읽을 것** — GPU 비용, 배포, 테스트 방법 포함
+
+| 문서 | 내용 |
+|------|------|
+| `docs/ops/gpu-worker.md` | **GPU on/off 방법 + 비용 주의** |
+| `docs/ops/workers-deploy.md` | Workers 배포 + secrets |
+| `docs/ops/e2e-test.md` | E2E 테스트 curl 명령어 |
+| `docs/ops/cost-warning.md` | Runpod 비용 경고 |
+| `docs/ops/architecture.md` | 전체 아키텍처 + API |
+
+**핵심 규칙**: Runpod endpoint 살아있으면 **~$11/일 과금**. 테스트 후 반드시 `delete-endpoint`.
+
+---
+
 ## 제품 5단 파이프라인 (모든 도메인 동일)
 
 ```
