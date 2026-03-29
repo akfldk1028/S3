@@ -10,10 +10,12 @@ export async function generateUploadUrls(
   userId: string,
   jobId: string,
   itemCount: number,
+  preset: string,
 ): Promise<Array<{ idx: number; url: string; key: string }>> {
   const urls = [];
+  const baseKey = `${userId}/${preset}/${jobId}`;
   for (let idx = 0; idx < itemCount; idx++) {
-    const key = `inputs/${userId}/${jobId}/${idx}.jpg`;
+    const key = `${baseKey}/originals/${idx}.jpg`;
     const url = await generatePresignedUrl(env, env.R2_BUCKET_NAME, key, 'PUT', 3600);
     urls.push({ idx, url, key });
   }

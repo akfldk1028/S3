@@ -93,7 +93,7 @@ app.post('/', authMiddleware, async (c) => {
     await coordStub.create(jobId, user.userId, preset, item_count);
 
     // Generate presigned upload URLs
-    const presigned_urls = await generateUploadUrls(c.env, user.userId, jobId, item_count);
+    const presigned_urls = await generateUploadUrls(c.env, user.userId, jobId, item_count, preset);
 
     return c.json(ok({ job_id: jobId, presigned_urls }), 201);
   } catch (e) {
@@ -157,13 +157,14 @@ app.post('/:id/execute', authMiddleware, async (c) => {
     }
 
     // Build items array for GPU queue message
+    const baseKey = `${user.userId}/${status.state.preset}/${jobId}`;
     const items = [];
     for (let idx = 0; idx < status.state.totalItems; idx++) {
       items.push({
         idx,
-        input_key: `inputs/${user.userId}/${jobId}/${idx}.jpg`,
-        output_key: `outputs/${user.userId}/${jobId}/${idx}_result.png`,
-        preview_key: `previews/${user.userId}/${jobId}/${idx}_thumb.jpg`,
+        input_key: `${baseKey}/originals/${idx}.jpg`,
+        output_key: `${baseKey}/results/${idx}_result.png`,
+        preview_key: `${baseKey}/previews/${idx}_thumb.jpg`,
       });
     }
 
